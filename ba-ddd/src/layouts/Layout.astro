@@ -1,0 +1,32 @@
+---
+import '../styles/global.css';
+
+interface Props {
+	title: string;
+	description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="generator" content={Astro.generator} />
+		{description && <meta name="description" content={description} />}
+		<title>{title}</title>
+	</head>
+	<body class="bg-white text-ink antialiased dark:bg-night dark:text-slate-100">
+		<a
+			href="#main"
+			class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-brand focus:px-4 focus:py-2 focus:text-white"
+		>
+			Skip to content
+		</a>
+		<slot />
+	</body>
+</html>
