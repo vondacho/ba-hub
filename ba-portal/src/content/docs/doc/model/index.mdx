@@ -1,0 +1,66 @@
+---
+title: The domain model
+description: What holds inside a boundary — entities, value objects, aggregates, invariants and events, explained as business concepts rather than class stereotypes.
+---
+
+Once a [boundary](/doc/strategic/bounded-contexts/) is drawn, the question
+becomes what is inside it. This section covers the tactical vocabulary — and
+covers it as business concepts, because that is where the analyst's leverage is.
+
+## Why an analyst should care about aggregates
+
+The usual division of labour puts this section in the architect's column. That
+division is why so many systems fit their business badly.
+
+An aggregate is not a class-design decision. It is the answer to a **business
+question**: what must never be false, even for a moment? Nobody in the
+architecture team knows whether a policy may briefly exist without a premium, or
+whether a claim reserve may go negative between two updates. The business knows.
+The only thing that has ever stopped that knowledge reaching the model is that
+nobody framed the question in a way a domain expert could answer.
+
+An analyst who can ask "is this rule allowed to be false for a second?" changes
+the design of the system. One who delivers a field list does not.
+
+## The vocabulary, briefly
+
+| Term | The business question behind it |
+|---|---|
+| [Entity](/doc/model/entities-and-values/) | Does this thing have an identity that survives its attributes changing? |
+| [Value object](/doc/model/entities-and-values/) | Is this thing entirely defined by what it is, so two of them are interchangeable? |
+| [Aggregate](/doc/model/aggregates/) | Which things must be consistent together, always? |
+| Invariant | Which sentence about them may never be false? |
+| [Domain event](/doc/model/domain-events/) | What happened, that the business would name? |
+| [Domain service](/doc/model/services-and-policies/) | Which operation belongs to no single thing? |
+| [Policy](/doc/model/services-and-policies/) | When this happens, what must follow? |
+
+Each page below takes one of those questions and shows how to get it answered by
+somebody who has never heard the term.
+
+## Depth is a choice, not a default
+
+Not every context deserves this. The
+[classification](/doc/strategic/subdomain-types/) decides:
+
+- **Core** — full model. Aggregates, invariants, events, and a language that
+  keeps up with them.
+- **Supporting** — enough structure to be correct. Naming the entities and the
+  handful of rules that matter is usually the right stopping point.
+- **Generic** — none. In the [catalog](/catalog), generic contexts show no
+  aggregates at all, which is a decision rather than a gap.
+
+Modelling a generic context deeply is a way of spending core-domain effort on
+something a vendor already solved.
+
+## In this section
+
+- **[Entities and value objects](/doc/model/entities-and-values/)** — identity
+  versus value, and the question that separates them.
+- **[Aggregates and invariants](/doc/model/aggregates/)** — a rule with a
+  boundary drawn around it.
+- **[Domain events](/doc/model/domain-events/)** — the business's own record of
+  what happened.
+- **[Services, policies and rules](/doc/model/services-and-policies/)** — where
+  behaviour goes when it belongs to no single thing.
+- **[Modelling with the analyst](/doc/model/modelling-together/)** — how this
+  work actually gets done, in a room, with the people who know.

@@ -1,0 +1,112 @@
+---
+title: Entities and value objects
+description: Identity versus value — the one question that separates them, why it is a business question, and what goes wrong when the answer is assumed.
+---
+
+Two kinds of thing live inside a model, and telling them apart takes one
+question.
+
+## The question
+
+**If every attribute changed, would it still be the same thing?**
+
+Yes → an <span class="term">entity</span>. It has an identity that survives its
+attributes.
+
+No → a <span class="term">value object</span>. It *is* its attributes, and two
+with the same attributes are interchangeable.
+
+That is the whole distinction. Everything else follows.
+
+## Entities
+
+A policy is an entity. Change the insured address, the premium, the cover, even
+the policyholder — it is still policy `PL-2019-88421`, and its history is
+continuous. That continuity is why claims can ask what it looked like in March.
+
+Entities have:
+
+- **Identity** that is assigned once and never reused. Usually a business
+  identifier, because the business already has one and prints it on documents.
+- **A lifecycle** — created, changed, ended — that the business has names for.
+- **History that matters.** If nobody would ever ask "what did this look like
+  before?", it may not be an entity.
+
+The test people get wrong: entities are not "things with an ID column". Every
+row has one of those. The question is whether the *business* would say it is the
+same thing after everything about it changed.
+
+## Value objects
+
+A money amount is a value object. £150.00 is £150.00; there is no meaningful
+question about *which* £150.00 it is. Same for a date range, an address, a
+percentage, a coverage limit.
+
+Value objects have three properties worth insisting on:
+
+**Interchangeable.** Two with the same attributes are the same. You replace
+them rather than editing them.
+
+**Immutable.** You do not change a value object; you produce a new one. This is
+not a technical nicety — it prevents a whole class of bug where an address is
+edited and a historical document silently changes.
+
+**Self-validating.** A `DateRange` whose end precedes its start should not be
+constructible. This is the cheapest place in a system to enforce a rule, and it
+is enormously underused.
+
+## Why analysts should push on this
+
+Because the default is wrong, and the default is expensive.
+
+Left alone, most systems make everything an entity with a database row and an
+identifier. Address becomes a table. Money becomes two columns, an amount and a
+currency, unenforced and occasionally mismatched. Coverage limits become
+integers with no unit.
+
+The costs are specific:
+
+- **A shared address entity means editing one changes it everywhere.** Correct a
+  typo in a policyholder's address and the certificate issued three years ago now
+  shows the new one. The archive is silently rewritten.
+- **Amounts without currency get added together.** This happens more often than
+  anyone admits.
+- **Ranges with no validation produce negative durations**, which produce
+  negative premiums, which produce a credit note nobody authorised.
+
+Each of those is a business rule that was never asked about, because nobody
+framed the question in a way the business could answer.
+
+## Getting the answer from a domain expert
+
+Do not ask "is an address an entity or a value object?" Nobody outside this
+discipline can answer that.
+
+Ask instead:
+
+> If we correct a spelling mistake in this address, should the certificate we
+> issued in 2019 show the corrected version, or the version we actually sent?
+
+Every domain expert has an immediate, confident answer — and it is usually
+"obviously the version we sent, we'd be in trouble otherwise". You now know that
+the address on a document is a value object, captured at the time, and *not* a
+reference to a shared record.
+
+Similar questions that work:
+
+> Is this the same claim as before, or a new one? *(entity identity)*
+
+> If two of these had identical details, would anyone care which was which?
+> *(value)*
+
+> Can this ever be changed after the fact, or only replaced? *(mutability)*
+
+## Recording it
+
+In the [catalog](/doc/catalog/entries/), value objects are usually not listed
+individually — they appear inside the aggregate that uses them. What is worth
+recording is any value object whose **validation rule is a business rule**: a
+`CoverageLimit` that may not be negative, a `PolicyTerm` that may not exceed
+twelve months. Those are invariants that happen to live in a small type, and
+they belong in the model description rather than being discovered later in a
+defect report.

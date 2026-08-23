@@ -1,0 +1,109 @@
+---
+title: Context mapping
+description: Drawing the map of intent — what belongs on it, what does not, how to keep it honest, and how to read it for organisational risk rather than technical risk.
+---
+
+The context map records how the [bounded contexts](/doc/strategic/bounded-contexts/)
+in the [catalog](/catalog) are meant to relate. It is a map of *intent*: what was
+agreed, not what is running.
+
+The [patterns](/doc/strategic/context-mapping/) page defines the vocabulary.
+This page is about producing and maintaining the map.
+
+## What an edge holds
+
+| Field | Why |
+|---|---|
+| **Upstream** | The context the model flows *from*. |
+| **Downstream** | The context it flows *to*. |
+| **[Pattern](/doc/strategic/context-mapping/)** | The relationship type. The field that carries the information. |
+| **What crosses** | The actual thing exchanged, in domain terms. Not "data". |
+| **Why this pattern** | The rationale, including the political fact. |
+
+The last two are where most maps are thin, and they are what makes the map
+readable a year later by somebody who was not in the room.
+
+**What crosses** should be a domain concept, not a payload. *"A cover snapshot
+as at the date of loss — deliberately not the live policy"* tells a reader what
+the boundary is protecting. *"Policy data"* tells them nothing and cannot be
+checked.
+
+**Why this pattern** is the field that keeps the map honest. Writing *"the
+billing vendor will not change its model for us and we will not fork it, so
+downstream conforms"* forces the admission that makes conformist the right
+label. Nobody writes that sentence and then labels the arrow customer/supplier.
+
+## Drawing it
+
+**Start from the process, not from the systems.** Trace a real business process
+across the catalog and note every point where it leaves one context and enters
+another. That produces edges that matter, in the order they matter. Starting
+from an inventory of integrations produces a map of the current architecture with
+domain words on it.
+
+**One edge per relationship, not per message.** Two contexts exchanging six
+message types have one relationship unless the messages genuinely run in
+different directions with different patterns.
+
+**Direction is about the model, not the network.** Upstream is whoever's model
+the other has to accommodate. A downstream context frequently initiates the call.
+
+**Record the ones you are unhappy about.** A shared kernel you regret is still a
+shared kernel. The map's job is to be true.
+
+## Keeping it honest
+
+The characteristic failure of context maps is aspiration: everything becomes
+customer/supplier, because conformist feels like an admission and shared kernel
+feels like a confession.
+
+Both *are* admissions, and that is their value. Three habits help:
+
+**Ask the leverage question for every arrow.** "Can the downstream team ask for a
+change and get it?" If the honest answer is no, the pattern is conformist,
+regardless of what the integration looks like.
+
+**Let the owner of each context review its edges.** Someone who has to conform
+will say so; the person drawing the map from outside will guess generously.
+
+**Check the map against the [findings](/doc/landscapes/conformance/).** An
+arrow labelled anticorruption layer whose implementation shares a database is a
+label, not a relationship. The seed landscape contains exactly that case.
+
+## Reading it
+
+The most valuable readings of a context map are organisational, and none of them
+are visible on a systems diagram.
+
+**Clusters of conformist arrows** show where the organisation has no leverage. If
+they point into a core context, a vendor's roadmap now bounds your competitive
+position.
+
+**Shared kernels** show where two teams cannot move independently. More than two
+or three on a map means the boundaries are probably wrong.
+
+**Partnerships between contexts owned by directors who do not speak** are a
+delivery risk that will surface as a missed date and be reported as an
+engineering problem.
+
+**A context with many downstream consumers and no open host service** is about to
+grow one, or to grow six bespoke integrations. Better to choose.
+
+**A context with no edges at all** is either genuinely
+[separate ways](/doc/strategic/context-mapping/) — legitimate and underused — or
+missing from the analysis.
+
+## Unrealised edges
+
+An edge with no observed integration behind it appears on the
+[landscapes page](/landscapes) as an explicit warning. Two possible causes, with
+different owners:
+
+- **The collector cannot see it.** An observability gap. Owned by whoever runs
+  the collection.
+- **It was agreed and never built.** A delivery gap. Owned by the context
+  owners.
+
+The map cannot distinguish them, which is why the warning names both. What it
+must not do is quietly assume the first, because that is how a relationship that
+was never implemented stays green for four years.

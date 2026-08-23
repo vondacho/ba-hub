@@ -1,0 +1,62 @@
+---
+title: Business processes
+description: How work flows across bounded contexts, and what happens to consistency when it does — event storming, process modelling, and the specific problems of a process that crosses boundaries.
+---
+
+A business process is what the business actually does: a submission arrives, it
+is assessed, priced, offered, accepted, incepted, billed, and eventually claimed
+against or renewed.
+
+Almost none of that happens inside one
+[bounded context](/doc/strategic/bounded-contexts/).
+
+That is the whole difficulty and the whole value of this section. A process
+model that stays inside one boundary is a workflow diagram, and any tool can
+draw one. A process model that crosses boundaries has to answer questions with
+no comfortable answers: who owns the process, what happens when step four
+succeeds and step five does not, and what "consistent" even means when three
+systems are involved.
+
+## Why processes come after boundaries
+
+The order in [the approach](/doc/approach/) is deliberate. Model the process
+first and it will be drawn as a single flow with a single owner, because that is
+what a flow diagram encourages — and the boundaries will then be drawn to fit
+the diagram, which gets them wrong.
+
+Draw the boundaries first, then trace the process across them, and the crossings
+announce themselves. Each one is a place where:
+
+- there is no shared transaction;
+- there is no single owner;
+- the [language changes](/doc/strategic/ubiquitous-language/) and something has
+  to translate;
+- and failure has to be handled by *compensating*, not by rolling back.
+
+Those four facts are the deliverable. The flow is context.
+
+## What a process model must say
+
+Beyond the sequence, three things that flow diagrams usually omit:
+
+**Where the boundaries are crossed**, and which
+[relationship pattern](/doc/strategic/context-mapping/) governs each crossing.
+
+**What happens when a step fails after an earlier step succeeded.** Business
+processes do not roll back. A policy that was incepted and then failed to bill is
+not un-incepted; something else happens, and the business knows what.
+
+**Who can answer for the process as a whole.** Not each step — the whole thing.
+A process with no owner is the normal state of affairs and the reason nobody can
+say why it takes eleven days.
+
+## In this section
+
+- **[Event storming](/doc/processes/event-storming/)** — the workshop technique
+  that gets a process out of people's heads and onto a wall in a morning.
+- **[Process modelling](/doc/processes/modelling/)** — turning the wall into
+  something that survives the week, in commands, events, policies and read
+  models.
+- **[Processes across contexts](/doc/processes/across-contexts/)** — the hard
+  part: no shared transaction, orchestration versus choreography, and designing
+  the compensating action before production designs it for you.

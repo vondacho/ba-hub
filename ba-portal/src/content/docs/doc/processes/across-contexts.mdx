@@ -1,0 +1,138 @@
+---
+title: Processes across contexts
+description: The hard part — no shared transaction, orchestration versus choreography, eventual consistency explained to whoever signs it off, and designing the compensating action before production designs it for you.
+---
+
+A process that stays inside one [bounded context](/doc/strategic/bounded-contexts/)
+is a workflow. A process that crosses boundaries is a distributed system with a
+business consequence, and this page is about the three problems that creates.
+
+## Problem one: there is no shared transaction
+
+Inside an [aggregate](/doc/model/aggregates/), consistency is free. Across
+contexts, it does not exist.
+
+When a quote is accepted, three things must eventually be true: the quote is
+marked accepted, a policy is incepted, and billing is set up. Those live in three
+contexts. There is no operation that makes all three true at once.
+
+So the business has to answer a question it has probably never been asked:
+
+> Between accepting the quote and setting up billing, there is a window — usually
+> under a second, occasionally minutes if something is down — where the customer
+> has a policy and no invoice. What should happen if we never manage to set up
+> the billing?
+
+The answers are always concrete and never "roll it back":
+
+- *"The policy stands. Cover is cover. We chase the money."* → inception is
+  authoritative, billing is a downstream policy with retries and an exception
+  queue.
+- *"That can't happen, cover is conditional on the first payment."* → then
+  inception is not where you thought it was, and the model needs a
+  pending-inception state that is a real business concept.
+
+Either answer is fine. Not asking is what produces a system where the resolution
+depends on which service happened to time out.
+
+## Problem two: who is in charge
+
+Two shapes, and the choice is more political than technical.
+
+### Orchestration
+
+One context owns the process and tells the others what to do. There is a
+component you can point at and ask "where is this submission?"
+
+**Good for:** processes with a genuine owner, complex conditional logic,
+regulatory requirements to demonstrate what happened.
+**Costs:** the orchestrator knows about every participant, so it changes
+whenever any of them does — and it accumulates business logic that belongs
+elsewhere.
+
+### Choreography
+
+Each context reacts to [events](/doc/model/domain-events/) from others. No
+central coordinator; the process is an emergent property.
+
+**Good for:** loosely coupled steps, contexts owned by teams that need to move
+independently, processes that vary a lot by product or region.
+**Costs:** nobody can answer "where is this submission?" without a read model
+built specially to answer it. Debugging is archaeology.
+
+### Choosing
+
+The question that decides it: **can somebody in the business name the owner of
+this process end to end?**
+
+If yes, orchestrate — that person needs something to point at, and they will get
+a spreadsheet if you do not give them a system.
+
+If no, and the business genuinely treats the steps as independent, choreograph
+and build a read model for the "where is it" question rather than pretending
+nobody will ask.
+
+The wrong reason to choose choreography is that it sounds more modern. The wrong
+reason to choose orchestration is that it draws better.
+
+## Problem three: compensation
+
+Business processes do not roll back. They **compensate** — a new action that
+counters an earlier one, and leaves a trace.
+
+A cancelled policy is not an un-incepted policy. It is a policy with a
+cancellation, a refund calculation, a pro-rata premium, a document, and a record
+that any of it happened. The customer had cover for eleven days and that fact
+does not go away.
+
+Every boundary crossing needs its compensating action **named by the business**,
+and the questions are ordinary:
+
+> If we have to undo this after it has happened, what does the customer see?
+> Who has to authorise it?
+> What if it is discovered a month later instead of a minute later?
+
+That last one matters more than it looks: compensations discovered late are
+usually different actions from compensations discovered immediately, and systems
+designed for the immediate case handle the late case by having someone do it
+manually and forget to write it down.
+
+## Explaining eventual consistency to whoever signs it off
+
+This conversation goes badly when framed technically and well when framed as
+what it is — a question about acceptable delay, which the business already
+answers a hundred times a day about everything that is not software.
+
+Not: *"the system is eventually consistent between these bounded contexts."*
+
+Instead:
+
+> When an underwriter accepts a submission, the policy exists immediately. The
+> invoice appears within a few seconds, and if the billing system is down it
+> could be an hour. During that time the policy is live and unbilled. Is that
+> acceptable, and if the billing never succeeds, who should be told?
+
+Every domain expert can answer that. Nobody can answer the first version.
+
+Two things worth adding when the answer is "it must be immediate":
+
+- Immediate consistency across contexts is available, and it costs a shared
+  transaction, which means coupling the two contexts hard enough that they
+  release together. Say the price.
+- Ask what happens today, on paper or in the current system. The answer is
+  frequently that it is *already* eventually consistent by several hours and
+  nobody has minded.
+
+## Recording the crossings
+
+Each crossing goes in two places:
+
+1. On the [context map](/doc/landscapes/context-mapping/), as a relationship
+   with a [pattern](/doc/strategic/context-mapping/).
+2. In the process model, as the point where the Context column changes — with
+   its consistency answer and its compensating action.
+
+Then the [landscape](/doc/landscapes/conformance/) can check whether an
+integration exists that actually implements it. A crossing on paper with nothing
+observed behind it is one of the four verdicts, and it is the one most likely to
+be a genuine gap rather than a monitoring blind spot.

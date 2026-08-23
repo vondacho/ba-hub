@@ -1,0 +1,152 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Hero from '../../components/home/Hero.astro';
+import SectionPanels, { type Panel } from '../../components/home/SectionPanels.astro';
+import SiteFooter from '../../components/home/SiteFooter.astro';
+import { tools } from '../../lib/tools';
+import { eventStormerUrl } from '../../lib/links';
+
+/*
+ * The tools. Definitions live in src/lib/tools.ts so the panel copy has exactly
+ * one home.
+ *
+ * Two of them link *out*: the DDD mapper and the landscape collector, whose
+ * addresses are configuration read per request from the environment. That is
+ * safe because this page is server-rendered; the prerendered /doc/* pages have
+ * to go through /go/ instead.
+ *
+ * `href` is a function exactly when the address is configuration rather than a
+ * route, which is why it is resolved here rather than in the data.
+ *
+ * One tool is deployed and the rest are not, so the notice near the top says
+ * exactly that rather than a blanket "coming soon" — the panels carry their own
+ * status badges, and the notice's job is to tell a reader which of the five to
+ * click first.
+ */
+const panels: readonly Panel[] = tools.map((tool) => ({
+	title: tool.title,
+	description: tool.description,
+	href: typeof tool.href === 'function' ? tool.href() : tool.href,
+	cta: tool.cta,
+	status: tool.status,
+	icon: tool.icon,
+	...(tool.external ? { external: true } : {}),
+}));
+---
+
+<Layout
+	title="Tools — BA Hub"
+	description="The DDD mapper and the tools around it: catalog in, context map drawn, landscape evidence ingested, and a conformance verdict against every edge."
+>
+	<main id="main">
+		<Hero
+			kicker="Tools"
+			title="One tool for the wall the model is built on, and one for checking whether anyone still respects it."
+			lead="The first exists. The Event Stormer runs event storming and process modelling on the
+				same board — big picture for discovery, process modelling for the commands and
+				policies, software design for the aggregates underneath — because they are three
+				depths of one notation rather than three exercises. The second does not exist yet: a
+				mapper that holds the catalog and the observed estate at the same time and computes
+				the difference, so its interesting output is never the map but the list of edges the
+				map got wrong. Everything here serves one of those two jobs."
+			parent={{ label: 'Home', href: '/' }}
+			actions={[
+				{ label: 'Open the Event Stormer', href: eventStormerUrl(), external: true },
+				{ label: 'Read the mapper design', href: '/doc/tooling/ddd-mapper/' },
+			]}
+		/>
+
+		<div class="mx-auto w-full max-w-5xl px-6 pt-16">
+			<!--
+				Amber rather than the brand colour: this is a caveat, not a feature, and
+				it should read as one on first glance. It is deliberately specific about
+				*which* tool is real — a blanket "coming soon" over a box containing one
+				working tool teaches the reader to ignore the badges.
+			-->
+			<p class="rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm dark:border-amber-700/60 dark:bg-amber-950/40">
+				<strong>One of these is deployed. The other four are not.</strong>
+				<span class="mt-1 block text-ink-muted dark:text-slate-400">
+					The <strong class="text-ink dark:text-slate-200">Event Stormer</strong> is real and
+					usable now — it is doc-hub&rsquo;s board, and it runs two of this hub&rsquo;s
+					practices rather than one: event storming and process modelling are two of its
+					three levels. For the rest, the designs are written and the interfaces are decided;
+					the software is not built. The addresses those panels point at are configuration,
+					so the day something is deployed behind one it takes a value change and a restart
+					rather than a rebuild. Until then, the
+					<a href="/landscapes" class="font-semibold text-brand underline-offset-4 hover:underline dark:text-purple-400">
+						landscapes
+					</a>
+					page does by hand what the mapper would do continuously.
+				</span>
+			</p>
+		</div>
+
+		<SectionPanels panels={panels} label="Tools" columns={3} />
+
+		<section
+			aria-labelledby="in-out"
+			class="border-t border-slate-200 bg-slate-50 py-16 sm:py-20 dark:border-slate-800 dark:bg-night-raised"
+		>
+			<div class="mx-auto w-full max-w-5xl px-6">
+				<h2 id="in-out" class="text-2xl font-semibold tracking-tight">What goes in, what comes out</h2>
+				<p class="mt-2 max-w-3xl text-ink-muted dark:text-slate-400">
+					A tool with no named input is a drawing program, and a tool with no named consumer is
+					a hobby. Both columns are filled in for every entry below, which is a cheap way to
+					notice when one of these should not be built.
+				</p>
+
+				<div class="mt-8 overflow-x-auto">
+					<table class="w-full min-w-[48rem] border-collapse text-left text-sm">
+						<thead>
+							<tr class="border-b border-slate-300 dark:border-slate-700">
+								<th scope="col" class="py-3 pr-4 font-semibold">Tool</th>
+								<th scope="col" class="py-3 pr-4 font-semibold">Does what nothing else does</th>
+								<th scope="col" class="py-3 pr-4 font-semibold">Reads</th>
+								<th scope="col" class="py-3 font-semibold">Emits</th>
+							</tr>
+						</thead>
+						<tbody>
+							{
+								tools.map((tool) => (
+									<tr class="border-b border-slate-200 align-top dark:border-slate-800">
+										<th scope="row" class="py-3 pr-4 font-semibold whitespace-nowrap">
+											{tool.title}
+										</th>
+										<td class="py-3 pr-4 text-ink-muted dark:text-slate-400">{tool.purpose}</td>
+										<td class="py-3 pr-4 text-ink-muted dark:text-slate-400">{tool.input}</td>
+										<td class="py-3 text-ink-muted dark:text-slate-400">{tool.output}</td>
+									</tr>
+								))
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</section>
+
+		<section aria-labelledby="mcp-note" class="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
+			<h2 id="mcp-note" class="text-2xl font-semibold tracking-tight">And the part a model can do</h2>
+			<p class="mt-3 max-w-3xl text-ink-muted dark:text-slate-400">
+				Some of this work is judgement and some of it is reading. Distilling a first pass at the
+				subdomains out of documents the business already wrote, spotting that one word carries
+				two meanings across four systems, or noticing that an integration nobody declared has
+				appeared — none of those need an analyst, and all of them currently consume one.
+			</p>
+			<div class="mt-6 flex flex-wrap gap-3">
+				<a
+					href="/doc/mcp/"
+					class="rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-brand"
+				>
+					The four MCP servers
+				</a>
+				<a
+					href="/doc/tooling/"
+					class="rounded-full border border-slate-300 px-6 py-3 font-semibold transition hover:bg-white dark:border-slate-600 dark:hover:bg-night"
+				>
+					Tooling overview
+				</a>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</Layout>

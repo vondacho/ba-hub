@@ -1,0 +1,159 @@
+---
+title: Event storming
+description: The workshop that gets a business process out of people's heads and onto a wall in a morning — how to run one, what the colours mean, and what to do with the result.
+---
+
+Event storming is a workshop format: everyone who knows part of a process stands
+at a very long wall and puts up sticky notes for everything that happens, in the
+past tense, roughly in order.
+
+It is the fastest way known to get a shared picture of a domain, and its main
+value is not the picture. It is that six people discover, in about ninety
+minutes, that they disagreed about something they all assumed was settled.
+
+## Running one
+
+### Before
+
+**Get the right people.** Domain experts who do the work — not their managers.
+Developers who will build it. One facilitator. Somebody from each part of the
+process, including the part everyone forgets, which is usually finance or
+compliance.
+
+**Get an absurd amount of wall.** Eight metres is not too much. Running out of
+space causes people to compress and compressing loses the detail that matters.
+
+**Time-box it.** Half a day for a first pass over one process. Two days for a
+whole domain, with breaks, and expect the second day to be better than the
+first.
+
+### The colours
+
+The convention is arbitrary and consistency matters more than which convention:
+
+| Colour | Means | Tense |
+|---|---|---|
+| Orange | [Domain event](/doc/model/domain-events/) — something happened | Past |
+| Blue | Command — a request that may be refused | Imperative |
+| Yellow | [Aggregate](/doc/model/aggregates/) — what decides | Noun |
+| Purple | [Policy](/doc/model/services-and-policies/) — when this, then that | "Whenever…" |
+| Green | Read model — what someone looks at to decide | Noun |
+| Pink | External system | Noun |
+| Red | **A question nobody can answer** — a *hotspot* | Anything |
+
+Red is the most valuable colour on the wall. Guard it. On the
+[Event Stormer](/doc/tooling/event-stormer/) it is the `hotspot` card, and a
+hotspot is one of three things: a boundary, a genuine process defect nobody has
+surfaced, or an [invariant](/doc/model/aggregates/) nobody agreed on — which will
+otherwise be decided by whoever writes the code.
+
+### The phases
+
+**1. Events, chaotically.** Everyone writes orange stickies at once, in the past
+tense, and puts them up. No discussion, no ordering. Fifteen minutes, and expect
+noise, duplication and disagreement about wording.
+
+**2. Enforce the timeline.** Push them into rough order. This is where the first
+arguments start — two people put the same event in different places because
+their departments do it in different orders. That argument is the point of the
+exercise.
+
+**3. Find the pivotal events.** A handful of events change everything after
+them: `SubmissionAccepted`, `PolicyIncepted`, `ClaimNotified`. Mark them. They
+usually sit exactly on [context boundaries](/doc/strategic/bounded-contexts/).
+
+**4. Add commands and actors.** What caused each event, and who issued it? Blue
+stickies to the left of their events.
+
+**5. Add aggregates.** What decided whether the command was allowed? Yellow,
+between command and event. This is where invariants surface — listen for
+"you can't do that if…".
+
+**6. Add policies and read models.** Purple for every "whenever X, then Y".
+Green for whatever someone had to look at to make the decision.
+
+**7. Draw the boundaries.** Where does the language change? Where do the
+pivotal events sit? Draw them on the wall in marker and argue about them.
+
+Phases 1 to 3 and 7 are a **big picture** session. Phases 4 to 6 are
+[process modelling](/doc/processes/modelling/), and on the
+[Event Stormer](/doc/tooling/event-stormer/) they are literally a level change on
+the same board rather than a new exercise. Whether you run all seven in one
+sitting or stop after phase 3 and reconvene is a scheduling decision — a first
+pass over an unfamiliar domain is usually better stopped at the big picture,
+because the boundaries found in phase 7 change who should be in the room for
+phases 4 to 6.
+
+## What the facilitator is doing
+
+**Insisting on the past tense.** "Validate submission" is not an event.
+Correcting this every time for the first twenty minutes is tedious and
+non-negotiable — half the value of the format comes from the discipline.
+
+**Refusing to resolve disagreements quickly.** When two experts disagree about
+what happens, the instinct is to settle it and move on. Slow down. That
+disagreement is either a boundary or a genuine process defect, and both are
+worth more than a tidy wall.
+
+**Putting up red stickies liberally.** Every "we'd have to check", every "I
+think Ravi's team does something there" gets a red note with a name against it.
+
+**Keeping the business's words.** Nobody's term gets normalised on the wall. If
+two departments use two words, both go up, next to each other, which makes the
+[collision](/doc/strategic/ubiquitous-language/) visible instead of resolving it
+by force.
+
+## Afterwards
+
+The wall dies within a week. Photographs of it are nearly useless — unreadable,
+and they lose the arguments, which were the content.
+
+The [Event Stormer](/doc/tooling/event-stormer/) exists for exactly this: it
+holds the same wall — lanes, columns, the ten card colours, and a `context` card
+for each seam the room found — and writes it to a plain `.eventstorm` file that
+goes in version control next to the catalog. Use it during the session if the
+room is remote, or transcribe the wall into it the same afternoon if it is not.
+
+Either way, within two days:
+
+**Write the events down** in a list, with their commands, aggregates and
+policies — into the [Event Stormer](/doc/tooling/event-stormer/), or into the
+four-part table the [process modelling](/doc/processes/modelling/) page covers.
+The board keeps the shape of the wall; the table keeps the rules. For a session
+that found boundaries rather than settled rules, the board is the better home.
+
+**Write the language down.** Every term the business used, and the collisions
+found. This goes to the [catalog](/doc/catalog/entries/).
+
+**Assign the red stickies.** Each one gets an owner and a date. A red note
+without a name is a question that will be asked again in six months, in another
+workshop.
+
+**Record the candidate boundaries** — as candidates. A boundary from one
+workshop is a hypothesis; it earns its place in the [catalog](/catalog) once it
+has survived a second process being traced across it. On the board these are
+`context` cards, and they are big-picture cards on purpose: finding the seams is
+the last phase of a big picture, not something that waits for anybody to discuss
+aggregates.
+
+## When not to do this
+
+It is not a universal technique. Skip it when:
+
+- The process is genuinely simple and uncontested. Two people and a whiteboard
+  is faster.
+- You cannot get the domain experts. Event storming without them is a group of
+  developers guessing in a colourful format.
+- The [subdomain is generic](/doc/strategic/subdomain-types/). You are about to
+  buy a package; discovering its process in a workshop is effort spent on
+  something a vendor already decided.
+- You want to go straight to **software design** on a domain nobody has stormed
+  at big picture yet. The board will let you — the levels are cumulative and it
+  admits everything at the deepest one — and you will draw aggregates inside a
+  boundary that has not been argued about.
+
+## Sources
+
+The practice is Alberto Brandolini's — [eventstorming.com](https://eventstorming.com).
+A practical walkthrough of the three levels is Staffan Palopää's
+[Event Storming The Complete Guide](https://www.qlerify.com/post/event-storming-the-complete-guide#toc-software-design-event-storming).

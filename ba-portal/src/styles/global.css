@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+/*
+ * Portal theme. Imported by src/layouts/Layout.astro only — the documentation
+ * under /doc/* is themed by Starlight and must not receive Tailwind's preflight,
+ * which would reset Starlight's own base styles.
+ *
+ * The structure is dev-portal's, so the hubs read as one platform; the brand
+ * hue is not. Violet rather than the engineering hubs' blue or qa-hub's teal,
+ * because a reader with several portals open should be able to tell which one
+ * they are in without reading the header.
+ *
+ * Dark mode follows the OS. Starlight ships an explicit toggle; if the portal
+ * ever grows one too, switch this to a `@custom-variant dark` driven by a
+ * data-attribute so both halves of the site can be told apart from one source.
+ */
+
+@theme {
+  --color-ink: oklch(0.24 0.03 300);
+  --color-ink-muted: oklch(0.52 0.03 300);
+  --color-brand: oklch(0.52 0.18 305);
+  --color-brand-strong: oklch(0.44 0.19 305);
+  --color-night: oklch(0.19 0.03 300);
+  --color-night-raised: oklch(0.24 0.03 300);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

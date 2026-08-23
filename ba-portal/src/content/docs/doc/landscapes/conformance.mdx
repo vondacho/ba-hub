@@ -1,0 +1,120 @@
+---
+title: Conformance and drift
+description: Judging the difference between intent and reality — the four verdicts, how to write a finding somebody will act on, and prioritising by cost rather than by ugliness.
+---
+
+Conformance is the comparison of the [context map](/doc/landscapes/context-mapping/)
+against the [system map](/doc/landscapes/system-mapping/). It is the reason both
+exist, and it is the part of this discipline that is usually skipped.
+
+## The four verdicts
+
+**Matches.** An observed integration realises a declared relationship in the way
+its [pattern](/doc/strategic/context-mapping/) requires. Nothing to do.
+
+**Drifts.** The relationship exists and its implementation violates the pattern.
+An anticorruption layer that was never built. An adapter that gets bypassed. A
+shared kernel implemented as an overnight fuzzy match on name and postcode.
+These are the findings with the highest expected value, because the intent is
+already agreed — only the implementation is wrong.
+
+**Unmapped.** A real integration with no relationship behind it. Two systems are
+talking and nobody declared that their contexts should. This is **always a
+modelling question**: either the relationship is legitimate and the map is
+incomplete, or the boundary is in the wrong place. Resolving it by adding an
+arrow to the map, without asking which, is how a map gets talked into agreeing
+with whatever was built.
+
+**Unobserved.** A declared relationship with nothing observed behind it. Either
+it was agreed and never built, or the collector cannot see that corner. Different
+owners, and the map cannot tell them apart — so the finding names both
+possibilities rather than picking the comfortable one.
+
+## Writing a finding
+
+The discipline that decides whether any of this produces change: **state the
+business consequence, not the mechanism.**
+
+Compare two descriptions of the same fact from the [seed landscape](/landscapes):
+
+> claims-platform performs direct reads against the legacy-policy-master schema
+> rather than consuming a materialised snapshot.
+
+> A claim can be assessed against cover that was added to the policy after the
+> loss happened. A mid-term endorsement silently changes what an open claim
+> appears to be covered for.
+
+The first is accurate and will be triaged as technical debt. The second is the
+same fact and will be triaged as a regulatory exposure, because it names what
+goes wrong for the business.
+
+A finding worth acting on has four parts:
+
+1. **What is true**, in business terms.
+2. **What it costs** — money, risk, or delay. If you cannot name a cost, ask
+   whether it is really a finding.
+3. **Who owns it** — the owner of the downstream context, usually.
+4. **What would resolve it**, concretely. *"Materialise a cover snapshot at
+   notification and read only that"*, not *"decouple claims from policy"*.
+
+## Prioritising
+
+Not by how ugly it is. By cost, which usually means three questions:
+
+**What is the exposure?** A breached boundary between two core contexts is worth
+more attention than a bypassed adapter into a generic one — usually. The seed
+landscape's claims/policy finding tops the list because the failure mode is a
+wrong payment decision with a regulator attached.
+
+**How often does it bite?** A drift that produces a wrong answer once a year and
+one that produces one daily are different problems with the same description.
+
+**What does the fix cost?** A finding whose resolution is a two-week change to a
+context you own beats one requiring a vendor migration, even if the second is
+worse in principle. Fix what moves.
+
+The trap is a conformance report ranked by severity where severity was assigned
+by the person who wrote the finding. Severity is a business judgement, and the
+context owner is the one who can make it.
+
+## Making it a standing number
+
+The difference between an audit and a practice.
+
+**An audit** produces a report, a remediation plan, and a return to baseline
+over the following eighteen months.
+
+**A practice** publishes a number that people watch: *how many of our declared
+relationships are actually implemented as declared?* In the seed landscape that
+number is visible on the [landscapes page](/landscapes) and on the
+[home page](/), because a count that is not in front of anyone is not being
+watched.
+
+Two rules keep the number honest:
+
+**Unobserved is not success.** A context nothing watches must not count as
+aligned. Otherwise the cheapest way to improve the number is to stop looking,
+and that is exactly what will happen.
+
+**New unmapped integrations are visible immediately.** The most useful alert in
+the whole system is *two systems started talking this week and nobody declared
+it*. That is a boundary decision being made by default, and it is much cheaper
+to have the conversation now than after it has been depended on.
+
+## What good looks like
+
+Not zero findings. A landscape with no findings is either a very small estate or
+a collector that is not looking hard enough.
+
+What good looks like is:
+
+- Every finding has an owner and a stated cost.
+- The count of unobserved contexts is going down.
+- Unmapped integrations are noticed in weeks, not years.
+- The oldest finding is old because somebody decided to accept it, and that
+  decision is written down.
+
+That last one matters. An accepted finding is a legitimate outcome — a boundary
+violation the business has looked at and decided to live with is a *decision*.
+An unaccepted finding that has been open for three years is a decision too, just
+not one anybody made on purpose.

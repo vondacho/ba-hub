@@ -1,0 +1,121 @@
+---
+title: Modelling with the analyst
+description: How this work actually gets done — in a room, with the people who know, and without a handover. The analyst's specific contribution, and the artefacts worth producing.
+---
+
+Domain modelling done as a handover fails, reliably, in both directions.
+
+An analyst who writes a specification and passes it to developers produces a
+model of the *documents*, not of the business. Developers who model without a
+domain expert produce something coherent, plausible and subtly wrong in the
+places that cost the most.
+
+The model has to be built in a room with everyone in it. This page is about
+what the analyst does in that room.
+
+## The three roles
+
+**The domain expert** knows what is true and cannot say it in a structured form.
+They know the exceptions, the reasons, and the case from 2017 that changed the
+policy.
+
+**The developer** knows what is buildable and what a stated rule will cost, and
+does not know which rules are load-bearing.
+
+**The analyst** is the only person in the room whose job is the *translation*.
+Not writing it down afterwards — doing the translation live, so the other two are
+having the same conversation.
+
+That is the specific contribution, and it is worth being explicit about it:
+an analyst who acts as a scribe has been replaced by a recording.
+
+## What the analyst actually does
+
+### Asks the invariant question
+
+The single highest-value habit. Every time a rule appears, ask whether it may be
+briefly false.
+
+> *Expert:* The reserve has to be within the policy limit.
+> *Analyst:* Suppose for ten seconds it wasn't — someone raises the reserve and
+> someone else reduces the limit at the same moment. Do we prevent that, or fix
+> it up?
+> *Expert:* Prevent. Absolutely prevent, that's a regulatory thing.
+
+That exchange has just decided an [aggregate boundary](/doc/model/aggregates/),
+and the expert never heard the word.
+
+### Catches the word collisions
+
+The analyst is usually the only person who has been in both rooms. When claims
+says "policy" and the policy team says "policy" and the two meanings differ,
+somebody has to notice, and it is almost never the two people who each think
+their meaning is obvious.
+
+Noticing this is how [boundaries](/doc/strategic/bounded-contexts/) get found.
+
+### Refuses the premature screen
+
+Domain experts describe systems through screens, because that is how they use
+them. "There's a field on the second tab for the delegated authority reference."
+
+The analyst's job is to go behind it: *what is a delegated authority
+arrangement, who grants it, and what changes when a submission comes under one?*
+The field is a shadow of a concept, and the concept is what needs modelling.
+
+### Keeps the exception
+
+When an expert says "well, except for…", that is the model arriving. The
+instinct in a requirements-gathering culture is to note it as an edge case and
+move on. The instinct here should be to stop and pull on it — most named
+concepts in a mature model started life as somebody's apologetic exception.
+
+### Holds the boundary
+
+In a long session, everything wants to become one model. The analyst is the
+person who says "that is a different context, and this conversation is about
+this one" — and, separately, records the crossing so it does not get lost.
+
+## Format
+
+Whatever gets a domain expert talking. In practice:
+
+**[Event storming](/doc/processes/event-storming/)** for breadth — the whole
+process on a wall, fast, with everyone. Best first move on a new domain.
+
+**Example mapping** for depth — one rule, its examples, and the questions nobody
+can answer. Best when a specific area is contested.
+
+**Concrete scenarios** for anything contested. "Walk me through the Henderson
+claim" beats any abstract question, because experts reason from cases and
+abstract from them badly.
+
+The failure mode is a whiteboard full of boxes and lines drawn by the
+architect while the domain expert watches politely.
+
+## What comes out
+
+Three artefacts, in descending order of value:
+
+**Agreed language.** Terms, with the sentences the business asserts about them.
+This is the durable output — models get refactored, the language survives.
+
+**Invariants, written as sentences.** Not as constraints, not as validation
+rules. *"A submission may not be priced until it has been accepted."* A domain
+expert can confirm or deny that sentence a year later; nobody can confirm a
+class diagram.
+
+**Boundary crossings.** Every point where the conversation left one context and
+entered another, recorded as a candidate relationship on the
+[context map](/doc/landscapes/context-mapping/).
+
+Note what is *not* on the list: a diagram. Diagrams are useful and they are a
+byproduct. A session that produces a beautiful diagram and no agreed sentences
+has produced nothing that survives its own authors.
+
+## Then write it down
+
+Into the [catalog](/doc/catalog/entries/), the same week. A model that stays in
+photographs of a wall has a half-life of about a month, and the reason to record
+it is not documentation for its own sake — it is so that the
+[landscape](/doc/landscapes/) has something to check the estate against.

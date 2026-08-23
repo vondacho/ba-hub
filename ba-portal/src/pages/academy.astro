@@ -1,0 +1,181 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SiteFooter from '../components/home/SiteFooter.astro';
+import { paths, lessonCount, videoLessonCount } from '../lib/academy';
+
+/*
+ * The Academy: the curriculum as a set of learning paths, following the sibling
+ * portals' academy pages so the hubs teach in the same shape — kicker, promise,
+ * honest "in preparation" notice, then one card per path with its lessons and a
+ * pointer to what is readable today.
+ *
+ * Published before the lessons exist on purpose. A curriculum is a commitment
+ * about what is worth learning and in what order, and that is worth reviewing
+ * early; "coming soon" on its own tells a reader nothing.
+ *
+ * Deliberately not the Hero component: this is a second-level page in the same
+ * family as the other hubs' /academy, and it uses that page's lighter header
+ * rather than the full-bleed banner /catalog and /landscapes get.
+ */
+---
+
+<Layout
+	title="Academy — BA Hub"
+	description="Seven learning paths through domain-driven business analysis: listening for the domain, classifying subdomains, drawing bounded contexts, modelling inside them, processes across contexts, cataloguing and context mapping, and system mapping and drift."
+>
+	<main id="main" class="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
+		<nav aria-label="Breadcrumb" class="text-sm">
+			<a href="/" class="text-ink-muted underline-offset-4 hover:text-brand hover:underline dark:text-slate-400 dark:hover:text-purple-400">
+				Home
+			</a>
+			<span aria-hidden="true" class="mx-2 text-ink-muted dark:text-slate-500">/</span>
+			<span class="text-ink-muted dark:text-slate-400">Academy</span>
+		</nav>
+
+		<p class="mt-6 text-xs font-semibold tracking-[0.16em] text-brand uppercase dark:text-purple-400">
+			Learning paths
+		</p>
+		<h1 class="mt-3 text-3xl font-bold tracking-tight text-balance sm:text-4xl">
+			The hub holds the model. The Academy teaches you how anyone arrived at it.
+		</h1>
+		<p class="mt-5 max-w-2xl text-base text-ink-muted sm:text-lg dark:text-slate-400">
+			Seven paths through domain-driven analysis, in the order the work runs: learn to hear a
+			domain in the words people already use, work out which parts of it are worth your best
+			people, draw the boundaries, model inside them, follow a process that crosses three of
+			them — and only then take the path that needs everything above it, which is checking any
+			of it against the systems that are actually running.
+		</p>
+
+		<!--
+			Amber rather than the brand colour: this is a caveat, not a feature, and
+			it should read as one on first glance.
+		-->
+		<p class="mt-8 rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm dark:border-amber-700/60 dark:bg-amber-950/40">
+			<strong>In preparation.</strong>
+			<span class="mt-1 block text-ink-muted dark:text-slate-400">
+				The curriculum below is settled; the lessons are still being written, and there is
+				nothing to enrol in yet. Every path links to the documentation that covers its
+				ground today.
+			</span>
+		</p>
+
+		<section aria-labelledby="format" class="mt-10 rounded-2xl border border-slate-200 bg-slate-50 p-7 dark:border-slate-700 dark:bg-night-raised">
+			<h2 id="format" class="text-xl font-semibold tracking-tight">Told as stories</h2>
+			<p class="mt-2 max-w-3xl text-ink-muted dark:text-slate-400">
+				Domain-driven design is taught badly as a vocabulary and well as a sequence of
+				arguments somebody had to settle. Nobody has ever been helped by a definition of
+				"aggregate"; people are helped by watching one get drawn in the wrong place and
+				finding out what that cost. So the lessons carrying a
+				<span class="mx-1 inline-flex items-center gap-1 align-middle text-brand dark:text-purple-400">
+					<svg viewBox="0 0 20 20" class="inline h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+						<circle cx="10" cy="10" r="7.5" />
+						<path d="M8.5 7.5 13 10l-4.5 2.5V7.5Z" fill="currentColor" stroke="none" />
+					</svg>
+					<span class="font-semibold">story</span>
+				</span>
+				mark come with a short video in narrative form: a team with a problem, the option they
+				took, what it bought them and what it cost. {videoLessonCount} of the{' '}
+				{lessonCount} lessons are planned that way — the rest are short enough to read.
+			</p>
+		</section>
+
+		<h2 class="mt-14 text-2xl font-semibold tracking-tight">The curriculum</h2>
+		<ul class="mt-6 grid gap-6 md:grid-cols-2">
+			{
+				paths.map((path) => (
+					<li class="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-700 dark:bg-night-raised">
+						<span class="flex items-center justify-between gap-3">
+							<span class="text-xs font-semibold tracking-[0.14em] text-brand uppercase dark:text-purple-400">
+								{path.level}
+							</span>
+							<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold tracking-wide text-ink-muted uppercase dark:bg-slate-700 dark:text-slate-300">
+								Coming soon
+							</span>
+						</span>
+
+						<h3 class="mt-4 text-xl font-semibold">{path.title}</h3>
+						<p class="mt-2 text-ink-muted dark:text-slate-400">{path.summary}</p>
+
+						<ul class="mt-5 grow space-y-2 text-sm text-ink-muted dark:text-slate-400">
+							{path.lessons.map((lesson) => (
+								<li class="flex gap-3">
+									<span
+										aria-hidden="true"
+										class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-brand dark:bg-purple-400"
+									/>
+									<span>
+										{lesson.title}
+										{lesson.video && (
+											<>
+												{' '}
+												<span class="inline-flex items-center gap-1 align-middle text-brand dark:text-purple-400">
+													<svg
+														viewBox="0 0 20 20"
+														class="inline h-3.5 w-3.5"
+														fill="none"
+														stroke="currentColor"
+														stroke-width="2"
+														aria-hidden="true"
+													>
+														<circle cx="10" cy="10" r="7.5" />
+														<path d="M8.5 7.5 13 10l-4.5 2.5V7.5Z" fill="currentColor" stroke="none" />
+													</svg>
+													<span class="sr-only">Includes a storytelling video</span>
+												</span>
+											</>
+										)}
+									</span>
+								</li>
+							))}
+						</ul>
+
+						<p class="mt-6 border-t border-slate-200 pt-4 text-sm dark:border-slate-700">
+							<span class="text-ink-muted dark:text-slate-400">Read today: </span>
+							<a
+								href={path.readToday.href}
+								class="font-semibold text-brand underline-offset-4 hover:underline dark:text-purple-400"
+							>
+								{path.readToday.label}
+							</a>
+						</p>
+					</li>
+				))
+			}
+		</ul>
+
+		<section
+			aria-labelledby="start-now"
+			class="mt-14 rounded-2xl border border-slate-200 bg-slate-50 p-8 dark:border-slate-700 dark:bg-night-raised"
+		>
+			<h2 id="start-now" class="text-2xl font-semibold tracking-tight">You do not have to wait</h2>
+			<p class="mt-2 max-w-2xl text-ink-muted dark:text-slate-400">
+				Everything the first lessons will teach is already written down, and the fastest way to
+				see how it fits together is to take one word your business argues about — "customer",
+				"policy", "order", "account" — and write down what it means in each of the rooms that
+				uses it. If the answers differ, you have found a boundary, and you found it in an
+				afternoon.
+			</p>
+			<div class="mt-6 flex flex-wrap gap-3">
+				<a
+					href="/doc/approach/"
+					class="rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-brand"
+				>
+					Read the approach
+				</a>
+				<a
+					href="/doc/strategic/ubiquitous-language/"
+					class="rounded-full border border-slate-300 px-6 py-3 font-semibold transition hover:bg-white dark:border-slate-600 dark:hover:bg-night"
+				>
+					Ubiquitous language
+				</a>
+				<a
+					href="/catalog"
+					class="rounded-full border border-slate-300 px-6 py-3 font-semibold transition hover:bg-white dark:border-slate-600 dark:hover:bg-night"
+				>
+					Browse the catalog
+				</a>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</Layout>

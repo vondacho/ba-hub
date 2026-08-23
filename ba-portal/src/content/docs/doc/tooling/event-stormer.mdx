@@ -1,0 +1,263 @@
+---
+title: Event Stormer
+description: doc-hub's event storming board — the one tool in this box that exists. Event storming and process modelling on one wall, at three cumulative levels that line up with three sections of this hub.
+---
+
+**Status: deployed.** The board is at [doc-es](/go/stormer), and it is the only
+tool on this page you can open right now.
+
+It is doc-hub's, not this hub's — the third of three workshop boards there,
+after story mapping and example mapping.
+
+It earns its place in this toolbox by carrying **two of this hub's practices
+rather than one**. [Event storming](/doc/processes/event-storming/) and
+[process modelling](/doc/processes/modelling/) are not two exercises with two
+tools; they are two depths of one notation, and the board treats them that way.
+
+## What it is
+
+A wall, as a chessboard. Squares addressed by lane and column, where the two
+axes mean different things:
+
+**Horizontal is time.** Column 4 is the same moment in every lane. That is the
+one thing this arrangement says that a list of events cannot — two notes side by
+side are simultaneous, and a lane that is empty where its neighbour is busy has a
+visible hole in it.
+
+**Vertical is parallel tracks.** A lane is a department, an actor, a subsystem —
+whatever the room is separating.
+
+Cards are square and their text is clamped, deliberately. A note that grew to fit
+its words would push its neighbours out of alignment and the grid would stop
+being a grid — and the practice makes the same nudge anyway, because a domain
+event is three or four words and a note that does not fit is usually two notes.
+
+## The notation is cumulative
+
+The three levels **add** to one another rather than replacing one another, and the
+board treats them that way.
+
+| Level | Adds | Cards |
+|---|---|---|
+| **Big picture** | domain event, actor, external system, hotspot, opportunity, **bounded context** | 6 |
+| **Process modelling** | command, policy, read model | 9 |
+| **Software design** | aggregate, screen | 11 |
+
+Two things follow from that, and both matter for how a session is run:
+
+**The level is declared, not inferred.** A facilitator sets it up before the room
+arrives, because a session that has decided it is modelling a process decided
+that before anybody placed a command. Omitting it means big picture, which is
+where the practice starts.
+
+**Going deeper is always allowed; going shallower is not, past the notes already
+on the wall.** The picker disables the levels that would orphan something and
+says how many notes are in the way.
+
+## The three levels are three sections of this hub
+
+This is the part worth internalising, because it means a session can be aimed at
+a specific piece of the model rather than run as a general-purpose workshop.
+
+| Level | The question the room is answering | Where it lands |
+|---|---|---|
+| **Big picture** | What happens in this business, and where does the language change? | [Strategic design](/doc/strategic/) — subdomains and [bounded contexts](/doc/strategic/bounded-contexts/) |
+| **Process modelling** | How does work actually flow, and who decides what? | [Business processes](/doc/processes/) — commands, policies, read models |
+| **Software design** | What enforces the rules inside one boundary? | [The domain model](/doc/model/) — [aggregates](/doc/model/aggregates/) and invariants |
+
+Read down that table and it is [the approach](/doc/approach/), steps 1 to 5, on
+one board. Which is why a facilitator declares the level in advance: the level
+*is* the decision about which of those three questions the room has been
+assembled to answer.
+
+Three practical consequences:
+
+**A discovery session should be pinned to big picture**, even though software
+design admits everything. A room that can place aggregates will place them, and
+an aggregate drawn before the boundary is drawn is a
+[well-built room in a house facing the wrong way](/doc/strategic/).
+
+**A process modelling session builds on the same wall**, not a new one. The
+events are already there from the big picture; the level rises and commands,
+policies and read models arrive around them. That containment is the whole
+argument for one board with a setting rather than three boards.
+
+**Software design comes after a boundary is chosen**, and it goes *inside* one.
+If a software-design session is ranging across three contexts, the session is
+mis-scoped rather than the board.
+
+## Big picture: the context card
+
+The bounded context is a **big-picture** card, and that placement is the reason
+this board connects to the [catalog](/catalog) at all.
+
+Finding the seams is the last phase of a big picture, not something that waits
+for software design. A room that has just discovered two departments mean
+different things by "account" has found a
+[boundary](/doc/strategic/bounded-contexts/), and it needs somewhere to write
+that down long before anyone talks about aggregates. Software design is where you
+go *inside* one of them.
+
+So the path from a wall to a catalog entry is short and direct:
+
+1. A room storms the big picture and puts up `context` cards where the language
+   changes.
+2. Those are **candidate** contexts — a boundary from one workshop is a
+   hypothesis, and it earns a catalog entry once a second process has been traced
+   across it.
+3. The [language](/doc/strategic/ubiquitous-language/) that made the seam visible
+   goes in the entry with it, including the collision that revealed it.
+
+One fidelity note worth knowing: the physical notation draws a bounded context as
+a line around a region rather than as a note. It is a card here because there is
+no way to draw a region on this board — a limitation, not a reading of the
+practice.
+
+## Process modelling: the four-part sentence, on a wall
+
+Raise the level and three cards arrive: **command**, **policy**, **read model**.
+Those are exactly the three the
+[four-part sentence](/doc/processes/modelling/) needs, and placing them turns a
+timeline of events into a model of who decides what.
+
+> A **command** is a request that may be refused.
+> An **aggregate** decides, using its [invariants](/doc/model/aggregates/).
+> An **event** is the resulting fact.
+> A **policy** reacts to the event by issuing the next command.
+
+On the board that reads left to right along a lane: `command → event`, with a
+purple `policy` note where the next command is triggered. The board's own example
+is a clean one —
+
+```
+lane "Payments" {
+  command "Take the payment" @3
+  event   "Payment requested" @4
+  policy  "Whenever a payment is refused, hold the order" @5
+}
+```
+
+Two things the level gives an analyst that a flow diagram does not:
+
+**The read model is a card.** Which forces the question a process model usually
+skips: *what did the person look at before they decided?* A `readmodel` note
+with nothing behind it is hidden work — frequently somebody opening a second
+system and typing. The board makes it visible because the colour exists and the
+square is empty.
+
+**Simultaneity is visible.** Column 4 is the same moment in every lane, so a
+command in one lane and an event in another sitting in the same column are
+concurrent. That is where
+[crossings without a transaction](/doc/processes/across-contexts/) become
+obvious, and it is invisible on any notation that draws a process as a single
+line.
+
+The two things it does *not* do: it will not tell you which context owns a card,
+and it will not compute where the process crosses a boundary. Those need the
+catalog, and they are the [storm reconciler](/tools), which is not built.
+
+## Software design: aggregates and the human path
+
+The deepest level adds **aggregate** and **screen** (written `ui` in the file).
+
+The aggregate is the one that matters here: it is what
+[decides whether a command is allowed](/doc/model/aggregates/), so placing it
+between a command and its event is the moment a room has to say *what enforces
+this*. That question is the highest-value habit in
+[modelling with the analyst](/doc/model/modelling-together/), and the board
+creates a place where not answering it is visibly a gap.
+
+The screen is the missing half of the human path. Process modelling draws
+`read model → command` and leaves the person implied; software design lets the
+chain be written properly as **read model → screen → command**. Without a card
+for the screen, that chain has a hole in it exactly where the human goes.
+
+It is called a *screen* on the board and `ui` in the file — the practice's own
+word is "UI", which is right in a room and wrong in a legend, and the keyword
+stays `ui` because that is what somebody hand-editing will type.
+
+## Hotspots are the output nobody expects
+
+The `hotspot` card is for the disagreements nobody could settle, and it is the
+highest-value thing a session produces for an analyst.
+
+A hotspot is one of three things, and all three are worth a morning:
+
+- A [boundary](/doc/strategic/bounded-contexts/) — two people disagree because
+  they are describing two different models.
+- A genuine process defect that has never been surfaced because each department
+  works around it locally.
+- An [invariant](/doc/model/aggregates/) nobody agreed on, which will otherwise
+  be decided by whoever writes the code.
+
+*"Nobody agrees whether a refused payment cancels the order"* is a real card from
+the board's own example, and it is a better analysis finding than most
+requirement documents contain.
+
+## The file
+
+`.eventstorm` — braces rather than indentation, so a file that has been through a
+chat window or a different editor still parses.
+
+```
+eventstorm "Ordering a pizza" {
+  product "client-onboarding"
+
+  level process-modelling
+
+  lane "Customer" {
+    actor "Hungry customer" @1
+    event "Menu opened" @1
+    event "Order placed" @3
+  }
+
+  lane "Payments" {
+    command "Take the payment" @3
+    event "Payment requested" @4
+    policy "Whenever a payment is refused, hold the order" @5
+    hotspot "Nobody agrees whether a refused payment cancels the order" @5
+  }
+}
+```
+
+That it is a text file is the part that matters here. A photograph of a wall
+loses the arguments and cannot be diffed; an `.eventstorm` file goes in version
+control next to the catalog, gets reviewed, and can be read by the
+[storm reconciler](/tools) when that exists. The
+[event storming](/doc/processes/event-storming/) page says the wall dies within a
+week — this is what stops that being true.
+
+The keyword is the colour, with no separate type annotation, because a card whose
+keyword said one thing and whose annotation said another would be a state the
+file could express and the board could not. A card the declared level does not
+admit is a parse error naming the level that would admit it.
+
+## What it does not do
+
+**No ticketing space, and no deliveries sidebar** — which the story mapping and
+example mapping boards next door both have. A space is where work is raised, and
+an event storm does not produce work. It produces a shared picture and a set of
+seams; the story map is where the work is cut.
+
+**It does not know about the catalog.** The board holds a wall; nothing in it
+checks a `context` card against an existing bounded context, attributes a command
+to the context that owns it, or notices that a term on it collides with one
+recorded elsewhere. That is the
+[language workbench](/doc/tooling/modelling/) and the
+[storm reconciler](/tools), and neither is built. It is the seam between this
+tool and the rest of the hub, and it is currently crossed by hand.
+
+**It does not replace the room.** Remote sessions are worse than co-located ones
+in two specific ways — people contribute less spontaneously, and the facilitator
+cannot see who has stopped participating. Smaller groups and explicit turn-taking
+help; the tool does not.
+
+## The practice
+
+The workshop itself is written up for this audience on the
+[event storming](/doc/processes/event-storming/) page, and the practice's own
+source is Alberto Brandolini's [eventstorming.com](https://eventstorming.com).
+Neither the workshop nor the note colours were ours to choose.
+
+A good practical walkthrough of the three levels is Staffan Palopää's
+[Event Storming The Complete Guide](https://www.qlerify.com/post/event-storming-the-complete-guide#toc-software-design-event-storming).

@@ -1,0 +1,113 @@
+---
+title: Services, policies and rules
+description: Where behaviour goes when it belongs to no single thing — domain services, policies that react to events, and the difference between a rule that constrains and a rule that decides.
+---
+
+Most behaviour belongs to an [aggregate](/doc/model/aggregates/): the thing that
+holds the rule enforces the rule. Some does not, and this page is about the
+three places it goes instead.
+
+## Domain services
+
+A <span class="term">domain service</span> is an operation that is genuinely
+part of the domain but belongs to no single entity.
+
+The test: **would forcing this onto one of the participants distort it?**
+
+Calculating a premium involves the risk, the product, the rate tables and the
+loadings. It is not an operation *on* any of them; making `Risk.calculatePrice()`
+would give the risk knowledge of rate tables it has no business having. So
+`RatingService` is a domain service, and it appears in the
+[seed catalog](/catalog) as the whole point of the Rating context.
+
+Two disciplines keep this from becoming a dumping ground:
+
+**It must be named in the ubiquitous language.** `RatingService` is a thing an
+actuary recognises. `PolicyHelper` is not, and a service the business cannot
+name is usually behaviour that was pushed out of an aggregate because putting it
+there was awkward.
+
+**It must be stateless.** State belongs to aggregates. A service holding state
+is an aggregate that has not been recognised.
+
+The anti-pattern is the anaemic model: entities reduced to field bags, all
+behaviour in a layer of services, and the invariants scattered where nothing
+enforces them. If most of a core context's logic is in services, the aggregates
+have not been found yet.
+
+## Policies
+
+A <span class="term">policy</span> is a rule of the form **when this happens,
+that must follow**. It reacts to a [domain event](/doc/model/domain-events/) and
+issues the next command.
+
+> When a claim is settled, close the reserve.
+> When a policy is cancelled mid-term, calculate the refund.
+> When a submission is referred, notify a senior underwriter.
+
+Policies are where processes live, and three properties make them worth
+isolating:
+
+**They cross aggregates.** A policy is how two aggregates coordinate without
+sharing a transaction. This is why the
+[one-aggregate-per-transaction rule](/doc/model/aggregates/) is affordable.
+
+**They are eventually consistent, by construction.** There is a gap between the
+event and the resulting command. If the business cannot tolerate that gap, this
+is not a policy — it is an invariant, and the two things belong in one
+aggregate.
+
+**They change more often than aggregates.** Business processes get reorganised
+far more often than the underlying rules do. Keeping them separate means a
+process change does not touch the model.
+
+Watch for the word "then" in a domain expert's description. "When the claim is
+settled, then we close the reserve" is a policy, spoken aloud, and it usually
+takes no further elicitation.
+
+## Two kinds of rule
+
+The word "business rule" covers two different things and it is worth splitting
+them, because they live in different places and fail in different ways.
+
+**Constraints** say what may not be true. *A reserve may not exceed the policy
+limit.* These are [invariants](/doc/model/aggregates/), they live inside an
+aggregate, and violating one is an error.
+
+**Decisions** say what to do. *Refer any submission over £5m to a senior
+underwriter.* These are policies or specifications, they change frequently, and
+"violating" one is not meaningful — a decision rule that changes is just a
+different decision.
+
+The failure is treating a decision like a constraint: hard-coding the £5m
+referral threshold as an invariant, so that changing it needs a release. Or the
+reverse: treating a constraint as configurable, so that somebody can switch off
+the rule preventing a negative reserve.
+
+Ask: *if this rule changed tomorrow, would past records become invalid?* Yes →
+constraint. No → decision.
+
+## Specifications
+
+A <span class="term">specification</span> is a named, reusable predicate:
+*"is this submission within appetite?"*, *"is this claim eligible for fast-track
+settlement?"*
+
+Worth naming when:
+
+- The business has a name for the test and uses it in conversation.
+- The same test is applied in several places and must not drift.
+- It is used for both selecting and validating — finding all the submissions
+  within appetite, *and* checking that this one is.
+
+They are the smallest unit of the model that a domain expert can review in
+isolation, which makes them unusually good value.
+
+## Recording it
+
+Services and policies belong in the context's model description rather than in
+the [catalog](/doc/catalog/entries/) aggregate list — they are not consistency
+boundaries. What is worth recording explicitly is any policy that **crosses a
+context boundary**, because that is a relationship on the
+[context map](/doc/landscapes/context-mapping/) and a place where the process
+loses its transaction.

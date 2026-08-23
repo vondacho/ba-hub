@@ -1,0 +1,105 @@
+---
+title: Domain events
+description: What happened, stated in the business's own words and in the past tense. Why they are the most analyst-accessible part of the model, and how to tell an event from a database change.
+---
+
+A <span class="term">domain event</span> is something that happened in the
+business, that the business would name, stated in the past tense.
+
+`PolicyIncepted`. `ClaimRepudiated`. `SubmissionReferred`. `PremiumWrittenOff`.
+
+They are the most immediately useful part of the tactical vocabulary for an
+analyst, because they are the part domain experts produce without being taught
+anything. Ask what happens in a working day and you get events.
+
+## What makes an event a domain event
+
+Three tests, all of which have to pass.
+
+**The business would say it.** `ClaimSettled` passes. `ClaimRowUpdated` does not.
+`CustomerAddressCorrected` passes; `CustomerRecordSaved` does not.
+
+**It already happened.** Past tense, no exceptions. An event is a fact, and
+facts cannot be rejected. `PolicyIncepted` is an event; `InceptPolicy` is a
+command, which *can* be rejected, and confusing the two is the single most
+common error on an event storming wall.
+
+**Somebody would care.** If no other part of the business reacts to it and
+nobody would ask about it later, it is a state change, not a domain event. Not
+every change deserves a name.
+
+## Why they are worth the effort
+
+**They are the business's own record.** A sequence of events is a narrative a
+domain expert can read and correct. No other artefact in this discipline has
+that property — nobody has ever corrected a class diagram.
+
+**They cross boundaries.** Events are how one
+[bounded context](/doc/strategic/bounded-contexts/) tells another that something
+happened without exposing its model. In the [seed catalog](/catalog),
+`OfferAccepted` is what carries an accepted quote into policy administration.
+
+**They explain the past.** "Why is this claim assessed against that cover?" is
+answerable from a sequence of events and very often unanswerable from current
+state.
+
+**They surface missing concepts.** An event that is hard to name usually means
+the concept underneath it has no name either, and that is a finding.
+
+## Events and commands and policies
+
+The four-part sentence that most of process modelling reduces to:
+
+> A **command** is a request that may be refused.
+> It is decided by an **aggregate**, using its invariants.
+> If accepted, it produces an **event**, which is a fact.
+> A **policy** reacts to an event by issuing the next command.
+
+Worked:
+
+> *Command:* Refer this submission.
+> *Aggregate:* `Submission` — checks it is not already declined.
+> *Event:* `SubmissionReferred`.
+> *Policy:* when a submission is referred, notify a senior underwriter.
+
+Once a group has this sentence, an event storming wall stops being sticky notes
+and starts being a model. The [processes](/doc/processes/) section builds on it.
+
+## Naming them
+
+Naming is most of the work, and bad names are load-bearing in the wrong
+direction.
+
+**Use the business's verb.** Insurers do not "reject" claims; they *repudiate*
+them, and the difference is legally meaningful. Using the wrong verb in an event
+name teaches everyone downstream the wrong word.
+
+**Name the fact, not the mechanism.** `PolicyRenewed`, not
+`RenewalBatchProcessed`. If the business would not describe it that way, the
+event has been named after the implementation.
+
+**Do not encode the reaction.** `ClaimSettled` — not `ClaimSettledSendLetter`.
+What follows is a policy's business, and encoding it in the name freezes today's
+process into a permanent fact.
+
+**Be specific about which fact.** `PolicyChanged` is not an event, it is a
+category. `PolicyCancelled`, `PolicyEndorsed` and `PolicyRenewed` are three
+events with three different downstream consequences.
+
+## Where events are not the answer
+
+Some honesty, because events attract enthusiasm.
+
+They are not automatically an audit log — an audit log records who did what to
+what record; a domain event records what happened to the business. There is
+overlap and they are not the same artefact.
+
+They do not make consistency free. A process that reacts to an event is
+eventually consistent by construction, and if the business needed it to be
+immediate, an event was the wrong tool. See
+[aggregates](/doc/model/aggregates/) for how to find out which you have.
+
+And an event-sourced implementation is a separate decision from having domain
+events in the model. The model can be full of well-named events and stored in
+ordinary tables. Deciding otherwise is an engineering choice, made in
+[dev-hub](/go/dev), and it does not need to be made here.

@@ -1,0 +1,123 @@
+---
+title: Evidence and discovery
+description: How the landscape gets collected — the sources, what each one cannot see, and the practical order to turn them on in.
+---
+
+The [system map](/doc/landscapes/system-mapping/) is only worth having if its
+edges are observed. This page is about doing the observing.
+
+## The sources, and the order to enable them
+
+Listed in the order that usually gives the most information per unit of effort.
+
+### 1. Service mesh or gateway traffic
+
+If a mesh or gateway already exists, this is free information: who calls whom,
+how often, in which direction.
+
+**Turn it on first** because it costs nothing and covers the modern half of the
+estate.
+
+**Cannot see:** anything not routed through it — which is usually the legacy
+half, and the legacy half is where the findings are.
+
+### 2. Database audit logs
+
+The highest-value source and the one most often disabled.
+
+Direct cross-schema access is the most damaging class of boundary violation
+there is, and nothing else detects it. Both of the worst findings in the
+[seed landscape](/landscapes) — claims reading live policy rows, and the nightly
+appetite-table reads — are only visible here.
+
+**Cost:** audit logging on a busy database has a real performance cost, and it is
+frequently the first thing switched off. Getting it switched back on is often
+the single highest-value change in a landscape programme, and it is a
+negotiation with a DBA rather than a technical problem.
+
+**Cannot see:** intent. It gives you the fact of the access, not why.
+
+### 3. Broker and topic metadata
+
+Publishers and subscribers per topic. Direct evidence of event-driven
+relationships, usually available from the broker's own admin API.
+
+**Cannot see:** whether a consumer acts on what it receives.
+
+### 4. Source code analysis
+
+Connection strings, client libraries, and vendor field names appearing in
+contexts that should not know them.
+
+The only source that catches a **bypassed adapter** — which is the
+claims-platform finding in the seed landscape, where vendor vocabulary appears
+inside a core context because someone called the API directly.
+
+**Cannot see:** whether the code path executes. Pairs well with traffic data,
+which answers exactly that.
+
+### 5. Schema registries and API catalogues
+
+The shape of what crosses, and its versions. [api-hub](/go/api) holds the
+published contracts, so this is mostly a matter of reading them rather than
+collecting anything.
+
+**Cannot see:** usage. A registered schema with no traffic is a plan.
+
+### 6. People
+
+Interviews, and the batch job somebody remembers.
+
+Legitimate, and **it must be labelled**. An edge whose evidence is *"Ravi says
+the nightly job does this"* is worth having and is not an observation. Record it,
+mark it as asserted, and let a collector replace it when one reaches that corner.
+
+The failure is letting asserted edges accumulate silently until the map is back
+to being a memory with better formatting.
+
+## What to record
+
+For each observed edge, four things:
+
+**The systems**, as deployables.
+
+**The mechanism** — HTTP, events, shared schema, file transfer. Not the meaning.
+
+**The evidence**, specific enough that someone else could go and check it.
+*"40,000 reads a day against the policy tables, none date-qualified"* is
+evidence. *"Tight coupling"* is a mood.
+
+**When it was observed.** An edge from eighteen months ago is a historical
+record. Undated evidence ages into assertion.
+
+## Blind spots are findings
+
+The most important discipline in this section: a corner nothing observes is
+**unobserved**, not fine.
+
+In the seed catalog, Documents carries that value because nothing collects from
+`doc-gen`. It reads as a gap on the [landscapes page](/landscapes) and it counts
+against the conformance number, which is what stops the cheapest route to a good
+number being to stop looking.
+
+## What this is not
+
+**Not application performance monitoring.** APM answers whether a system is
+healthy. This answers whether it respects a boundary. Same telemetry, sometimes
+the same tools, entirely different question — and an APM dashboard cannot tell
+you that an arrow should not exist.
+
+**Not architecture discovery in the CMDB sense.** An inventory of what runs
+where is useful and it is not this. The system map exists to be compared against
+a [context map](/doc/landscapes/context-mapping/), and an inventory with no
+intent to compare against produces no verdicts.
+
+## Status
+
+The [landscape collector](/tools) is designed and not built. The evidence on the
+landscapes page is a worked example of what it would write.
+
+Starting by hand is reasonable and is not a lesser version: one afternoon with
+database audit logs and a grep over source trees will find most of what an estate
+this size is hiding, and it tells you whether continuous collection is worth
+building.

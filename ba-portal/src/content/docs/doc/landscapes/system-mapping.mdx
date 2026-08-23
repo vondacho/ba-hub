@@ -1,0 +1,117 @@
+---
+title: System mapping
+description: Gathering evidence about what the estate actually does — the sources, the blind spots of each one, and the rule that separates a map from a diagram.
+---
+
+The system map records what the running systems actually do to each other. Its
+governing rule:
+
+**Every edge carries the observation that produced it.**
+
+An edge somebody remembers is not an edge. An edge somebody drew in a workshop
+is not an edge. An edge with a query, a log sample or a traffic count behind it
+is an edge — and can be disputed, rechecked, and shown to have changed.
+
+That rule is the entire difference between a map and a diagram.
+
+## What an edge holds
+
+| Field | Why |
+|---|---|
+| **From / To** | The two running systems. Deployables, not contexts. |
+| **Transport** | The mechanism: HTTP, events, a shared schema, a nightly file. |
+| **Evidence** | What was observed, specifically enough that someone else could check. |
+| **Realises** | The [context relationship](/doc/landscapes/context-mapping/) this is supposed to implement, if any. |
+| **Verdict** | Matches, drifts, unmapped, unobserved. |
+
+**Evidence** is the field that does the work. Compare:
+
+> *"Claims queries the live policy tables 40,000 times a day. No snapshot table
+> exists and no read is date-qualified."*
+
+> *"Tight coupling with legacy."*
+
+The first can be checked, dated, and shown to have improved. The second is a
+mood.
+
+## Where evidence comes from
+
+Five sources, each with a real blind spot. Using one and believing it is
+complete is the usual mistake.
+
+### Service mesh or gateway traffic
+
+**Sees:** service-to-service HTTP and gRPC, with volume and direction. The best
+single source where it exists.
+
+**Blind to:** anything not routed through it. Direct database access, message
+brokers, batch jobs, and every call that predates the mesh.
+
+### Database audit logs
+
+**Sees:** which credentials read and wrote which schemas. The only reliable way
+to catch a system reaching past a boundary into another context's tables — and
+that is the most damaging class of finding there is.
+
+**Blind to:** what the access meant. It gives you the fact, not the intent.
+
+**Cost:** audit logging on a busy database is not free, and it is often the
+first thing turned off for performance. Turning it back on is frequently the
+single highest-value change in a landscape programme.
+
+### Broker and topic metadata
+
+**Sees:** who publishes and who subscribes to what. Direct evidence of
+event-driven relationships.
+
+**Blind to:** whether a subscriber does anything with what it receives. A
+consumer group that reads and discards looks identical to one that acts.
+
+### Schema registries and API catalogues
+
+**Sees:** the shape of what crosses, and its versions. Pairs well with
+[api-hub](/go/api), which holds the published contracts.
+
+**Blind to:** whether anything uses it. A registered schema with no traffic is a
+plan.
+
+### Source code
+
+**Sees:** connection strings, client libraries, vendor field names appearing
+where they should not. The only source that catches a bypassed adapter — the
+claims-platform finding in the seed landscape was found this way.
+
+**Blind to:** whether the code path runs. A configured integration that is dead
+looks live.
+
+### The honest sixth source
+
+**Asking people.** Legitimate, and it must be labelled as what it is. An edge
+whose evidence is *"Ravi says the batch job does this"* is worth having and is
+not an observation. Record it, mark it, and let it be replaced when the
+collector reaches that corner.
+
+## Systems, not contexts
+
+The system map is drawn in terms of **deployables**, and the mapping to contexts
+is many-to-many.
+
+In the [seed catalog](/catalog), `uw-workbench` is one deployable holding two
+contexts — Risk appetite and Quotation — kept apart by separate schemas and a
+build rule. Meanwhile Policy lifecycle is spread across two deployables,
+`legacy-policy-master` and `policy-service`, mid-strangler.
+
+Both facts are normal. Forcing a one-to-one mapping would require lying about
+one of them, and the mismatch is itself informative: a context spread across two
+systems that are at different stages of a migration is a context whose
+invariants are enforced in two places, which is worth knowing.
+
+## Blind spots are findings
+
+A corner of the estate nothing observes is not "assumed fine". It is
+**unobserved**, and it says so.
+
+In the seed catalog, Documents carries a conformance value of *unobserved* for
+exactly this reason — nothing collects from `doc-gen`, so no claim about it is
+supported. That is more useful than a green tick nobody earned, and it makes the
+cost of the monitoring gap visible next to everything else.

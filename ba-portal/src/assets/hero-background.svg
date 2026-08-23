@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="presentation">
+  <!--
+    Hero backdrop: a context map.
+
+    Four bounded contexts drawn as rounded boundaries, with the relationships
+    between them as directed edges — an upstream/downstream pair, a shared
+    kernel between two neighbours, and one dashed edge to a boundary drawn in
+    outline only, which is the legacy system nobody has a model for yet. The
+    scattered nodes inside each boundary are its aggregates.
+
+    The point of the picture is the *lines between the boxes*, not the boxes:
+    that is the part a catalogue of contexts leaves out and a context map does
+    not.
+
+    Drawn rather than photographed so it stays sharp at any width, themes with
+    the page, and costs a few KB. Its counterparts are dev-hub's contract graph
+    and qa-hub's signal timeline — the family resemblance is deliberate, the
+    subject is not.
+  -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1030" />
+      <stop offset="55%" stop-color="#2a1747" />
+      <stop offset="100%" stop-color="#331a4a" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0.7" cy="0.26" r="0.75">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.38" />
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glow2" cx="0.14" cy="0.86" r="0.62">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
+    </radialGradient>
+    <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
+      <path d="M80 0H0V80" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1" />
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 1 L9 5 L0 9 z" fill="#c4b5fd" fill-opacity="0.75" />
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)" />
+  <rect width="1600" height="900" fill="url(#grid)" />
+  <rect width="1600" height="900" fill="url(#glow)" />
+  <rect width="1600" height="900" fill="url(#glow2)" />
+
+  <!-- The core domain, larger and brighter than the rest: the reason the
+       business exists, and the only one worth modelling in this much detail. -->
+  <g stroke="#c4b5fd" stroke-opacity="0.6" fill="#a855f7" fill-opacity="0.07" stroke-width="2">
+    <rect x="600" y="250" width="400" height="290" rx="28" />
+  </g>
+  <g fill="#e9d5ff" fill-opacity="0.85">
+    <circle cx="700" cy="340" r="9" />
+    <circle cx="810" cy="310" r="13" />
+    <circle cx="900" cy="380" r="9" />
+    <circle cx="760" cy="450" r="11" />
+    <circle cx="880" cy="480" r="8" />
+  </g>
+  <g stroke="#e9d5ff" stroke-opacity="0.45" stroke-width="1.5" fill="none">
+    <path d="M700 340 L810 310 L900 380 L880 480 L760 450 Z" />
+    <path d="M810 310 L760 450 M810 310 L880 480" stroke-opacity="0.22" />
+  </g>
+
+  <!-- Two supporting contexts. Same shape, less light on them. -->
+  <g stroke="#a5b4fc" stroke-opacity="0.4" fill="#6366f1" fill-opacity="0.05" stroke-width="1.75">
+    <rect x="200" y="180" width="290" height="200" rx="24" />
+    <rect x="230" y="560" width="300" height="190" rx="24" />
+  </g>
+  <g fill="#c7d2fe" fill-opacity="0.6">
+    <circle cx="290" cy="250" r="8" />
+    <circle cx="390" cy="290" r="10" />
+    <circle cx="310" cy="330" r="7" />
+    <circle cx="320" cy="630" r="9" />
+    <circle cx="430" cy="670" r="7" />
+    <circle cx="350" cy="710" r="8" />
+  </g>
+  <g stroke="#c7d2fe" stroke-opacity="0.3" stroke-width="1.4" fill="none">
+    <path d="M290 250 L390 290 L310 330 Z" />
+    <path d="M320 630 L430 670 L350 710 Z" />
+  </g>
+
+  <!-- The generic subdomain: bought, not built, so it gets a boundary and no
+       interior model at all. -->
+  <rect x="1120" y="600" width="280" height="170" rx="24"
+        fill="none" stroke="#94a3b8" stroke-opacity="0.35" stroke-width="1.75" stroke-dasharray="10 8" />
+  <path d="M1180 660 h160 M1180 700 h120 M1180 735 h140"
+        stroke="#94a3b8" stroke-opacity="0.28" stroke-width="6" stroke-linecap="round" fill="none" />
+
+  <!-- The relationships. This is the actual subject of the picture. -->
+  <g fill="none" stroke="#c4b5fd" stroke-opacity="0.5" stroke-width="2.25" marker-end="url(#arrow)">
+    <!-- Supporting context, upstream of the core. -->
+    <path d="M490 300 C 545 315, 550 330, 600 340" />
+    <!-- The core publishes downstream to the second supporting context. -->
+    <path d="M615 540 C 570 590, 560 600, 530 620" />
+  </g>
+  <!-- Anticorruption layer against the legacy system: dashed, because nothing
+       on the other side of it is modelled. -->
+  <path d="M1000 480 C 1070 520, 1090 560, 1120 620"
+        fill="none" stroke="#94a3b8" stroke-opacity="0.4" stroke-width="2" stroke-dasharray="8 8"
+        marker-end="url(#arrow)" />
+
+  <!-- The seam between the two supporting contexts: a shared kernel, drawn as
+       an overlap rather than an arrow, because neither one owns it. -->
+  <path d="M340 380 L340 560" stroke="#c4b5fd" stroke-opacity="0.25" stroke-width="2" stroke-dasharray="3 9" fill="none" />
+</svg>

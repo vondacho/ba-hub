@@ -1,0 +1,114 @@
+---
+title: Curation and ownership
+description: How a catalog stays true after the workshop — who owns what, when entries are reviewed, and the three checks that catch rot cheaply.
+---
+
+Every organisation that has done this has a wiki page from four years ago with a
+context diagram on it. Nobody knows which parts are still true, so nobody uses
+it, so nobody updates it, so it stays wrong.
+
+This page is about not doing that. It is the least glamorous part of the
+discipline and it decides whether any of the rest was worth doing.
+
+## Why catalogs rot
+
+Four causes, worth naming because the fixes differ:
+
+**No owner.** The entry was written by whoever ran the workshop, and they moved
+on. Nobody is wrong when it is wrong.
+
+**No consumer.** Nothing reads the catalog, so nobody notices staleness. This is
+the deep cause — an artefact that is not used cannot be maintained, no matter
+how much process is wrapped around it.
+
+**No feedback.** Nothing compares the entry against reality, so being wrong has
+no consequence and produces no signal.
+
+**Too much detail.** An entry with forty fields needs constant maintenance, so it
+gets none, so all forty rot together. Smaller entries survive longer.
+
+## Ownership
+
+**Every context has one named owner.** The person who answers for the language
+and the boundary. Not a department. See
+[what an entry holds](/doc/catalog/entries/) on why this field is the one most
+often fudged.
+
+**Every subdomain has one business owner.** The person who decides whether it is
+core, and who can be shown that it is drifting towards being core.
+
+**The catalog itself has a curator.** One person who keeps the *shape* consistent
+— that entries follow the same form, that new contexts get added, that
+[unrealised relationships](/doc/landscapes/context-mapping/) get chased. Not the
+author of the content; the person who notices when an entry has been sitting in
+"drafted" for eleven months.
+
+## The rhythm
+
+**On change, not on a schedule.** The trigger for updating an entry is a
+modelling decision, not a calendar. A quarterly review of everything produces a
+quarter's worth of rot and a rushed afternoon.
+
+Specific triggers worth wiring in:
+
+- A [modelling session](/doc/model/modelling-together/) happened → update the
+  language and aggregates that week.
+- A new system went live, or an old one was retired → update the realisations.
+- A context changed owner → update it the same day, because an entry with the
+  wrong owner is worse than one with none.
+- A [drift finding](/doc/landscapes/conformance/) was resolved → update the
+  realisation note that described it.
+
+**A yearly classification review**, tied to business strategy rather than to the
+calendar. That is the one thing genuinely worth reviewing on a cycle, because
+[supporting subdomains become core](/doc/strategic/subdomain-types/) without
+anyone announcing it.
+
+## Three cheap checks
+
+Automatable, and each one catches a specific kind of rot.
+
+**Every context has an owner, and the owner still works here.** Trivially
+checkable against the directory. Catches the most common decay.
+
+**Every context has at least one realisation, and every named system exists.**
+A context nothing implements is either a gap or a stale entry; a realisation
+naming a decommissioned system is definitely stale. Both are worth a nudge.
+
+**Every declared relationship has an observed integration, or an explanation.**
+This is the [unrealised relationship](/doc/landscapes/context-mapping/) check.
+It catches the case where something was agreed and never built — and it is the
+check that produces the most argument, which is a good sign.
+
+The [DDD mapper](/doc/tooling/ddd-mapper/) is designed to run all three
+continuously. Until it exists they are a half-hour job with a spreadsheet, and
+worth doing that way rather than not at all.
+
+## Make it the place people look
+
+The only durable defence against rot is being used. Some ways to force that:
+
+**Link to it from the artefacts people already read.** Acceptance criteria that
+reference the context. Architecture decision records that name the boundary.
+Onboarding that starts here.
+
+**Answer questions with it.** When somebody asks what "policy" means in claims,
+answer with a link, not a paragraph. If the link is wrong, you have just found
+a stale entry, which is the mechanism working.
+
+**Put the drift findings in front of people who can act.** A finding that a core
+boundary is breached, with a named owner and a cost, gets attention. The same
+finding in a quarterly report does not.
+
+## When to delete an entry
+
+More often than teams do.
+
+A context that no longer exists should be removed, not marked deprecated and
+left. A subdomain that turned out to be part of another one should be merged. A
+speculative context from a workshop that never became real should go.
+
+The instinct to keep everything "for history" is what makes a register
+untrustworthy — a reader who cannot tell current entries from archaeological
+ones will treat all of it as archaeology. Version control remembers; the catalog
+describes what is true now.

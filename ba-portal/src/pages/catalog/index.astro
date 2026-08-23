@@ -1,0 +1,314 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Hero from '../../components/home/Hero.astro';
+import SiteFooter from '../../components/home/SiteFooter.astro';
+import {
+	contexts,
+	contextsOf,
+	counts,
+	domain,
+	subdomains,
+	type SubdomainType,
+	type ModelStatus,
+	type Conformance,
+} from '../../lib/catalog';
+
+/*
+ * The catalog. Definitions live in src/lib/catalog.ts so the copy has exactly
+ * one home.
+ *
+ * The page is organised problem-first: domain, then subdomains grouped by what
+ * they are worth, then the contexts that solve each one. That order is the
+ * argument — a reader who scrolls this page in sequence cannot avoid noticing
+ * that the generic subdomains have no aggregates and no model, which is the
+ * intended conclusion rather than an omission.
+ *
+ * Every context shows a named owner and a conformance verdict. Both columns are
+ * deliberately impossible to leave blank: a context without an owner is
+ * unowned, and a context nobody is observing is a claim rather than a model.
+ */
+
+const typeLabel: Record<SubdomainType, string> = {
+	core: 'Core',
+	supporting: 'Supporting',
+	generic: 'Generic',
+};
+
+const typeBlurb: Record<SubdomainType, string> = {
+	core: 'The reason the business wins. Modelled deeply, built in house.',
+	supporting: 'Necessary and specific to us, and not a differentiator. Built simply.',
+	generic: 'A solved problem someone else sells. Bought, wrapped, not modelled.',
+};
+
+// Tailwind scans the source for class names and cannot see one assembled at
+// runtime, so every variant is written out rather than interpolated.
+const typeChip: Record<SubdomainType, string> = {
+	core: 'bg-brand text-white',
+	supporting:
+		'bg-slate-200 text-ink dark:bg-slate-700 dark:text-slate-100',
+	generic:
+		'border border-slate-300 text-ink-muted dark:border-slate-600 dark:text-slate-400',
+};
+
+const statusLabel: Record<ModelStatus, string> = {
+	modelled: 'Modelled',
+	drafted: 'Drafted',
+	unmodelled: 'Not modelled',
+};
+
+const conformanceLabel: Record<Conformance, string> = {
+	aligned: 'Aligned',
+	drifting: 'Drifting',
+	breached: 'Breached',
+	unknown: 'Unobserved',
+};
+
+const conformanceChip: Record<Conformance, string> = {
+	aligned:
+		'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300',
+	drifting: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300',
+	breached: 'bg-rose-100 text-rose-900 dark:bg-rose-950/60 dark:text-rose-300',
+	unknown: 'bg-slate-200 text-ink-muted dark:bg-slate-700 dark:text-slate-300',
+};
+
+const order: readonly SubdomainType[] = ['core', 'supporting', 'generic'];
+---
+
+<Layout
+	title="Catalog — BA Hub"
+	description="The register of the business: one domain, its subdomains classified core, supporting and generic, and the bounded contexts that solve them — each with its ubiquitous language, its aggregates, a named owner, and the systems that claim to implement it."
+>
+	<main id="main">
+		<Hero
+			kicker="Catalog"
+			title="A subdomain is a problem you were given. A bounded context is a solution you chose."
+			lead="Which is why they are listed separately here, and why the mapping between them is not
+				forced to be one to one. Where a single subdomain is served by two contexts, somebody
+				decided that on purpose. Where one context is straddling two subdomains, that is not a
+				tidy-up job — it is the most interesting sentence on this page, and it usually explains
+				an argument that has been running for years."
+			parent={{ label: 'Home', href: '/' }}
+			actions={[
+				{ label: 'What an entry holds', href: '/doc/catalog/entries/' },
+				{ label: 'Compare against the estate', href: '/landscapes' },
+			]}
+		/>
+
+		<section aria-labelledby="domain" class="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
+			<p class="text-xs font-semibold tracking-[0.16em] text-brand uppercase dark:text-purple-400">
+				The domain
+			</p>
+			<h2 id="domain" class="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{domain.name}</h2>
+			<p class="mt-3 max-w-3xl text-ink-muted dark:text-slate-400">{domain.summary}</p>
+
+			<dl class="mt-8 grid gap-4 text-sm sm:grid-cols-4">
+				<div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+					<dt class="text-ink-muted dark:text-slate-400">Subdomains</dt>
+					<dd class="mt-1 text-2xl font-bold">{counts.subdomains}</dd>
+				</div>
+				<div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+					<dt class="text-ink-muted dark:text-slate-400">Bounded contexts</dt>
+					<dd class="mt-1 text-2xl font-bold">{counts.contexts}</dd>
+				</div>
+				<div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+					<dt class="text-ink-muted dark:text-slate-400">Fully modelled</dt>
+					<dd class="mt-1 text-2xl font-bold">{counts.modelled}</dd>
+				</div>
+				<div class="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+					<dt class="text-ink-muted dark:text-slate-400">Not aligned</dt>
+					<dd class="mt-1 text-2xl font-bold">{counts.notAligned}</dd>
+				</div>
+			</dl>
+
+			<!--
+				Amber rather than the brand colour: this is a caveat about the data, not
+				a feature of it, and it should read as one on first glance.
+			-->
+			<p class="mt-8 rounded-xl border border-amber-300 bg-amber-50 p-5 text-sm dark:border-amber-700/60 dark:bg-amber-950/40">
+				<strong>A worked example.</strong>
+				<span class="mt-1 block text-ink-muted dark:text-slate-400">
+					The contents below are a seed catalog for an insurance carrier — the canonical
+					domain in the literature, and one whose core/supporting/generic split is unusually
+					crisp. Replace it with your own; what is worth copying is the shape of an entry,
+					not the entry.
+				</span>
+			</p>
+		</section>
+
+		{
+			order.map((type) => (
+				<section
+					aria-labelledby={`sub-${type}`}
+					class="border-t border-slate-200 py-14 first-of-type:border-t-0 dark:border-slate-800"
+				>
+					<div class="mx-auto w-full max-w-5xl px-6">
+						<div class="flex flex-wrap items-baseline gap-3">
+							<h2 id={`sub-${type}`} class="text-2xl font-semibold tracking-tight">
+								{typeLabel[type]} subdomains
+							</h2>
+							<span class={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${typeChip[type]}`}>
+								{subdomains.filter((s) => s.type === type).length}
+							</span>
+						</div>
+						<p class="mt-2 max-w-3xl text-ink-muted dark:text-slate-400">{typeBlurb[type]}</p>
+
+						<div class="mt-8 space-y-10">
+							{subdomains
+								.filter((subdomain) => subdomain.type === type)
+								.map((subdomain) => (
+									<article>
+										<h3 class="text-xl font-semibold">{subdomain.name}</h3>
+										<p class="mt-2 max-w-3xl text-ink-muted dark:text-slate-400">
+											{subdomain.summary}
+										</p>
+
+										<ul class="mt-5 grid gap-5 lg:grid-cols-2">
+											{contextsOf(subdomain.slug).map((context) => (
+												<li class="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-night-raised">
+													<span class="flex flex-wrap items-center justify-between gap-2">
+														<h4 class="text-lg font-semibold">{context.name}</h4>
+														<span
+															class={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${conformanceChip[context.conformance]}`}
+														>
+															{conformanceLabel[context.conformance]}
+														</span>
+													</span>
+
+													<p class="mt-3 text-sm text-ink-muted dark:text-slate-400">
+														{context.summary}
+													</p>
+
+													<dl class="mt-5 grow space-y-3 text-sm">
+														<div>
+															<dt class="text-xs font-semibold tracking-wide text-ink-muted uppercase dark:text-slate-500">
+																Language
+															</dt>
+															<dd class="mt-1 flex flex-wrap gap-1.5">
+																{context.language.map((term) => (
+																	<span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs dark:bg-slate-800">
+																		{term}
+																	</span>
+																))}
+															</dd>
+														</div>
+														<div>
+															<dt class="text-xs font-semibold tracking-wide text-ink-muted uppercase dark:text-slate-500">
+																Aggregates
+															</dt>
+															<dd class="mt-1 text-ink-muted dark:text-slate-400">
+																{context.aggregates.length > 0 ? (
+																	context.aggregates.join(', ')
+																) : (
+																	<em>None — bought whole and wrapped.</em>
+																)}
+															</dd>
+														</div>
+														<div>
+															<dt class="text-xs font-semibold tracking-wide text-ink-muted uppercase dark:text-slate-500">
+																Realised by
+															</dt>
+															<dd class="mt-1 space-y-2">
+																{context.realisations.map((realisation) => (
+																	<p class="text-ink-muted dark:text-slate-400">
+																		<span class="font-mono text-xs text-ink dark:text-slate-200">
+																			{realisation.system}
+																		</span>{' '}
+																		<span class="italic">{realisation.role}</span> it —{' '}
+																		{realisation.note}
+																	</p>
+																))}
+															</dd>
+														</div>
+													</dl>
+
+													<p class="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4 text-sm dark:border-slate-700">
+														<span class="text-ink-muted dark:text-slate-400">
+															Owner: <strong class="text-ink dark:text-slate-200">{context.owner}</strong>
+														</span>
+														<span class="text-xs font-semibold tracking-wide text-ink-muted uppercase dark:text-slate-500">
+															{statusLabel[context.status]}
+														</span>
+													</p>
+												</li>
+											))}
+										</ul>
+									</article>
+								))}
+						</div>
+					</div>
+				</section>
+			))
+		}
+
+		<section
+			aria-labelledby="at-a-glance"
+			class="border-t border-slate-200 bg-slate-50 py-16 dark:border-slate-800 dark:bg-night-raised"
+		>
+			<div class="mx-auto w-full max-w-5xl px-6">
+				<h2 id="at-a-glance" class="text-2xl font-semibold tracking-tight">Every context, at a glance</h2>
+				<p class="mt-2 max-w-3xl text-ink-muted dark:text-slate-400">
+					The same {counts.contexts} contexts as a table, because the useful question is usually
+					comparative: which core contexts are not fully modelled, and which boundaries the
+					estate is not respecting.
+				</p>
+
+				<div class="mt-8 overflow-x-auto">
+					<table class="w-full min-w-[46rem] border-collapse text-left text-sm">
+						<thead>
+							<tr class="border-b border-slate-300 dark:border-slate-700">
+								<th scope="col" class="py-3 pr-4 font-semibold">Context</th>
+								<th scope="col" class="py-3 pr-4 font-semibold">Subdomain</th>
+								<th scope="col" class="py-3 pr-4 font-semibold">Model</th>
+								<th scope="col" class="py-3 pr-4 font-semibold">Estate</th>
+								<th scope="col" class="py-3 font-semibold">Owner</th>
+							</tr>
+						</thead>
+						<tbody>
+							{contexts.map((context) => {
+								const subdomain = subdomains.find((s) => s.slug === context.subdomain);
+								return (
+									<tr class="border-b border-slate-200 align-top dark:border-slate-800">
+										<th scope="row" class="py-3 pr-4 font-semibold whitespace-nowrap">
+											{context.name}
+										</th>
+										<td class="py-3 pr-4 text-ink-muted dark:text-slate-400">
+											{subdomain?.name}
+											{subdomain && (
+												<span
+													class={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold uppercase ${typeChip[subdomain.type]}`}
+												>
+													{typeLabel[subdomain.type]}
+												</span>
+											)}
+										</td>
+										<td class="py-3 pr-4 text-ink-muted dark:text-slate-400">
+											{statusLabel[context.status]}
+										</td>
+										<td class="py-3 pr-4">
+											<span
+												class={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase ${conformanceChip[context.conformance]}`}
+											>
+												{conformanceLabel[context.conformance]}
+											</span>
+										</td>
+										<td class="py-3 text-ink-muted dark:text-slate-400">{context.owner}</td>
+									</tr>
+								);
+							})}
+						</tbody>
+					</table>
+				</div>
+
+				<p class="mt-8 text-sm text-ink-muted dark:text-slate-400">
+					The Estate column comes from the
+					<a href="/landscapes" class="font-semibold text-brand underline-offset-4 hover:underline dark:text-purple-400">
+						landscapes
+					</a>
+					, not from anybody&rsquo;s opinion. A context nothing is observing reads
+					<em>Unobserved</em> rather than <em>Aligned</em>, which is the only honest answer.
+				</p>
+			</div>
+		</section>
+	</main>
+	<SiteFooter />
+</Layout>

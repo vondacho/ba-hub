@@ -1,0 +1,77 @@
+---
+title: Tooling
+description: What the work needs software for — and what it does not. The DDD mapper, the landscape collector, and the honest limits of diagramming tools.
+---
+
+Most of this discipline needs a wall, some stickies and the right people in the
+room. Software helps with four specific things, and pretending it helps with
+more is how a modelling programme becomes a tool selection exercise.
+
+## What software is actually for here
+
+**Running the workshop, and keeping the wall afterwards.** A physical wall is
+still the best surface for [event storming](/doc/processes/event-storming/), and
+it dies within a week. The [Event Stormer](/doc/tooling/event-stormer/) is the
+one tool here that exists, and what it buys is that the session survives as a
+text file rather than as photographs.
+
+**Holding the [catalog](/catalog) where people look.** A register that is
+searchable, linkable, and part of the artefacts people already read. This is the
+lowest-tech requirement and the one that matters most.
+
+**Computing the difference between intent and reality.** Nobody can hold
+eleven relationships and eleven integrations in their head and reliably spot the
+mismatches — and nobody will redo it by hand every month. This is the
+[DDD mapper](/doc/tooling/ddd-mapper/), and it is the only part of this section
+that could not be done with a spreadsheet.
+
+**Collecting the evidence.** [Observing the estate](/doc/tooling/evidence/)
+continuously rather than during a two-week audit. Necessarily automated, because
+the value comes from noticing changes within weeks.
+
+## What software is not for
+
+**Drawing the boundaries.** No tool has ever found a bounded context. They are
+found by noticing that two departments mean different things by one word, and
+that happens in conversation.
+
+**Replacing the workshop.** A collaborative modelling tool is worth having when
+people cannot be in a room, and the [Event Stormer](/doc/tooling/event-stormer/)
+is one. It is a substitute for a wall, not for the argument.
+
+**Making the model true.** A beautifully rendered diagram of a wrong model is
+worse than a sketch of a right one, because it is harder to disbelieve.
+
+## The honest position on diagramming tools
+
+They are fine. Use whichever one people will actually open.
+
+What matters more than the tool is one rule: **the diagram must be generated
+from the data, not drawn beside it.** A hand-drawn context map and a catalog are
+two sources of truth, and they will disagree within a quarter — silently, because
+nothing compares them.
+
+That is the specific reason the [landscapes page](/landscapes) renders its maps
+from `src/lib/landscapes.ts` rather than embedding an image. A new relationship
+appears in the tables and the counts on the home page change; nobody has to
+remember to update a picture.
+
+## In this section
+
+- **[Event Stormer](/doc/tooling/event-stormer/)** — the board a domain is
+  discovered on. Deployed, and usable today.
+- **[DDD mapper](/doc/tooling/ddd-mapper/)** — the tool this hub is arguing for.
+- **[Modelling and diagramming](/doc/tooling/modelling/)** — what to use for
+  glossaries and pictures.
+- **[Evidence and discovery](/doc/tooling/evidence/)** — how the landscape gets
+  collected, and what each source cannot see.
+
+## Status
+
+One of them is deployed. The [Event Stormer](/doc/tooling/event-stormer/) is
+doc-hub's board and it is real; the rest have designs, decided interfaces and no
+software, and the [tools page](/tools) says which is which.
+
+Until the mapper exists, the [landscapes page](/landscapes) does by hand what it
+would do continuously — which is a reasonable way to find out whether the
+automated version would pay for itself.

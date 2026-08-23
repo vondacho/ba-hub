@@ -1,0 +1,96 @@
+---
+/*
+ * The banner shared by the home page and /campaigns. Props-driven rather than
+ * hardcoded, matching dev-portal's version: /campaigns is a home page in its own
+ * right and needs the same treatment with different words.
+ */
+import heroBackground from '../../assets/hero-background.svg';
+
+interface Action {
+	label: string;
+	href: string;
+	external?: boolean;
+}
+
+interface Props {
+	kicker: string;
+	title: string;
+	lead: string;
+	actions?: readonly Action[];
+	/** Rendered above the title on second-level pages. */
+	parent?: { label: string; href: string };
+}
+
+const { kicker, title, lead, actions = [], parent } = Astro.props;
+---
+
+<section class="relative isolate flex min-h-[min(70vh,620px)] items-center overflow-hidden px-6 py-20 text-slate-100 sm:py-28">
+	<!--
+		The backdrop is decorative: it carries nothing the copy does not, so it is
+		empty-alt and aria-hidden. The copy sits on a gradient scrim rather than on
+		the artwork itself, so contrast never depends on where the image is dark.
+	-->
+	<!--
+		Deliberately a plain <img>, not <Image>: the backdrop is vector, so there is
+		nothing to resize or re-encode, and routing it through astro:assets would
+		put a request on the SSR image endpoint on every page view for no gain.
+		The import still gets the asset hashed and fingerprinted.
+	-->
+	<img
+		class="absolute inset-0 -z-20 h-full w-full object-cover"
+		src={heroBackground.src}
+		width={heroBackground.width}
+		height={heroBackground.height}
+		alt=""
+		aria-hidden="true"
+		loading="eager"
+		decoding="async"
+	/>
+	<div
+		class="absolute inset-0 -z-10 bg-linear-100 from-slate-950/95 via-slate-950/75 to-slate-950/35"
+	>
+	</div>
+
+	<div class="mx-auto w-full max-w-5xl">
+		{
+			parent && (
+				<nav class="mb-5 text-sm text-slate-300">
+					<a href={parent.href} class="underline-offset-4 hover:text-purple-300 hover:underline">
+						{parent.label}
+					</a>
+					<span aria-hidden="true"> / </span>
+					<span>{kicker}</span>
+				</nav>
+			)
+		}
+		<p class="text-xs font-semibold tracking-[0.16em] text-purple-300 uppercase">
+			{kicker}
+		</p>
+		<h1 class="mt-3 max-w-3xl text-4xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
+			{title}
+		</h1>
+		<p class="mt-5 max-w-2xl text-base text-slate-300 sm:text-lg">
+			{lead}
+		</p>
+		{
+			actions.length > 0 && (
+				<div class="mt-8 flex flex-wrap gap-3">
+					{actions.map(({ label, href, external }, index) => (
+						<a
+							href={href}
+							rel={external ? 'noreferrer' : undefined}
+							class={
+								index === 0
+									? 'rounded-full bg-brand px-6 py-3 font-semibold text-white transition hover:bg-brand-strong focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-purple-300'
+									: 'rounded-full border border-white/35 px-6 py-3 font-semibold text-slate-100 transition hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-purple-300'
+							}
+						>
+							{label}
+							{external && <span class="sr-only"> (leaves this site)</span>}
+						</a>
+					))}
+				</div>
+			)
+		}
+	</div>
+</section>

@@ -1,0 +1,114 @@
+---
+title: Domains and subdomains
+description: How to find the parts of a business — following the money, the vocabulary and the arguments — and why subdomains are discovered rather than designed.
+---
+
+A <span class="term">domain</span> is the business. There is one, and naming it
+is a five-minute job that occasionally reveals the company does not agree about
+what it sells.
+
+A <span class="term">subdomain</span> is a part of that business with its own
+reason to exist, its own vocabulary, and usually its own people. Subdomains are
+**discovered, not designed**: they would exist if the company ran on paper and
+telephones, and no software decision creates or removes one.
+
+That is the whole distinction, and it does most of the work.
+
+## Why "discovered" matters
+
+If a subdomain can be designed, then a reorganisation can create one, and a
+project can decide there are now four instead of three. That is how a
+"domain model" becomes a picture of the org chart, which then has to be redrawn
+every time somebody is promoted.
+
+The test: describe the subdomain without naming a system, a team or a
+department. If you cannot, you are probably looking at a solution, not a
+problem.
+
+- "Deciding which risks we accept and on what terms" — a subdomain.
+- "What the underwriting workbench does" — a system.
+- "What Priya's team is responsible for" — an org chart.
+
+The last two are often *close to* a subdomain, because organisations do tend to
+arrange themselves around real divisions of work. Close is not the same as
+identical, and the gap is usually where the interesting findings are.
+
+## How to find them
+
+Four signals, in rough order of reliability.
+
+### The vocabulary changes
+
+Walk from one part of the business to another and listen for the point where a
+word stops meaning what it meant. This is the strongest signal there is, and it
+is available to anyone who can sit in two meetings.
+
+In the [seed catalog](/catalog), "Risk" means a judgement about whether to
+accept an exposure in underwriting, and a vector of rating factors in pricing.
+Same word, two subdomains.
+
+### Follow the money
+
+Which activities generate revenue, which protect it, and which are pure cost?
+Not because cost centres are unimportant, but because the answer usually tracks
+the [core/supporting/generic split](/doc/strategic/subdomain-types/) closely
+enough to be a good first draft.
+
+### Follow the arguments
+
+Long-running unresolved arguments between departments are almost always
+boundary disputes wearing a different hat. "Sales keeps promising things we
+cannot underwrite" is a statement about where a boundary is and who is upstream
+of whom.
+
+### Follow the specialists
+
+Where the business employs people with a professional qualification of their
+own — actuaries, underwriters, claims adjusters, compliance officers — there is
+usually a subdomain, because the qualification exists precisely because that
+body of judgement does not reduce to the one next door.
+
+## Granularity
+
+The most common question, and the honest answer is that it depends on what you
+are going to do with the answer.
+
+**Too coarse** looks like: one subdomain called "Insurance". Nothing follows
+from it; you cannot classify it, budget it, or draw a boundary from it.
+
+**Too fine** looks like: a subdomain per business capability in a capability
+model, forty of them, each one a noun phrase. Nothing follows from that either,
+because no decision is ever made at that granularity.
+
+A working rule: a subdomain should be big enough that somebody senior owns it
+and small enough that its classification is not obviously contested. If half of
+a proposed subdomain is clearly core and the other half is clearly generic, it
+is two.
+
+## The relationship to bounded contexts
+
+Not one to one, and the places it is not are worth reading.
+
+- **One subdomain, two contexts.** Usually deliberate and usually fine. In the
+  seed catalog, Pricing is served by both Rating (a calculation) and Quotation
+  (a commitment with an expiry) — a split made because the two have different
+  lifecycles and different owners.
+- **Two subdomains, one context.** A warning sign. It usually means one model is
+  being stretched over two vocabularies, and someone is losing.
+- **A subdomain with no context.** Either genuinely manual, or being served
+  invisibly inside something else — which is how a core capability ends up
+  implemented as a spreadsheet nobody has a backup of.
+
+## What to write down
+
+For each subdomain, four things:
+
+1. **A name** in the business's own words.
+2. **What it is for**, in a sentence that does not mention software.
+3. **Its [classification](/doc/strategic/subdomain-types/)**, and the argument
+   for it.
+4. **Who in the business owns it** — a person, not a department.
+
+Everything else belongs to the [contexts](/doc/strategic/bounded-contexts/) that
+serve it, and to the [catalog entry](/doc/catalog/entries/) they get recorded
+in.

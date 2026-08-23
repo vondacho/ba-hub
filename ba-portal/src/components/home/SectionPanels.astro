@@ -1,0 +1,109 @@
+---
+/*
+ * The card grid used by both home pages: the site root lists the hub's areas,
+ * /campaigns lists the campaigns inside one of them.
+ *
+ * Panels arrive as a prop rather than being baked in — there are two sets here,
+ * and a second hardcoded component would drift from the first the moment either
+ * changed.
+ *
+ * `status` is what is actually reachable:
+ *   live    — the link goes somewhere real
+ *   soon    — the page exists and is worth reading, but the thing it describes
+ *             is not built
+ *   planned — nothing behind it yet; the link is a placeholder
+ * Flip a panel to `live` when its section ships.
+ */
+export type PanelStatus = 'live' | 'soon' | 'planned';
+
+export interface Panel {
+	title: string;
+	description: string;
+	href: string;
+	cta: string;
+	status: PanelStatus;
+	/** A single SVG path `d`, stroked. Multiple subpaths are fine. */
+	icon: string;
+	/** Set for links that leave the portal, so they are marked and open safely. */
+	external?: boolean;
+}
+
+interface Props {
+	panels: readonly Panel[];
+	/** Rendered as the section's accessible name. */
+	label: string;
+	/**
+	 * Columns at the `lg` breakpoint. Four puts a four-panel set in a single row,
+	 * matching the other hubs' home pages; three is right for the campaigns,
+	 * which tile 3 + 3. Below `lg` both fall back to the same two-column and
+	 * single-column layouts.
+	 */
+	columns?: 3 | 4;
+}
+
+const { panels, label, columns = 3 } = Astro.props;
+
+// Written out in full rather than interpolated: Tailwind scans the source for
+// class names and cannot see one assembled at runtime, so `lg:grid-cols-${n}`
+// would emit no CSS and the grid would silently collapse to one column.
+const gridClass =
+	columns === 4
+		? 'grid gap-6 sm:grid-cols-2 lg:grid-cols-4'
+		: 'grid gap-6 sm:grid-cols-2 lg:grid-cols-3';
+
+const badges: Record<PanelStatus, string | undefined> = {
+	live: undefined,
+	soon: 'Coming soon',
+	planned: 'Planned',
+};
+
+const id = `panels-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+---
+
+<section aria-labelledby={id} class="mx-auto w-full max-w-5xl px-6 py-16 sm:py-20">
+	<h2 id={id} class="sr-only">{label}</h2>
+
+	<ul class={gridClass}>
+		{
+			panels.map(({ title, description, href, cta, status, icon, external }) => (
+				<li class="h-full">
+					<a
+						href={href}
+						rel={external ? 'noreferrer' : undefined}
+						class="group flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-0.5 hover:border-brand hover:shadow-md motion-reduce:hover:translate-y-0 dark:border-slate-700 dark:bg-night-raised dark:hover:border-purple-400"
+					>
+						<span class="flex items-center justify-between gap-3">
+							<svg
+								viewBox="0 0 24 24"
+								class="h-8 w-8 text-brand dark:text-purple-400"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.6"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								aria-hidden="true"
+							>
+								<path d={icon} />
+							</svg>
+							{badges[status] && (
+								<span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold tracking-wide text-ink-muted uppercase dark:bg-slate-700 dark:text-slate-300">
+									{badges[status]}
+								</span>
+							)}
+						</span>
+
+						<h3 class="mt-5 text-xl font-semibold">{title}</h3>
+						<p class="mt-2 grow text-ink-muted dark:text-slate-400">{description}</p>
+						<span class="mt-6 font-semibold text-brand dark:text-purple-400">
+							{cta}
+							{external && <span class="sr-only"> (leaves this site)</span>}
+							<span aria-hidden="true" class="inline-block transition group-hover:translate-x-1 motion-reduce:transition-none">
+								{external ? <>&nbsp;↗</> : <>&nbsp;→</>}
+							</span>
+						</span>
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</section>

@@ -1,0 +1,129 @@
+---
+title: The approach
+description: Domain-driven business analysis on one page — discover the language, classify the subdomains, draw the boundaries, model inside them, record it, and check it against the running estate.
+---
+
+The whole thing on one page: what the work is, in what order, and what each step
+produces that the next one needs.
+
+## The order matters
+
+Each step below consumes the previous one. Doing them out of order is possible
+and common, and it produces the specific failures noted at each step.
+
+### 1. Listen for the language
+
+**Produces:** candidate terms, and the places two rooms use one word differently.
+
+Before any boundary is drawn, before any classification: sit with the people
+doing the work and write down the nouns and verbs they use without explaining.
+The terms nobody defines are the ones that matter — a word people feel the need
+to define is a word they are borrowing.
+
+The signal you are looking for is *disagreement about a word*. When underwriting
+says "risk" and claims says "risk" and the two definitions cannot both be true,
+that is not a communication problem to fix. It is a boundary, and it is telling
+you where it is.
+
+**Skip this and:** you draw boundaries along the org chart, because that is the
+only structure visible from the outside.
+
+### 2. Find the subdomains
+
+**Produces:** the parts of the business, each classified core, supporting or
+generic.
+
+[Subdomains](/doc/strategic/domains/) are discovered, not designed. They are
+parts of the *problem* — the business would have them if no software existed.
+Follow the money, the specialised vocabulary, and the arguments about priority.
+
+Then [classify each one](/doc/strategic/subdomain-types/), because the
+classification is a budget: core gets your best people and a deep model,
+supporting gets something simple and correct, generic gets bought.
+
+**Skip this and:** effort is spread evenly, which means the core domain is
+underfunded by definition.
+
+### 3. Draw the bounded contexts
+
+**Produces:** boundaries, each with one model, one language, and one owner.
+
+A [bounded context](/doc/strategic/bounded-contexts/) is a solution-space
+decision: inside it, every term means exactly one thing. Contexts often map one
+to one with subdomains, and where they do not, that is worth writing down rather
+than tidying away.
+
+**Skip this and:** you get a canonical enterprise data model, which is a model
+that is slightly wrong for everybody and owned by nobody.
+
+### 4. Model inside each boundary
+
+**Produces:** the aggregates, the invariants, the events.
+
+Only now does [tactical modelling](/doc/model/) start, and only for contexts
+that deserve it. Aggregates, entities, value objects, domain events — but framed
+as business statements, not class stereotypes. An
+[aggregate](/doc/model/aggregates/) is a rule with a boundary drawn around it,
+and the question that produces one is *"what must never be false, even for a
+moment?"*
+
+**Skip this and:** the core domain gets a CRUD model and its rules end up spread
+across screens, batch jobs and the memories of two long-serving employees.
+
+### 5. Follow the processes
+
+**Produces:** business processes, with their boundary crossings named.
+
+A [business process](/doc/processes/) runs across contexts. The valuable output
+is not the flow — it is the list of points where the process leaves one boundary
+and enters another, because each of those is a place with no shared transaction,
+no single owner, and consistency that has to be negotiated.
+
+**Skip this and:** somebody assumes a distributed transaction exists, and the
+compensating action gets designed in production at 2am.
+
+### 6. Record it
+
+**Produces:** [the catalog](/catalog).
+
+An entry per context: language, aggregates, owner, and the systems that claim to
+implement it. Written so that a person who was not in the workshop can use it,
+and structured so that it can be [checked](/doc/catalog/curation/) rather than
+believed.
+
+**Skip this and:** the model lives in the heads of the people who ran the
+workshop, and leaves when they do.
+
+### 7. Check it against the estate
+
+**Produces:** [conformance findings](/doc/landscapes/conformance/).
+
+Observe what the running systems actually do. Compare it to the context map.
+Every disagreement is a finding: the boundary is breached, the relationship was
+never built, or an integration exists that nobody declared.
+
+**Skip this and:** you have a diagram. Everyone will nod at it, and nobody will
+be able to tell you which parts stopped being true.
+
+## What makes this analysis rather than architecture
+
+The steps above are usually presented as architecture work, and steps 4 to 7
+partly are. But the decisions that carry the value are analysis decisions:
+
+- Whether "risk" means the same thing in two departments is a **business
+  question**, answered by talking to people.
+- Whether a subdomain is core is a **strategy question**, answered by whoever
+  decides where money goes.
+- Whether a boundary crossing needs consistency or can tolerate a delay is a
+  **business rule**, and the business is the only place the answer exists.
+- Whether a drift finding matters is a **cost question** — what does it cost
+  when a claim is assessed against the wrong cover?
+
+An architect can answer none of those alone. An analyst who can pose them
+properly changes what gets built.
+
+## The one-sentence version
+
+Find where the language changes, draw the boundary there, model what is inside
+it, record it so somebody else can use it, and then keep checking whether the
+software still agrees.

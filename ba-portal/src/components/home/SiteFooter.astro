@@ -1,0 +1,98 @@
+---
+/*
+ * Contact details are PLACEHOLDERS on the reserved example.org domain — replace
+ * them with real addresses (or drop the column) before this goes anywhere public.
+ * An address that looks real but is not is worse than an obvious stand-in.
+ */
+import { archPortalUrl, apiPortalUrl, devPortalUrl, eventStormerUrl } from '../../lib/links';
+
+const year = new Date().getFullYear();
+
+const columns = [
+	{
+		title: 'Documentation',
+		links: [
+			{ label: 'Overview', href: '/doc/' },
+			{ label: 'The approach', href: '/doc/approach/' },
+			{ label: 'Strategic design', href: '/doc/strategic/' },
+			{ label: 'The domain model', href: '/doc/model/' },
+			{ label: 'Business processes', href: '/doc/processes/' },
+			{ label: 'Ubiquitous language', href: '/doc/strategic/ubiquitous-language/' },
+		],
+	},
+	{
+		title: 'Catalog',
+		links: [
+			{ label: 'Domains and contexts', href: '/catalog' },
+			{ label: 'What an entry holds', href: '/doc/catalog/entries/' },
+			{ label: 'Curation and ownership', href: '/doc/catalog/curation/' },
+			{ label: 'Context mapping patterns', href: '/doc/strategic/context-mapping/' },
+		],
+	},
+	{
+		title: 'Landscapes',
+		links: [
+			{ label: 'Both landscapes', href: '/landscapes' },
+			{ label: 'Context mapping', href: '/doc/landscapes/context-mapping/' },
+			{ label: 'System mapping', href: '/doc/landscapes/system-mapping/' },
+			{ label: 'Conformance and drift', href: '/doc/landscapes/conformance/' },
+		],
+	},
+	{
+		title: 'Platform',
+		links: [
+			{ label: 'Tools', href: '/tools' },
+			{ label: 'Event Stormer', href: eventStormerUrl() },
+			{ label: 'MCP', href: '/doc/mcp/' },
+			{ label: 'Academy', href: '/academy' },
+			{ label: 'Architecture portal', href: archPortalUrl() },
+			{ label: 'API portal', href: apiPortalUrl() },
+			{ label: 'Development portal', href: devPortalUrl() },
+			{ label: 'Service health', href: '/healthz' },
+		],
+	},
+	{
+		title: 'Contact',
+		links: [
+			{ label: 'Domain modelling team', href: 'mailto:ba-hub@example.org' },
+			{ label: 'Report a modelling error', href: 'mailto:ba-hub-support@example.org' },
+		],
+	},
+];
+---
+
+<footer class="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-night-raised">
+	<div class="mx-auto w-full max-w-5xl px-6 py-14">
+		<div class="grid gap-10 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+			{
+				columns.map(({ title, links }) => (
+					<nav aria-labelledby={`footer-${title.toLowerCase()}`}>
+						<h2
+							id={`footer-${title.toLowerCase()}`}
+							class="text-xs font-semibold tracking-[0.14em] uppercase"
+						>
+							{title}
+						</h2>
+						<ul class="mt-4 space-y-2 text-sm">
+							{links.map(({ label, href }) => (
+								<li>
+									<a
+										href={href}
+										class="text-ink-muted underline-offset-4 hover:text-brand hover:underline dark:text-slate-400 dark:hover:text-purple-400"
+									>
+										{label}
+									</a>
+								</li>
+							))}
+						</ul>
+					</nav>
+				))
+			}
+		</div>
+
+		<div class="mt-12 flex flex-col gap-2 border-t border-slate-200 pt-6 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:text-slate-400">
+			<p>© {year} BA Hub. All rights reserved.</p>
+			<p>Domain-driven analysis — the language is the model, and the estate is the evidence.</p>
+		</div>
+	</div>
+</footer>

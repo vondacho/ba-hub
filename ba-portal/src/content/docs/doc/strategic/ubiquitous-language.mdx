@@ -1,0 +1,115 @@
+---
+title: Ubiquitous language
+description: The language that makes a boundary real — not a glossary, not jargon, and not a data dictionary. How to build one, how it fails, and why one word per context beats one word per company.
+---
+
+The <span class="term">ubiquitous language</span> is the set of terms used
+identically by everyone working within a bounded context — the domain experts,
+the analysts, the developers, the tests, and the code.
+
+**Ubiquitous within a context. Never across the company.** That second sentence
+is the one people drop, and dropping it produces the canonical data model, which
+is the most reliably failed artefact in enterprise software.
+
+## What it is not
+
+**Not a glossary.** A glossary is a document that describes what words mean. A
+ubiquitous language is what people actually say. If the glossary says "Party" and
+everyone in the room says "customer", the glossary is a fiction with a
+maintenance cost.
+
+**Not jargon.** Jargon is vocabulary that excludes. This is vocabulary that
+*includes* — its entire purpose is that a developer and an underwriter can say
+the same sentence and mean the same thing.
+
+**Not a data dictionary.** A data dictionary describes fields. A language
+describes concepts, including the ones with no field: "lapse", "repudiate",
+"refer" are verbs the business performs, and none of them is a column.
+
+**Not the same as the business's current words, uncritically.** Sometimes a term
+is genuinely ambiguous inside a single context, and the modelling work is to
+propose a better one and get it adopted. That is a negotiation, not an edict —
+and if the business will not adopt it, the business is right and you were wrong
+about the boundary.
+
+## Building one
+
+### Collect, do not invent
+
+Sit in the meetings and write down the nouns and verbs that nobody explains.
+Words people define as they go are borrowed; words they use bare are theirs.
+
+### Chase the ambiguity
+
+The valuable moments are:
+
+- **One word, two meanings.** Almost always a boundary. Two contexts, and an
+  explicit translation.
+- **Two words, one meaning.** Usually two teams that grew apart inside one
+  context. Pick one and retire the other.
+- **A word with a special case.** "A claim, except for the ones we handle under
+  the delegated authority arrangement" — the exception usually names a concept
+  that deserves its own term.
+
+### Write the sentences, not the nouns
+
+A term list is much less useful than a set of sentences the business asserts:
+
+> A submission may be referred; a referred submission may be accepted or
+> declined by a senior underwriter, and may not be priced until it is accepted.
+
+That paragraph contains four terms, two state transitions and an
+[invariant](/doc/model/aggregates/). A bulleted list of "Submission, Referral,
+Underwriter, Price" contains none of them.
+
+### Put it where the work happens
+
+A language survives by being used in the artefacts people already read:
+acceptance criteria, screen labels, event names, table names, test names. A
+language that lives only in a wiki page is a glossary with better branding.
+
+## How it fails
+
+**Translation creep.** The team starts saying "record" for what the business
+calls a "submission" — usually because a database table is called `record` — and
+within a year the two vocabularies have separated and every conversation needs
+an interpreter.
+
+**The synonym truce.** Two terms coexist because nobody wants to tell one group
+they are wrong. Every document uses both, inconsistently, and a new joiner
+assumes they must be different things.
+
+**The universal term.** One word promoted to mean the union of its meanings in
+every context. "Customer" as an entity with sixty optional attributes, thirty of
+which are only meaningful when the customer is a broker. This is the canonical
+data model in miniature and it fails the same way.
+
+**Vocabulary leakage from a vendor.** A bought system's vocabulary escapes its
+[anticorruption layer](/doc/strategic/context-mapping/) and takes over a context
+that was yours. In the [seed landscape](/landscapes) this is exactly the
+claims-platform finding: vendor field names appearing inside a core context, so
+that a vendor upgrade is now a core-domain change.
+
+## One word, two contexts, on purpose
+
+The point that takes longest to accept: it is *correct* for "Policy" to mean
+different things in policy administration and in claims. Not a problem to
+resolve — a fact to make explicit.
+
+What is required is that the translation is deliberate and visible. In the seed
+catalog, claims receives a **cover snapshot as at the date of loss** rather than
+a live policy, and the [relationship](/doc/landscapes/context-mapping/) between
+those contexts is recorded as an anticorruption layer for precisely that reason.
+
+When that translation is skipped, the failure is not abstract. It is a claim
+assessed against cover that was added after the loss happened — which is the
+highest-cost [finding](/doc/landscapes/conformance/) in the seed estate, and it
+traces back to one word that two systems disagreed about.
+
+## Recording it
+
+Each context in the [catalog](/doc/catalog/entries/) carries its own term list,
+and the useful discipline is to record only the terms that are *specific to this
+boundary* — the ones that mean something here that they do not mean next door.
+A context whose language list is forty generic nouns has recorded a data
+dictionary and learned nothing.

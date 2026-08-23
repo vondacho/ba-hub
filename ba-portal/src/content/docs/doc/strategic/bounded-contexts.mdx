@@ -1,0 +1,127 @@
+---
+title: Bounded contexts
+description: The boundary inside which one model holds and one word means one thing — how to draw it, the signals it is in the wrong place, and why it is not a microservice.
+---
+
+A <span class="term">bounded context</span> is a boundary within which a single
+model applies and every term in the
+[ubiquitous language](/doc/strategic/ubiquitous-language/) means exactly one
+thing.
+
+That is the definition, and every word in it is load-bearing. *Single* model:
+not a preferred model with exceptions. *Every* term: not the important ones.
+*One thing*: not "roughly the same thing".
+
+## What it is not
+
+Four things a bounded context gets confused with, all of which it *interacts*
+with and none of which it *is*:
+
+**Not a microservice.** A context might be one service, or three, or a module
+inside a monolith. In the [seed catalog](/catalog), Risk appetite and Quotation
+are two contexts in one deployable, kept apart by separate schemas and a build
+rule. The boundary is about meaning; the deployment is about operations.
+
+**Not a team.** Teams and contexts *should* line up — a context with two teams
+grows two dialects, and a team with five contexts context-switches all day. But
+the boundary is not defined by who is on the payroll.
+
+**Not a database.** Sharing a database across contexts is a strong signal that
+the boundary is not real, and it is possible to have a genuine boundary inside
+one database with disciplined schemas. Signal, not definition.
+
+**Not a subdomain.** [Subdomains](/doc/strategic/domains/) are the problem,
+contexts are the solution. Frequently one to one, and the exceptions are
+informative rather than untidy.
+
+## Where to draw the line
+
+### Follow the language
+
+The primary technique, and it is available to any analyst who can attend two
+meetings. Where a word changes meaning, there is a boundary.
+
+If "Policy" means *the live contract with its current endorsements* to policy
+services and *the cover as it stood on the date of loss* to claims, then those
+are two models. You can either give them one shared definition that satisfies
+neither, or you can draw a boundary and translate — and only one of those two
+options is honest.
+
+### Follow the reasons for change
+
+Two things that always change together belong in one context. Two things that
+change for different reasons, on different cadences, at the request of different
+people, do not.
+
+Rating changes when the actuaries reprice. Quotation changes when the sales
+process changes. They are adjacent, they are not the same.
+
+### Follow the invariants
+
+If two concepts must be consistent *at all times* — not eventually, not within
+a minute — they are probably in one context. Consistency requirements that cross
+a boundary are the most expensive thing on a
+[context map](/doc/landscapes/context-mapping/), so a boundary drawn straight
+through an invariant is a boundary drawn badly.
+
+### Follow the conversation
+
+Where does a question stop being answerable? If the underwriting team can answer
+every question about a submission but has to ask someone else what the premium
+is, the boundary is between those two questions.
+
+## Signals that a boundary is wrong
+
+Six symptoms, in descending order of how often they turn out to be real.
+
+**A term needs a qualifier every time it is used.** "The claims policy" versus
+"the admin policy" versus "the policy policy". Prefixes are a boundary trying to
+get out.
+
+**Every change needs two teams.** If a routine change to one context always
+requires a coordinated change to another, the boundary is in the wrong place or
+the relationship pattern is wrong.
+
+**A translation layer that keeps growing.** A small adapter is healthy. An
+adapter that has grown business rules has become a third context nobody named.
+
+**The same concept is edited in two places.** Two systems both authoritative for
+party identity is not an integration problem; it is a modelling one. It is the
+Party finding in the [seed landscape](/landscapes).
+
+**One context has two glossaries.** Usually visible in the code as two module
+trees that share nothing but a deployment. Split it.
+
+**Nobody can name the owner.** Not fatal on day one, fatal by month six. An
+unowned boundary is a suggestion, and suggestions lose to deadlines.
+
+## Big contexts and small ones
+
+There is no correct size, and both extremes have a characteristic failure.
+
+**Too large:** the model gets vague to accommodate everything inside it. The
+telltale is a class or a table with thirty optional fields, half of which are
+mutually exclusive depending on a type code.
+
+**Too small:** the process cost dominates. Every business operation crosses four
+boundaries, each crossing needs translation and its own consistency story, and
+the [processes section](/doc/processes/across-contexts/) becomes the whole
+project.
+
+When in doubt, start larger and split. Splitting a context that grew two
+languages is a known, tractable operation; merging two contexts that were never
+one is a rewrite.
+
+## Recording it
+
+A bounded context in the [catalog](/doc/catalog/entries/) is not real until it
+has all four of:
+
+1. **A name** that the business recognises.
+2. **A language** — the terms that mean something specific here.
+3. **An owner** with a name.
+4. **A statement of what is inside**, whether that is a full set of
+   [aggregates](/doc/model/aggregates/) for a core context or an honest "bought
+   whole and wrapped" for a generic one.
+
+Three out of four is a boundary somebody drew on a whiteboard.

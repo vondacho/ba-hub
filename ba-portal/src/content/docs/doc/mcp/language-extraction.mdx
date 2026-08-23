@@ -1,0 +1,85 @@
+---
+title: Language extraction
+description: Building a per-context term list from documents, schemas and code — and reporting the collisions that indicate a boundary.
+---
+
+**Status: described, not built.**
+
+Of the four servers, this is the one that looks most clearly worth building,
+because the check it automates is one humans stop doing.
+
+## The problem
+
+The [ubiquitous language](/doc/strategic/ubiquitous-language/) is per-context,
+and collisions across contexts are the primary signal for where a
+[boundary](/doc/strategic/bounded-contexts/) is.
+
+Finding them by hand requires holding several contexts' vocabularies in your
+head at once and noticing that "risk" is doing different work in two of them.
+People are good at this for a handful of terms and hopeless at it for two
+hundred — and the estate has two hundred.
+
+## What it would read
+
+- [Catalog](/doc/catalog/entries/) language lists, per context
+- Requirement documents and acceptance criteria
+- API schemas ([api-hub](/go/api)) and database schemas
+- Source code — type names, event names, module names
+- Workshop output
+
+## What it would emit
+
+**A per-context term list**, with the sources each term was found in and how
+often.
+
+**Collisions**, which is the point:
+
+*One word, two meanings.* `Risk` in the seed catalog means a judgement about an
+exposure in Risk appetite and a vector of rating factors in Rating. Detected by
+looking at what surrounds the word — the terms it co-occurs with, the operations
+performed on it, the types it appears alongside.
+
+*Two words, one meaning.* Usually two teams that grew apart inside one context.
+Cheaper to fix than a boundary and rarely noticed.
+
+*Leakage.* A term from one context appearing where it should not. Vendor
+vocabulary inside a core context is the highest-signal case, and it is exactly
+the claims-platform [finding](/doc/landscapes/conformance/) in the seed
+landscape — found in that example by reading source code, which is what this
+server would do continuously.
+
+*Drift from the catalog.* Terms in use that the catalog does not record, and
+recorded terms nobody uses. Both indicate the entry has stopped tracking
+reality.
+
+## What it must not do
+
+**Resolve collisions.** A collision is a finding, not a defect. The resolution —
+draw a boundary, rename one term, accept the ambiguity — is a modelling decision
+with owners. Auto-renaming would destroy the signal that a boundary is missing.
+
+**Flatten to a canonical vocabulary.** The instinct on seeing two meanings is to
+pick one. That instinct produces the canonical data model, which is the failure
+this discipline exists to avoid. The output must be *"these two contexts mean
+different things, and there is no translation recorded"*, not *"these should be
+unified"*.
+
+**Assume frequency means importance.** The most-used term in a corpus is usually
+the most generic one.
+
+## The check worth having
+
+If only one thing from this page were built, it should be this:
+
+**A word that appears in two contexts with no translation recorded between
+them.**
+
+Either the two contexts mean the same thing — in which case, why are they
+separate — or they mean different things and the
+[relationship](/doc/landscapes/context-mapping/) between them should say what
+translates. The seed catalog's Risk/Risk pair passes that check precisely
+because the Rating entry says outright that the word arrives meaning something
+else.
+
+That single check would have caught the most expensive finding in the seed
+estate years before a claim was paid against the wrong cover.

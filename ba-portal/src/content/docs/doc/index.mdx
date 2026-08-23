@@ -1,0 +1,111 @@
+---
+title: Overview
+description: What domain-driven business analysis is, why the boundaries matter more than the diagrams, and how this hub is organised — strategic design, the domain model, business processes, the catalog and the two landscapes.
+---
+
+The business already has a model. Most of it is not written down anywhere.
+
+It lives in the words people use, in the exceptions they apologise for, and in
+the arguments that never resolve because two departments mean different things
+by the same noun. Domain-driven analysis is the work of finding those
+boundaries, naming them, and writing down the model that holds inside each one.
+
+**This hub is where that model is decided, recorded, and checked against
+reality.**
+
+That last clause is the one that makes this hub different from a wiki full of
+diagrams, and it is worth being blunt about why.
+
+## The two halves
+
+Most domain modelling efforts stop at exactly the point where they become
+valuable.
+
+**The first half is discovery.** Workshops, interviews, event storming. It
+produces subdomains, bounded contexts, a language per context, and a map of how
+those contexts are meant to relate. It is genuinely hard, and when it goes well
+everyone leaves the room agreeing about something they had been disagreeing
+about for years.
+
+**The second half is conformance.** Four years later, is any of it still true?
+Does the estate respect the boundary that was drawn? Did the anticorruption
+layer ever get built, or did somebody run out of sprint and join the two tables
+directly?
+
+The first half without the second produces a diagram that is confidently wrong
+and impossible to falsify. So this hub treats them as one job: every bounded
+context in [the catalog](/catalog) carries the systems that claim to implement
+it, and every relationship on the [context map](/doc/landscapes/context-mapping/)
+is checked against an integration somebody actually observed.
+
+## The four distinctions
+
+Almost every expensive mistake in this discipline is one of four collapses.
+
+**Problem space and solution space.** A [subdomain](/doc/strategic/domains/) is
+a part of the business — you were given it, and you do not get to choose it. A
+[bounded context](/doc/strategic/bounded-contexts/) is a boundary you drew.
+Mixing the two produces a "domain model" that is really an org chart, or an org
+chart defended as if it were the domain.
+
+**Core, supporting and generic.** A
+[classification](/doc/strategic/subdomain-types/) that is really a budget. Get
+it wrong and you build your own invoicing while buying the thing your customers
+actually pay you for.
+
+**The word and the concept.** Two contexts using the word "Policy" are not
+sharing a concept, and forcing them to share a table is how the
+[ubiquitous language](/doc/strategic/ubiquitous-language/) dies. One language
+per boundary, and the translation between them made explicit.
+
+**Intent and reality.** A [context map](/doc/landscapes/context-mapping/) says
+what should be true. A [system map](/doc/landscapes/system-mapping/) says what
+is. Keeping them apart is what makes [drift](/doc/landscapes/conformance/)
+something you can count rather than something you suspect.
+
+## How the documentation is organised
+
+| Section | Answers |
+|---------|---------|
+| [Strategic design](/doc/strategic/) | **Where** are the boundaries, and which side of each one is worth your best people? |
+| [The domain model](/doc/model/) | **What** holds inside a boundary — the things, the rules, and which rules may never be false? |
+| [Business processes](/doc/processes/) | **How** does work flow across boundaries, and what happens to consistency when it does? |
+| [The catalog](/doc/catalog/) | **How is it recorded** so that a second person can use it and a year cannot rot it? |
+| [Landscapes](/doc/landscapes/) | **Is it true**, according to systems that are actually running? |
+| [Tooling](/doc/tooling/) | **With what**, and why that rather than a diagram in a wiki? |
+
+The distinction most often collapsed is the first two. "We modelled the domain"
+usually means somebody drew aggregates, which is the second question answered
+without the first — and an aggregate inside a boundary drawn in the wrong place
+is a well-built room in a house facing away from the road.
+
+## Who this is for
+
+Business analysts, first. The discipline was written down mostly by and for
+software architects, and a lot of it reads that way; but the parts that decide
+whether a system fits the business are analysis work, and an analyst who can say
+where an invariant lives can hold a design conversation that a use-case document
+never opens.
+
+Also product owners, domain experts and enterprise architects, who own three of
+the four things a bounded context needs before it is real: a name, a language,
+and somebody who answers for both.
+
+## What is here today
+
+This portal is a scaffold, and it says so where it matters. The documentation
+sections above are written; the [catalog](/catalog) contents are a worked
+example rather than a real estate, the [DDD mapper](/doc/tooling/ddd-mapper/)
+and the landscape collector are designed and not built, the [MCP](/doc/mcp/)
+servers are described and not built, and the [Academy](/academy) lessons are not
+recorded. Each says so on its own page.
+
+One tool is real. The [Event Stormer](/doc/tooling/event-stormer/) is doc-hub's
+event storming board, deployed and usable today — which matters more than its
+size suggests, because it covers the first step of
+[the approach](/doc/approach/) and every other step consumes what it produces.
+
+The neighbouring hubs are real too: the architecture these contexts are realised
+in is [arch-hub](/go/arch), the contracts a context integration runs over are in
+[api-hub](/go/api), the practices that turn an agreed model into running code are
+in [dev-hub](/go/dev), and the workshop boards are in [doc-hub](/go/stormer).

@@ -1,0 +1,80 @@
+---
+title: Drift analysis
+description: Turning landscape evidence into findings a business reader will act on — the consequence rather than the mechanism, with a cost and an owner.
+---
+
+**Status: described, not built.**
+
+## The problem
+
+The [DDD mapper](/doc/tooling/ddd-mapper/) can compute that an edge drifts. What
+it cannot do is write the sentence that makes somebody act.
+
+> claims-platform performs direct reads against the legacy-policy-master schema
+> rather than consuming a materialised snapshot.
+
+> A claim can be assessed against cover that was added to the policy after the
+> loss happened. A mid-term endorsement silently changes what an open claim
+> appears to be covered for.
+
+Same fact. The first gets triaged as technical debt; the second as a regulatory
+exposure. Writing the second version requires knowing what the contexts are
+*for*, which is in the catalog — and it is the step humans reliably skip because
+it takes twenty minutes per finding.
+
+## What it would read
+
+- The computed verdicts from the mapper
+- The catalog: what each context is for, its language, its owner, its
+  [classification](/doc/strategic/subdomain-types/)
+- The declared [pattern](/doc/strategic/context-mapping/) and its rationale
+- The process models that cross the affected boundary
+
+## What it would emit
+
+For each drift, the four parts a
+[finding](/doc/landscapes/conformance/) needs:
+
+**What is true**, in business terms — derived by combining the mechanism with
+what the catalog says the two contexts are for.
+
+**What it puts at risk** — which business operations run across this crossing,
+from the [process models](/doc/processes/across-contexts/), and what goes wrong
+for them.
+
+**Who owns it** — the downstream context owner, from the catalog.
+
+**What would resolve it**, concretely. *"Materialise a cover snapshot at
+notification and read only that"*, not *"decouple claims from policy"*.
+
+Plus **a suggested rank**, marked as a suggestion, from exposure × frequency ÷
+fix cost.
+
+## What it must not do
+
+**Assign a cost.** A model can say which operations are affected and how often.
+It cannot say what a wrong claim decision costs this insurer, and a fabricated
+number is worse than none because it will be quoted. The cost field is left for
+the context owner, and it should look empty rather than confident.
+
+**Rank definitively.** Severity is a business judgement. The suggested rank is
+an ordering to argue with.
+
+**Close findings.** An [accepted finding](/doc/landscapes/conformance/) is a
+decision a person made, and the record of who accepted it is most of its value.
+A finding that stops appearing because the evidence stopped arriving is an
+observability gap, and must be reported as one rather than as a fix.
+
+**Narrate uncertainly.** If the evidence does not support a consequence, the
+finding says what was observed and stops. A plausible business consequence
+invented to fill the field is the failure mode that would discredit the whole
+section.
+
+## The alert worth having
+
+Beyond the report: **two systems started talking this week and nobody declared
+it.**
+
+An unmapped integration caught within a week is a conversation. Caught after
+four years, it is a dependency, and the boundary decision has already been made
+by default.

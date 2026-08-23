@@ -1,0 +1,82 @@
+---
+title: Domain distillation
+description: Proposing candidate subdomains from what the business already wrote — what it reads, what it emits, and why the classification must never be automatic.
+---
+
+**Status: described, not built.**
+
+## The problem
+
+Starting a domain analysis in an established organisation means reading. Process
+documents, product literature, the intranet, four years of requirement
+specifications, the org chart, last year's transformation deck. Somewhere in
+there is most of what the business does.
+
+Reading it takes weeks and produces a first draft that is then thrown away when
+the workshops disagree with it. The reading is necessary and it is not
+judgement — which makes it the right shape for automation.
+
+## What it would read
+
+- Process documentation and standard operating procedures
+- Product literature and customer-facing descriptions
+- Existing requirement documents and specifications
+- Org structure, role descriptions, job titles
+- Existing system documentation, where it exists
+
+## What it would emit
+
+**Candidate subdomains**, each with:
+
+- A name in the business's own words, taken from the source rather than invented
+- A one-sentence summary of what it is for
+- **The evidence**: which documents, which passages. Non-negotiable — a proposal
+  without citations cannot be checked, and an uncheckable proposal is worse than
+  none
+- A *suggested* classification, clearly marked as a suggestion
+- Confidence, and the reason for low confidence where it is low
+
+**Vocabulary clusters** — groups of terms that appear together, which frequently
+indicate a boundary before anyone has drawn one.
+
+**Contradictions** — places where two documents describe the same activity
+incompatibly. These are the highest-value output. A contradiction is either a
+boundary, a process that changed and left stale documentation, or a genuine
+disagreement nobody has surfaced, and all three are worth an analyst's morning.
+
+## What it must not do
+
+**Classify autonomously.** Whether a subdomain is
+[core](/doc/strategic/subdomain-types/) is a strategy decision — it depends on
+where the business intends to compete, which is frequently not written down
+anywhere and occasionally not decided. A model reading documents will infer core
+from *volume of documentation*, which correlates with regulatory burden rather
+than with competitive advantage. That inference is confidently wrong in a
+predictable direction.
+
+The suggested classification is a prompt for the conversation, and the output
+should say so.
+
+**Write to the catalog.** Proposals go to an analyst. Every
+[catalog entry](/doc/catalog/entries/) has a human owner who stands behind it,
+and an automated writer destroys that property.
+
+**Replace the workshop.** The documents describe what the business wrote down.
+The [workshops](/doc/processes/event-storming/) surface what it does. The gap is
+where the interesting findings are, and a distillation that made the workshop
+feel redundant would be actively harmful.
+
+## Where it would be worth most
+
+**Large established organisations** with a lot of written material and nobody who
+holds the whole picture. This is the case it is designed for.
+
+**Acquisitions**, where two businesses need comparing and neither team has read
+the other's documentation.
+
+**Restarting a stalled programme**, where earlier attempts left artefacts nobody
+has reconciled.
+
+Where it would be worth least: a startup with no documents, or a domain where
+the expert knowledge has never been written down — which is common, and is
+exactly where an analyst is irreplaceable.

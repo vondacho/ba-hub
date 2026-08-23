@@ -1,0 +1,117 @@
+---
+title: What an entry holds
+description: The fields on a catalog entry, why each one is there, and the two fields that are impossible to leave blank without admitting something.
+---
+
+An entry is small on purpose. Every field below has to earn its place by being
+used, and a field nobody reads is a field somebody has to maintain.
+
+## Subdomain entry
+
+| Field | Why |
+|---|---|
+| **Name** | In the business's own words. If the business does not recognise it, it is not a subdomain. |
+| **Type** | Core, supporting or generic. [A budget](/doc/strategic/subdomain-types/), not a label. |
+| **Summary** | What it is for, in a sentence that mentions no software. |
+| **Owner** | The person in the business who answers for this part of it. |
+
+Four fields. A subdomain does not need more, because everything else belongs to
+the contexts that serve it.
+
+## Bounded context entry
+
+| Field | Why |
+|---|---|
+| **Name** | The boundary's name. |
+| **Subdomain** | Which problem it serves. Where two contexts serve one subdomain, or one straddles two, that is visible here. |
+| **Summary** | What one model means inside this boundary — ideally naming a term that means something different next door. |
+| **Language** | The terms specific to *this* boundary. Not a glossary; see below. |
+| **Aggregates** | The [consistency boundaries](/doc/model/aggregates/). Empty is a legitimate answer for a generic context, and it means something. |
+| **Owner** | A named person. See below. |
+| **Model status** | Modelled, drafted, or not modelled. Honesty about depth. |
+| **Realised by** | The systems that claim to implement it, and what each one actually does. |
+| **Conformance** | What the [landscape](/doc/landscapes/) says. Never entered by hand. |
+
+## The fields that need defending
+
+### Language
+
+Record only the terms that are **specific to this boundary** — the ones that
+mean something here they do not mean next door, or that exist here and nowhere
+else.
+
+A context listing forty generic nouns has recorded a data dictionary. A context
+listing five terms, two of which collide with a neighbour's, has recorded the
+reason the boundary exists.
+
+In the [seed catalog](/catalog), Risk appetite lists `Risk` and Rating lists
+`Rating factor` — and the entry for Rating says outright that "Risk" arrives
+from next door meaning something else. That sentence is the most valuable one in
+the entry.
+
+### Aggregates, and the empty list
+
+An empty aggregate list is a statement: *this context is bought whole and
+wrapped, and we have deliberately not modelled it.*
+
+That is different from an entry where somebody has not got round to it, which is
+what **model status: drafted** is for. Keeping the two distinguishable is worth
+the extra field, because otherwise "no aggregates" is ambiguous between a
+decision and an omission — and the decision is one of the more valuable pieces
+of information in the register.
+
+### Owner
+
+A person. Not "the architecture team", not "Claims", not a distribution list.
+
+This is the field most often fudged, and fudging it is how boundaries erode.
+When two teams disagree about whether a term means one thing or another, the
+question has to reach somebody who can settle it. A department cannot settle
+anything.
+
+If no name can be found, record that: *unowned*. An unowned core context is a
+finding, and one worth escalating — it is more useful as a visible gap than as a
+plausible-looking department name.
+
+### Realised by
+
+The link between intent and reality, and the reason the catalog is checkable.
+
+Each realisation names a system and what it does to the context:
+
+- **implements** — owns it, boundaries respected.
+- **partially implements** — owns some of it; say which part and where the rest
+  is.
+- **shares a database with** — a boundary that exists on paper only.
+- **reaches into** — reads or writes past the boundary. Always a finding.
+- **is bought for** — a vendor product behind an adapter.
+
+And a **note** that is specific and falsifiable. *"Claims reads the live policy
+tables 40,000 times a day; no snapshot table exists"* is a note somebody can go
+and check. *"Some coupling with the legacy system"* is a rumour with a
+formatting budget.
+
+### Conformance
+
+Derived from the [landscape](/doc/landscapes/conformance/), never typed in.
+
+The value that matters most is **unobserved** — nothing is watching this context,
+so no claim about it can be supported. That is a much more honest default than
+"aligned", and it is the value Documents carries in the seed catalog for exactly
+that reason.
+
+## What is not in an entry
+
+**Diagrams.** They belong in the [landscapes](/doc/landscapes/), generated from
+the relationship data rather than drawn by hand. A hand-drawn diagram inside a
+catalog entry is a second source of truth with no way to check it.
+
+**Requirements.** A context is not a backlog.
+
+**Team structure.** Related and separately recorded. Contexts and teams should
+line up, and putting the team in the entry means the catalog needs updating
+every reorganisation, which is how a register acquires a reputation for being
+out of date.
+
+**History.** Version control has it. What belongs in the entry is what is true
+now, plus the *reason* for anything surprising — the rationale, not the changelog.

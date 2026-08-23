@@ -1,0 +1,133 @@
+---
+title: Process modelling
+description: Turning a workshop wall into something that survives the week — the four-part sentence, what to record, and why BPMN is a different artefact from a domain process model.
+---
+
+A wall of stickies has a half-life of about a week. This page is about what to
+write down so the model survives, and in what form.
+
+Process modelling is not a separate exercise from
+[event storming](/doc/processes/event-storming/) — it is the same wall, one level
+deeper. The [Event Stormer](/doc/tooling/event-stormer/) treats it that way:
+raising the level from big picture to **process modelling** adds exactly three
+cards, `command`, `policy` and `readmodel`, to the events that are already there.
+Nothing is orphaned and no second board is started.
+
+So the practical sequence is: storm the big picture, raise the level, and place
+the three new colours around the events the room already agreed on.
+
+## The four-part sentence
+
+Nearly all of process modelling reduces to repeating one sentence:
+
+> A **command** is a request that may be refused.
+> An **aggregate** decides, using its [invariants](/doc/model/aggregates/).
+> An **event** is the resulting fact.
+> A **policy** reacts to the event by issuing the next command.
+
+Written out for one step:
+
+| | |
+|---|---|
+| **Command** | Refer submission |
+| **Actor** | Underwriter |
+| **Aggregate** | `Submission` |
+| **Rules** | Must not already be declined; must be within an open renewal window |
+| **Event** | `SubmissionReferred` |
+| **Policy** | Whenever a submission is referred → notify a senior underwriter |
+| **Read model** | Referral queue, ordered by expiry |
+| **Context** | Risk appetite |
+
+A process is a list of those, in order. It is dull to write and it is
+unambiguous, which is the point — every column is a question with a definite
+answer, and a missing answer is visible rather than glossed.
+
+Five of those eight rows are cards on the
+[board at process-modelling level](/doc/tooling/event-stormer/) — command, actor,
+event, policy, read model — and a sixth, the aggregate, arrives at software
+design. The table and the wall are the same model in two shapes: the wall is
+better for building it with a room, the table is better for the **rules** column,
+which is the one a wall has no square for.
+
+## The columns that carry the weight
+
+**Rules.** The reason to write the step down at all. A step with no rules is a
+data transfer, and a step whose rules are "as per current process" has not been
+analysed.
+
+**Context.** Whenever this column changes between two consecutive rows, the
+process has crossed a boundary — no shared transaction, translation required,
+failure handled by compensation. See
+[processes across contexts](/doc/processes/across-contexts/).
+
+This is the column the board cannot fill in for you: it holds a wall, not the
+[catalog](/catalog), so nothing in it knows which context owns a given command.
+Filling it in is currently a manual pass over a finished `.eventstorm` file, and
+it is precisely what the [storm reconciler](/tools) would automate.
+
+**Read model.** Frequently skipped, and it is where a lot of hidden work lives.
+"The underwriter checks the broker's loss history" implies a read model
+assembled from somewhere, possibly from another context, possibly by someone
+opening a second system and typing.
+
+## What to leave out
+
+**The screens.** A process model that names screens is a model of the current
+software. It will be wrong after the next redesign and it teaches the reader
+that the software is the process.
+
+**The org chart.** Record the *role* that issues a command, not the department.
+Roles are stable; departments are reorganised.
+
+**Timings and volumes.** Real and important and they belong somewhere else —
+they are operational facts, they change constantly, and mixing them in makes the
+model look stale when only the numbers moved.
+
+## BPMN, and what it is for
+
+The obvious question from anyone with a business analysis background: is this
+not just BPMN?
+
+No, and both are worth having.
+
+**BPMN** describes flow control: sequence, gateways, parallel paths, timers,
+lanes. It is good at *how work moves* and it is executable by an engine.
+
+**A domain process model** describes decisions and facts: what may be refused,
+by what rule, producing what fact, in which boundary. It is good at *what is
+true* and it is not executable by anything.
+
+They answer different questions and neither replaces the other. A useful
+division:
+
+- Use BPMN when the flow is genuinely complex — many gateways, parallel
+  branches, timers, escalations — or when an engine will run it.
+- Use the four-part table when the *rules* are the complex part, which in a
+  [core subdomain](/doc/strategic/subdomain-types/) they usually are.
+- If you produce both, keep the table authoritative for rules and boundaries,
+  and let the BPMN reference it. Two artefacts that both claim to own the rules
+  will diverge, and the one that diverges silently is the one nobody executes.
+
+The [Event Stormer](/doc/tooling/event-stormer/) is neither of these. It is the
+surface the model is *built* on, with a room; the table and the BPMN are what it
+gets written down as afterwards. Its one structural advantage over both is that
+column position means time, so two cards in the same column are simultaneous —
+which is where a boundary crossing with no transaction behind it becomes visible,
+and which neither a table nor a single-line flow can show.
+
+## Keeping it alive
+
+The same discipline as the [catalog](/doc/catalog/curation/): a process model
+rots unless something checks it.
+
+Two cheap checks:
+
+**Trace one real case a quarter.** Take an actual submission or claim, follow
+it, and compare. Discrepancies are either process drift or model rot, and both
+are worth knowing.
+
+**Re-derive the boundary crossings.** If the process now crosses a boundary it
+did not cross before, something significant changed — either the process, or the
+boundary was wrong. That check is also what the
+[landscape](/doc/landscapes/conformance/) does continuously for integrations,
+and the two findings often point at the same thing from different directions.

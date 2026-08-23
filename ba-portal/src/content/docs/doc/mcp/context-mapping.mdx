@@ -1,0 +1,73 @@
+---
+title: Context mapping assistant
+description: Proposing relationship patterns for context pairs from what actually crosses between them — and challenging the patterns that look aspirational.
+---
+
+**Status: described, not built.**
+
+## The problem
+
+Two failures with [context maps](/doc/landscapes/context-mapping/), and both are
+tedious rather than difficult.
+
+**Aspiration.** Every arrow gets labelled customer/supplier, because conformist
+feels like an admission. A map of aspirational patterns tells you nothing.
+
+**Staleness.** A relationship labelled open host service four years ago, when
+there were two consumers and one endpoint. There are now six consumers and four
+bespoke endpoints, and the label has not moved.
+
+Both are caught by comparing the declared pattern against what crosses. That
+comparison is mechanical.
+
+## What it would read
+
+- Declared relationships from the catalog
+- Observed integrations from the [landscape collector](/doc/tooling/evidence/)
+- Schemas and payload shapes ([api-hub](/go/api))
+- Repository ownership and commit history, for who can change what
+
+## What it would emit
+
+**A proposed pattern for each context pair**, with the evidence:
+
+- Many consumers of one stable interface → open host service
+- One consumer, bespoke shape, upstream changes on request → customer/supplier
+- Downstream adapts to an interface it never influences → conformist
+- Both sides write the same model → shared kernel
+- Traffic in both directions, changes landing together → partnership
+- Vendor vocabulary stopping at an adapter → anticorruption layer, working
+- Vendor vocabulary past the adapter → anticorruption layer, breached
+
+**Challenges to declared patterns**, which is the valuable half:
+
+> Declared customer/supplier. The upstream repository has had no commit
+> referencing a downstream request in 18 months, and the downstream adapter has
+> grown three times. This looks like conformist.
+
+> Declared open host service. Four of six consumers use endpoints no other
+> consumer calls. This is six bespoke integrations with one deployment.
+
+> Declared shared kernel. The two sides reconcile nightly with an 87% match
+> rate. A reconciliation is not a kernel.
+
+That last one is the Party finding in the [seed landscape](/landscapes),
+detectable entirely from the mechanism.
+
+## What it must not do
+
+**Change a declared pattern.** A pattern is an agreement between two owners.
+The assistant proposes and challenges; the owners decide, and the record of the
+decision is the value.
+
+**Confuse "is" with "should be".** Observed behaviour tells you the pattern in
+force, not the one that ought to be. A conformist relationship into a core
+context is correctly *detected* as conformist and is still a
+[finding](/doc/landscapes/conformance/) — the right response may be to build an
+anticorruption layer rather than to relabel the arrow.
+
+**Propose relationships for unmapped integrations.** An unmapped integration is
+a [modelling question](/doc/landscapes/conformance/): either the map is
+incomplete or the boundary is wrong. Adding an arrow answers it by assuming the
+comfortable case, which is how a map gets talked into agreeing with whatever was
+built.

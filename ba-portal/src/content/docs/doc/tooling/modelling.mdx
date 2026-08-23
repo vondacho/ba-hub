@@ -1,0 +1,91 @@
+---
+title: Modelling and diagramming
+description: What to use for workshops, glossaries and pictures — with the one rule that matters more than the tool choice.
+---
+
+This page is deliberately short, because the tool choice matters much less than
+the discipline around it.
+
+## The one rule
+
+**The diagram is generated from the data. It is never drawn beside it.**
+
+A hand-drawn context map alongside a catalog is two sources of truth. They will
+disagree within a quarter, silently, because nothing compares them — and the
+diagram will win the disagreement, because it is the one people look at.
+
+Everything below is subordinate to that rule.
+
+## Workshops
+
+**In person, a wall and stickies.** Nothing has improved on this. Eight metres
+of wall, five colours, and a facilitator who insists on the past tense. See
+[event storming](/doc/processes/event-storming/).
+
+**Remote, or afterwards: the [Event Stormer](/doc/tooling/event-stormer/).**
+doc-hub's board, deployed and usable. It is the exception to the rule below,
+because it is built as a wall rather than as a modelling tool — square cards on a
+grid, a `+` on every square, and a `hotspot` colour for the things nobody could
+settle. It writes a plain `.eventstorm` file, which is what stops the wall dying
+within a week.
+
+Two things get worse remotely whatever the tool, and both need compensating for:
+people contribute less spontaneously, and the facilitator cannot see who has
+stopped participating. Smaller groups and more explicit turn-taking help.
+
+**Do not use a *modelling* tool for the workshop.** Anything that requires
+well-formed input suppresses the messy contributions, and the messy
+contributions are where the model is. A board that accepts four words on a square
+is not that; a tool that wants an aggregate declared before it will draw one is.
+
+## Glossaries and language
+
+The [ubiquitous language](/doc/strategic/ubiquitous-language/) needs to live
+where the work happens, which means the requirement is *linkable and searchable*
+rather than *feature-rich*.
+
+The **[language workbench](/tools)** described on the tools page would add the
+one thing a wiki cannot do: **collision detection**. Where the same word carries
+two meanings across contexts, and where two words carry one. That is the check
+worth automating, because it is exactly the check a human doing it by hand will
+stop doing.
+
+Until it exists, the language lives in the [catalog](/doc/catalog/entries/), one
+term list per context, recording only the terms specific to that boundary.
+
+## Diagrams
+
+**Mermaid or Structurizr** for anything generated from data. Both are text,
+both diff, both live next to the model.
+
+**Structurizr** in particular is worth knowing about if the organisation already
+uses C4: it takes a model as text and produces several views from it, which is
+the same rule as above applied to architecture. [arch-hub](/go/arch) covers the
+C4 side.
+
+**Avoid**: any tool where the diagram is the artefact and the model is implied by
+it. Visio, PowerPoint, and every drawing tool with a UML stencil. Not because
+they are bad at drawing — because a picture that is the only record of a model
+cannot be checked against anything.
+
+## Process modelling
+
+Covered in [process modelling](/doc/processes/modelling/): BPMN for flow control,
+the four-part table for rules and boundaries, and if you produce both, keep the
+table authoritative for the rules.
+
+The building of it happens on the
+[Event Stormer](/doc/tooling/event-stormer/) — process modelling is one of its
+three levels, not a separate tool. The **[storm reconciler](/tools)** on the
+tools page would add the piece neither the board nor the table gives you:
+attaching each card to the context that owns it, so that boundary crossings are
+computed rather than remembered.
+
+## What to standardise on
+
+Less than you think. Two things:
+
+**One place the catalog lives**, in version control, as data.
+
+**One rule that diagrams are generated.** Given those two, arguing about which
+canvas tool to use is a preference, not an architectural decision.

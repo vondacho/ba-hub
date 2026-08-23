@@ -1,0 +1,151 @@
+---
+title: Context mapping patterns
+description: The nine relationship patterns between bounded contexts, what each one admits about the balance of power, and how to choose one honestly.
+---
+
+Contexts do not stand alone, and the arrows between them carry more information
+than the boxes. The patterns below are Evans's, and using the names exactly is
+worth more than it looks — because several of them describe the *same arrow* and
+differ only in a political fact that a generic "depends on" would hide.
+
+The [landscapes](/doc/landscapes/context-mapping/) section is about drawing the
+map. This page is about what the arrows mean.
+
+## The nine
+
+### Partnership
+
+Two contexts succeed or fail together. The teams coordinate planning, changes go
+in together, and neither can unilaterally break the other.
+
+**Admits:** mutual dependence, and a real coordination cost.
+**Choose it when:** the two models genuinely have to evolve in the same
+conversation. In the [seed catalog](/catalog), Risk appetite and Rating are
+partners — appetite changes prices and prices change appetite.
+**Cost:** high. Two teams that cannot release independently. Do not choose it
+for convenience.
+
+### Shared kernel
+
+Two contexts share a subset of the model — code, schema, or both — and both may
+change it.
+
+**Admits:** that neither side can be made downstream of the other without
+lying.
+**Choose it when:** duplicating the shared part is worse than the coordination
+cost. In the seed catalog, Party identity is a shared kernel between Party and
+Policy lifecycle.
+**Cost:** the highest on the map. Every change to the kernel needs both parties.
+Choose it knowingly and revisit it.
+
+### Customer/supplier
+
+Upstream and downstream, where downstream is a *customer* — it can ask for
+changes and expect to get them, and its needs enter the upstream team's
+planning.
+
+**Admits:** that the downstream team has real negotiating power.
+**Choose it when:** the two teams share an incentive structure — same director,
+same budget, same objectives.
+**Cost:** moderate. Upstream carries a genuine obligation.
+
+### Conformist
+
+Upstream and downstream, where downstream has **no** negotiating power. It takes
+the upstream model as given and adapts to it.
+
+**Admits:** powerlessness, honestly. This is the value of the pattern name.
+**Choose it when:** it is already true — a vendor package, another company's
+API, a system whose team will not change for you. In the seed catalog, Billing
+is conformist because the SaaS vendor will not change its model and we will not
+fork it.
+**Cost:** low to run, and it lets an alien model into your thinking. Combine
+with an anticorruption layer if the downstream context is one you care about.
+
+### Anticorruption layer
+
+Downstream builds a translation layer so the upstream model cannot leak into it.
+
+**Admits:** that the upstream model is unsuitable and the downstream one is
+worth protecting.
+**Choose it when:** downstream is core, or legacy vocabulary would do real
+damage. In the seed catalog, Claims should receive a cover snapshot through such
+a layer rather than reading live policy rows.
+**Cost:** real. The layer is code, it needs an owner, and it grows. When it
+grows *business rules* it has quietly become a third context.
+
+### Open host service
+
+Upstream publishes a general-purpose interface for many consumers, rather than a
+bespoke integration each.
+
+**Admits:** that there are enough downstream contexts to make one interface
+cheaper than N.
+**Choose it when:** three or more consumers want overlapping things. Product
+catalogue in the seed catalog serves five contexts this way.
+**Cost:** upstream must keep a stable public model, which constrains its own
+refactoring.
+
+### Published language
+
+The exchange uses a well-documented shared format — a schema, a standard — that
+both sides commit to.
+
+**Admits:** that the interchange format is an asset in its own right, with more
+than two readers.
+**Choose it when:** the payload is consumed by parties you do not control, or
+has to be explicable to an auditor years later. Rating publishes its price
+breakdown this way in the seed catalog, because the actuaries and the regulator
+read it too.
+**Cost:** schema governance, versioning, deprecation.
+
+Often paired with open host service: the service is the *how*, the language is
+the *what*.
+
+### Separate ways
+
+The two contexts do not integrate. Each does its own thing, including
+duplicating some data.
+
+**Admits:** that integration costs more than duplication.
+**Choose it when:** the overlap is small and the coupling would be expensive.
+Genuinely underused — teams integrate reflexively.
+**Cost:** duplication, and the reconciliation conversation once a year.
+
+### Big ball of mud
+
+No boundary. Models bleed, dependencies are cyclic, nobody can say what is
+inside.
+
+**Admits:** reality. This is not a pattern you choose — it is one you *record*,
+so that everything around it can be defended.
+**Choose it when:** never. Record it when true, wrap it in an anticorruption
+layer, and do not let it grow.
+
+## Choosing honestly
+
+The failure mode with this vocabulary is aspiration: every arrow gets labelled
+customer/supplier because conformist feels like an admission of defeat.
+
+It *is* an admission, and that is the point. A map full of aspirational patterns
+tells you nothing. A map that says "we conform here, we have no leverage, and
+our core context is exposed to a vendor's model" tells you exactly where to
+spend money.
+
+Two questions settle most of them:
+
+**Can the downstream team ask for a change and get it?** No → conformist. Yes →
+customer/supplier.
+
+**Would we notice within a week if the upstream model changed shape?** No →
+there is probably an anticorruption layer, or there should be.
+
+## The map is organisational
+
+The most useful reading of a context map is not technical. Concentrations of
+conformist arrows show where the organisation has no leverage. Shared kernels
+show where two teams cannot move independently. A partnership between contexts
+owned by directors who do not speak is a risk that will surface as a missed
+date.
+
+None of that is visible on a systems diagram, and all of it is visible here.

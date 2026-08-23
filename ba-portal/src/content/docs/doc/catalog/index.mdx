@@ -1,0 +1,81 @@
+---
+title: The catalog
+description: The register of domains, subdomains and bounded contexts — what it is for, why it is a working artefact rather than documentation, and how it avoids becoming a wiki nobody trusts.
+---
+
+The [catalog](/catalog) is the register of what the business is: one domain, its
+subdomains, and the bounded contexts that serve them — each with its language,
+its aggregates, a named owner, and the systems that claim to implement it.
+
+It is deliberately not called documentation.
+
+## What it is for
+
+Three jobs, and a catalog that does not do all three has become a wiki.
+
+**Answering "what do we mean by X here?"** The most-used function, by a distance.
+A new joiner, an analyst from another department, a vendor's consultant — all
+need to know what "policy" means in this part of the business and where its
+meaning changes.
+
+**Making ownership explicit.** Every context has a named owner. Not a
+department: a person who answers for the language and the boundary. Unowned
+boundaries erode, quietly, and nobody is at fault because nobody was
+responsible.
+
+**Being checkable.** Every context lists the systems that realise it, which
+means the [landscape](/doc/landscapes/) can compare the claim against what those
+systems actually do. This is the property that separates a catalog from a
+diagram: it can be *wrong in a way somebody notices*.
+
+## What it is not
+
+**Not an inventory of systems.** That is the [system map](/doc/landscapes/system-mapping/),
+and it lives on the other side of the comparison. Merging them produces a
+document that describes the software and calls it the business.
+
+**Not a data dictionary.** Fields and types are downstream. The catalog records
+concepts, boundaries and the language that gives a boundary its edge.
+
+**Not a capability model.** Capability models are usually flat, exhaustive and
+uniform. A catalog is deliberately uneven: core contexts get aggregates and
+invariants, generic contexts get a boundary and an adapter, and that asymmetry is
+information.
+
+**Not complete.** A catalog covering every corner of the estate at equal depth
+has spent most of its effort on the parts that do not matter. Depth follows the
+[classification](/doc/strategic/subdomain-types/).
+
+## The structure
+
+Three levels, and the distinction between the first two is load-bearing:
+
+**Domain** — the business. One.
+
+**Subdomain** — a *problem*: part of the business, classified core, supporting or
+generic. [Discovered, not designed](/doc/strategic/domains/).
+
+**Bounded context** — a *solution*: a boundary you drew, inside which one model
+holds. The mapping to subdomains is not forced to be one to one, and the places
+it is not are among the most interesting entries in the register.
+
+## Reading the seed catalog
+
+The [catalog page](/catalog) is populated with a worked example — an insurance
+carrier. Two things in it are worth noticing because they are the point rather
+than the decoration:
+
+**The generic contexts have no aggregates.** Billing and Documents list none.
+That is a decision recorded, not a section left unfinished: modelling a bought
+package is effort taken from the core domain.
+
+**Two contexts are marked breached and two drifting.** Those verdicts come from
+the [landscape](/doc/landscapes/), not from an opinion. A catalog that cannot
+report that its own contents are being violated is not doing the third job.
+
+## In this section
+
+- **[What an entry holds](/doc/catalog/entries/)** — the fields, and why each
+  one is there.
+- **[Curation and ownership](/doc/catalog/curation/)** — how it stays true after
+  the workshop, which is the part that usually fails.

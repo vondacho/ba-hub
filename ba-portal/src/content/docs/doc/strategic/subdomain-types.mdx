@@ -1,0 +1,135 @@
+---
+title: Core, supporting, generic
+description: The classification that is really a budget — what each kind of subdomain deserves, how to tell them apart, and the two symmetrical ways of getting it wrong.
+---
+
+Every subdomain is one of three kinds, and the classification decides where
+effort goes. It is not a taxonomy exercise; it is a budget, and it is the
+highest-leverage decision in strategic design.
+
+## The three
+
+### Core
+
+**The reason the business wins.** Not merely important — *differentiating*. If a
+competitor did this better than you, you would lose customers to them.
+
+What it deserves:
+
+- Your best people, kept on it.
+- A [deep model](/doc/model/), maintained as understanding improves.
+- Built in house. Always.
+- Expect continuous change — a core domain that has stopped changing has stopped
+  being core.
+
+In the [seed catalog](/catalog): underwriting judgement, pricing, claims
+handling. An insurer that is better than the market at deciding which risks to
+accept and at what price *is* a better insurer; there is nothing else it could
+mean.
+
+### Supporting
+
+**Necessary, specific to you, and not a differentiator.** Nobody buys from you
+because of it, but you cannot operate without it and no vendor sells quite the
+right shape.
+
+What it deserves:
+
+- Something simple and correct. Explicitly not a deep model.
+- Built in house, or bought and adapted — whichever is cheaper.
+- Junior developers, a package with configuration, or the least clever thing
+  that works.
+- Actively resist gold-plating: effort here is effort not spent on core.
+
+In the seed catalog: policy administration, distribution and party management,
+product definition.
+
+### Generic
+
+**A solved problem with a mature market.** Identity, payments, document
+rendering, notifications, general ledger.
+
+What it deserves:
+
+- Buy it.
+- Wrap it in an [anticorruption layer](/doc/strategic/context-mapping/) so its
+  vocabulary does not leak into contexts that are yours.
+- Do not model it. In the [catalog](/catalog), generic contexts have no
+  aggregates listed, and that is a statement rather than an omission.
+
+## Telling them apart
+
+The classification is often obvious and occasionally contested. When it is
+contested, three questions usually settle it.
+
+**Would a competitor doing this better take customers from you?** Yes → core. No
+→ not core.
+
+**Can you buy something that fits without distorting how you work?** Yes →
+generic. If every vendor demo requires "we'd change our process to match" →
+probably not generic.
+
+**If it stopped working tomorrow, would you lose money or lose the business?**
+Lose money → supporting. Lose the business → core.
+
+## The two symmetrical failures
+
+Both are common, and both cost roughly a decade.
+
+### Building the generic
+
+A company builds its own invoicing, its own document generation, its own
+identity system. Each decision was locally defensible — the vendor product did
+not quite fit, integration looked expensive, someone had built one before.
+Collectively, a team of good engineers spends four years reimplementing things
+that were commodities before they started.
+
+The tell: a bespoke system whose closest competitor is a product with three
+thousand customers and a documented API.
+
+### Buying the core
+
+A company buys a package for the thing it competes on, then spends more on
+customising it than it would have spent building it — and ends up with a
+competitive position bounded by the vendor's roadmap.
+
+The tell: a core process where the answer to "why do we do it this way?" is
+"that is how the system does it".
+
+Of the two, buying the core is worse. Building the generic wastes money;
+buying the core caps the business.
+
+## Drift between the categories
+
+Classifications are not permanent, and the direction of travel is worth
+watching.
+
+**Supporting becomes core** when the business finds a way to compete on it.
+Logistics was supporting at most retailers until one of them made same-day
+delivery the reason to buy. When this happens, the model needs to deepen and the
+staffing needs to change — and the signal is usually that the business is asking
+for changes faster than the "simple and correct" implementation can absorb.
+
+**Core becomes generic** when the market catches up and somebody sells what you
+built. This is a good outcome badly handled: the correct response is to migrate
+onto the commodity and redeploy the people, and the usual response is to defend
+the in-house system because of what it cost.
+
+Review the classifications when the business strategy changes, not on a
+schedule.
+
+## What this changes downstream
+
+The classification is not documentation — it is an instruction to everything
+that follows:
+
+| | Core | Supporting | Generic |
+|---|---|---|---|
+| Model depth | Aggregates, invariants, events | Enough structure to be correct | None |
+| Build or buy | Build | Either | Buy |
+| Staffing | Best people, retained | Whoever is available | Nobody, after integration |
+| Catalog entry | Full | Language and owner | Boundary, owner, adapter |
+| Expected change | Constant | Occasional | Vendor's schedule |
+
+If the classification is not changing any of those, it has not been made — it
+has been written down.

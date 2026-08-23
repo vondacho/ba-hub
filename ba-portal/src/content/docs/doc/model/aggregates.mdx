@@ -1,0 +1,119 @@
+---
+title: Aggregates and invariants
+description: An aggregate is a rule with a boundary drawn around it. How to find the invariant first, why aggregate size is a business decision, and the questions that get a domain expert to answer it.
+---
+
+An <span class="term">aggregate</span> is a cluster of objects treated as one
+unit for the purpose of consistency. One object in it is the *root*, and
+everything outside refers to the aggregate only through that root.
+
+That is the textbook definition and it explains nothing about how to find one.
+Here is the version that does:
+
+**Find the invariant first. The aggregate is whatever it takes to enforce it.**
+
+## Invariants
+
+An <span class="term">invariant</span> is a sentence about the business that may
+never be false. Not "should rarely be false", not "gets corrected overnight" —
+never, not even for a moment.
+
+Examples from the [seed catalog](/catalog):
+
+- A claim's reserve may never exceed the policy limit for the cover it is
+  claimed under.
+- A policy may not have two endorsements with the same effective date.
+- A submission may not be priced until it has been accepted.
+- The sum of instalments must equal the premium.
+
+Each of those defines an aggregate boundary, because enforcing it requires
+seeing everything it mentions *at the same instant*.
+
+## The size question
+
+Aggregate size is the classic trade-off, and both directions have a real cost.
+
+**Large aggregates** enforce more rules atomically, and serialise more work. If
+`Policy` includes every endorsement ever made, then two people making unrelated
+endorsements to a large commercial policy will block each other, and a policy
+with 4,000 endorsements has to be loaded whole to change one.
+
+**Small aggregates** are concurrent and fast, and push rules outside the
+boundary — where they become "eventually true", enforced by a process, and
+occasionally not enforced at all.
+
+The way to decide is not to reason about performance. It is to ask the business
+which rules are allowed to be briefly false.
+
+## The question that gets it answered
+
+Never ask a domain expert about aggregate boundaries. Ask this instead:
+
+> Suppose two people press save at the same moment and for a few seconds the
+> system shows a policy whose instalments do not add up to the premium. Is that
+> a problem we have to prevent, or a problem we clean up?
+
+The answers are always immediate and always informative:
+
+- *"That must never happen."* → invariant. Same aggregate.
+- *"That's fine as long as it's right by end of day."* → not an invariant. A
+  [policy](/doc/model/services-and-policies/) enforces it, and the two things
+  can be separate aggregates.
+- *"That happens all the time, we have a report for it."* → it is not even a
+  rule. Do not build one.
+
+That third answer is the most valuable, because the alternative is discovering
+it after building a transactional guarantee nobody wanted.
+
+## One aggregate per transaction
+
+The working rule: **one aggregate is changed per transaction.** If a business
+operation must change two aggregates atomically, one of three things is true:
+
+1. The boundary is wrong and they are really one aggregate.
+2. The consistency requirement is weaker than stated, and a
+   [domain event](/doc/model/domain-events/) plus a policy will do.
+3. The operation crosses a [context boundary](/doc/processes/across-contexts/),
+   and there is no shared transaction available at all.
+
+The third case is the common one in practice, and it is the reason the
+[processes](/doc/processes/) section exists.
+
+## References between aggregates
+
+Aggregates refer to each other **by identity**, not by holding each other.
+
+`Claim` holds a `PolicyId`, not a `Policy`. This is not a technical preference:
+it is what makes it possible for claims to work with a
+[cover snapshot](/doc/strategic/ubiquitous-language/) rather than the live
+policy, and it is exactly the discipline that is missing in the seed estate's
+worst [finding](/doc/landscapes/conformance/), where claims reads live policy
+rows directly and a later endorsement retroactively changes what an open claim
+appears to be covered for.
+
+The reference-by-identity rule is what prevents that class of failure from being
+possible. Sharing a database schema is what made it possible.
+
+## Finding aggregates in a workshop
+
+The practical sequence, usually inside an
+[event storming](/doc/processes/event-storming/) session:
+
+1. **Collect the events.** What happens that the business names?
+2. **Ask what enforces each one.** "Who decides whether this is allowed?"
+3. **Listen for "you can't do that if…"** — every one of those is a candidate
+   invariant.
+4. **Group the invariants** that mention the same things.
+5. **Name the group.** That is the aggregate, and the thing the business names
+   it after is the root.
+
+Step 3 is where the value is. Domain experts describe invariants constantly and
+never call them that.
+
+## Recording it
+
+In the [catalog](/doc/catalog/entries/), a context lists its aggregates by name.
+The names alone are worth having — but a catalog entry that lists aggregates
+without their invariants has recorded the boundary and lost the reason for it,
+which is the part that would have let a reader check whether the boundary is
+still right.

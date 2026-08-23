@@ -1,0 +1,91 @@
+---
+title: Landscapes
+description: Two maps of the same estate — a context map of intent and a system map of reality — and the conformance findings where the two disagree.
+---
+
+Two maps, and the value is entirely in the difference between them.
+
+**The [context map](/doc/landscapes/context-mapping/)** is intent: how the
+bounded contexts are *meant* to relate, in the vocabulary of the
+[strategic patterns](/doc/strategic/context-mapping/). Who is upstream, who
+conforms, where an anticorruption layer is doing real work.
+
+**The [system map](/doc/landscapes/system-mapping/)** is reality: which running
+systems actually talk to which, over what, observed rather than asserted.
+
+**[Conformance](/doc/landscapes/conformance/)** is the comparison, and it is why
+both exist.
+
+## Why two, and not one
+
+Each map on its own has a characteristic failure.
+
+**A context map alone is a wish.** Nothing contradicts it, so it survives
+indefinitely, gaining authority as it ages. Everyone has seen the four-year-old
+diagram that no longer describes anything and is still on the wall.
+
+**A system map alone is a network diagram.** Every arrow is true and none of them
+is judged. It can tell you that claims-platform reads from
+legacy-policy-master; it cannot tell you that this arrow should not exist,
+because it has no notion of should.
+
+Drawn against the same [catalog](/catalog), the two produce a third artefact for
+free: the list of places where the estate has quietly stopped implementing the
+business.
+
+## The four verdicts
+
+Every edge, in either map, gets one:
+
+**Matches** — an observed integration realises a declared relationship, in the
+way the [pattern](/doc/strategic/context-mapping/) says it should.
+
+**Drifts** — it realises it badly. The relationship exists, and its implementation
+violates the pattern: an anticorruption layer that was never built, an adapter
+that gets bypassed, a shared kernel implemented as an overnight fuzzy match.
+
+**Unmapped** — a real, observed integration with no relationship behind it. Two
+systems are talking and nobody declared that their contexts should. This is
+always a modelling question rather than an integration one: either the
+relationship is legitimate and undeclared, or the boundary is in the wrong
+place.
+
+**Unobserved** — a declared relationship with nothing observed behind it. Either
+it was agreed and never built, or the collector cannot see it. Those have
+different owners, and the map cannot tell them apart on its own.
+
+## Findings are business statements
+
+The discipline that makes this section useful rather than another dashboard:
+**a finding is written as a sentence about the business.**
+
+Not: *claims-platform performs direct reads against the legacy-policy-master
+schema.*
+
+But: *a claim can be assessed against cover that was added to the policy after
+the loss happened.*
+
+Both describe the same fact. Only one of them can be taken to somebody who can
+authorise the fix, and only one of them makes it obvious why it should be near
+the top of the list. The seed landscape's worst finding is exactly this one.
+
+## What is real today
+
+The [landscapes page](/landscapes) is populated with a worked example. The
+relationships are the ones a modelling exercise would produce; the integrations
+are what a collector *would* observe, written by hand.
+
+The [landscape collector](/doc/tooling/evidence/) that would gather them
+continuously, and the [DDD mapper](/doc/tooling/ddd-mapper/) that would compute
+the verdicts, are designed and not built. Doing the comparison by hand once is
+still worth more than not doing it — it is how you find out whether the
+automated version would pay for itself.
+
+## In this section
+
+- **[Context mapping](/doc/landscapes/context-mapping/)** — drawing the map of
+  intent, and what belongs on it.
+- **[System mapping](/doc/landscapes/system-mapping/)** — gathering evidence
+  about what actually runs, and the blind spots of each source.
+- **[Conformance and drift](/doc/landscapes/conformance/)** — judging the
+  difference, and prioritising by cost.

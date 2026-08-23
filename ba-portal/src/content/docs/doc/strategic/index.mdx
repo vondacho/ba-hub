@@ -1,0 +1,85 @@
+---
+title: Strategic design
+description: The boundaries and what is worth your best people — domains and subdomains, the core/supporting/generic classification, bounded contexts, ubiquitous language, and the context mapping patterns.
+---
+
+Strategic design answers two questions, and both of them are about where lines
+go rather than what is inside them.
+
+**Where does the business divide?** Into
+[domains and subdomains](/doc/strategic/domains/) — parts of the problem, which
+exist whether or not anyone builds software.
+
+**Where should the models divide?** Into
+[bounded contexts](/doc/strategic/bounded-contexts/) — parts of the solution,
+which are chosen.
+
+Everything tactical depends on getting these right, and no amount of careful
+aggregate design rescues a boundary drawn in the wrong place.
+
+## The problem space and the solution space
+
+This distinction is the one worth over-explaining, because collapsing it is
+responsible for more wasted modelling effort than any other mistake.
+
+| | Problem space | Solution space |
+|---|---|---|
+| Contains | Domain, subdomains | Bounded contexts |
+| Origin | Discovered — you were given it | Designed — you chose it |
+| Changes when | The business changes | You decide it should |
+| Wrong looks like | Missing a subdomain entirely | A boundary in an awkward place |
+| Cost of wrong | Strategic: investing in the wrong thing | Structural: expensive to change, not fatal |
+
+A useful test: if the company sold all its software tomorrow and went back to
+paper, which of these would still exist? The subdomains would. The bounded
+contexts would not.
+
+## Why the classification is a budget
+
+Subdomains get [classified](/doc/strategic/subdomain-types/) core, supporting or
+generic, and the classification is not descriptive — it decides where effort
+goes:
+
+- **Core** — the reason the business wins. Deep model, best people, built in
+  house, and expect it to keep changing.
+- **Supporting** — necessary, specific to you, not a differentiator. Build it
+  simply and correctly. Do not gold-plate it.
+- **Generic** — a solved problem with a mature market. Buy it, wrap it, and
+  spend the modelling effort somewhere it changes an outcome.
+
+The classic failure is symmetrical: a company builds a bespoke general ledger
+(generic, should have been bought) while running its underwriting judgement
+(core) out of a spreadsheet.
+
+## What gives a boundary its edge
+
+The [ubiquitous language](/doc/strategic/ubiquitous-language/). A bounded
+context is not a package, a team or a database — it is the region within which
+one word means one thing. When you cannot say what a term means without asking
+"in which context?", you have found the boundary.
+
+This is why the analyst's job is upstream of the architect's: the boundary is
+discovered in conversation, not in a design review.
+
+## And the relationships between them
+
+Contexts do not stand alone, and the arrows between them carry more information
+than the boxes.
+[The mapping patterns](/doc/strategic/context-mapping/) name a set of
+relationships that include a political fact — whether the downstream team can
+ask for a change and get one. "Customer/supplier" and "conformist" describe the
+same arrow and differ only in that, which is exactly the difference a generic
+"depends on" hides.
+
+## In this section
+
+- **[Domains and subdomains](/doc/strategic/domains/)** — how to find them, and
+  how to know you have.
+- **[Core, supporting, generic](/doc/strategic/subdomain-types/)** — the
+  classification, and what each one deserves.
+- **[Bounded contexts](/doc/strategic/bounded-contexts/)** — drawing the line,
+  and the signals that it is in the wrong place.
+- **[Ubiquitous language](/doc/strategic/ubiquitous-language/)** — the thing
+  that makes a boundary real.
+- **[Context mapping patterns](/doc/strategic/context-mapping/)** — the nine
+  relationships and what each one admits to.

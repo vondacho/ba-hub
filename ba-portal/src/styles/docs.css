@@ -1,0 +1,70 @@
+/*
+ * Documentation theme. Loaded by the Starlight integration only — the portal's
+ * own pages are styled by src/styles/global.css and never see this file.
+ *
+ * Three things so far.
+ *
+ * The figure rules match the sibling hubs': Starlight has no opinion on
+ * <figure>, so a diagram with a credit under it would otherwise render as a
+ * bare image followed by a stray paragraph.
+ *
+ * The accent override retints Starlight to the portal's violet. Without it the
+ * documentation would keep Starlight's default purple-blue while every page
+ * around it is violet, which reads as two sites rather than two halves of one.
+ *
+ * The `.term` rule marks a word that belongs to the ubiquitous language. In a
+ * hub whose whole argument is that the words are the model, a term being
+ * introduced should look different from a term being used, and neither should
+ * look like emphasis.
+ */
+
+:root {
+	--sl-color-accent-low: #2b1440;
+	--sl-color-accent: #9333ea;
+	--sl-color-accent-high: #e2ccfb;
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #e8d6fa;
+	--sl-color-accent: #7e22ce;
+	--sl-color-accent-high: #3b0764;
+}
+
+.sl-markdown-content figure {
+	margin: 1.75rem 0;
+}
+
+.sl-markdown-content figure img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 0.5rem;
+}
+
+.sl-markdown-content figcaption {
+	margin-top: 0.6rem;
+	font-size: var(--sl-text-sm);
+	line-height: 1.5;
+	color: var(--sl-color-gray-3);
+	text-align: center;
+	text-wrap: balance;
+}
+
+/*
+ * MDX wraps the caption text in a paragraph of its own, and Starlight gives
+ * every paragraph in the content area a top margin — which would push the
+ * credit away from the diagram it belongs to.
+ */
+.sl-markdown-content figcaption > p {
+	margin: 0;
+	font-size: inherit;
+}
+
+/* A term of the ubiquitous language, at the point it is defined. */
+.sl-markdown-content .term {
+	font-weight: 600;
+	color: var(--sl-color-white);
+	border-bottom: 2px solid var(--sl-color-accent);
+	padding-bottom: 0.05em;
+}

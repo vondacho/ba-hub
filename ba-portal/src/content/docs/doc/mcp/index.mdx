@@ -1,0 +1,73 @@
+---
+title: MCP
+description: The four model-driven servers that would carry the automatable half of domain analysis — described, not built, and honest about which parts still need a person.
+---
+
+Some of this work is judgement and some of it is reading.
+
+Distilling a first pass at the subdomains from documents the business already
+wrote. Noticing that one word carries two meanings across four systems. Spotting
+that two systems started talking last week and nobody declared it. None of those
+need an analyst's judgement, and all of them currently consume an analyst's
+week.
+
+Four MCP servers are described here. **None of them are built.** The pages say
+what each would do, what it would read, and — the part that matters — where its
+output stops being trustworthy.
+
+## The dividing line
+
+Worth stating before the individual pages, because it is the same line in all
+four.
+
+**A model is good at**: reading a lot of text, noticing repetition and
+inconsistency, proposing structure, and generating a first draft that is faster
+to correct than to write.
+
+**A model is bad at**: knowing which of two contradictory statements reflects
+what the business actually does, knowing which subdomain is
+[core](/doc/strategic/subdomain-types/), and knowing what a
+[drift finding](/doc/landscapes/conformance/) costs.
+
+Every server below is therefore a **draft generator with a named reviewer**. A
+proposal that lands in the [catalog](/catalog) without a person accepting it is
+the failure mode this whole section is designed against — the catalog's value is
+that a human owner stands behind each entry, and an automated writer destroys
+exactly that.
+
+## The four
+
+**[Domain distillation](/doc/mcp/domain-distillation/)** — reads what the
+business already wrote (process documents, org descriptions, product
+literature, existing requirements) and proposes candidate subdomains with a
+draft classification and the evidence for each.
+
+**[Language extraction](/doc/mcp/language-extraction/)** — builds a per-context
+term list from documents, schemas and code, and reports the collisions: one word
+with two meanings, two words with one.
+
+**[Context mapping assistant](/doc/mcp/context-mapping/)** — proposes
+[relationship patterns](/doc/strategic/context-mapping/) for context pairs based
+on what crosses between them, and challenges patterns that look aspirational.
+
+**[Drift analysis](/doc/mcp/drift-analysis/)** — reads the landscape evidence
+and writes the [finding](/doc/landscapes/conformance/) as a business consequence
+rather than a mechanism, which is the part humans reliably skip.
+
+## Why MCP rather than a feature
+
+Because the work happens where the analyst already is: in a document, in a
+workshop tool, in the repository holding the catalog. A server that exposes
+these as tools can be called from whatever the analyst is using, rather than
+requiring them to go to a separate application and come back.
+
+It also keeps the [DDD mapper](/doc/tooling/ddd-mapper/) honest. The mapper's job
+is to compute verdicts from data; if it also generated the data, it would be
+grading its own work.
+
+## Status
+
+Described, not built — the same status as the [tools](/tools). The designs are
+here because writing down what a server would read and emit is the cheapest way
+to find out whether it should exist, and two of the four look considerably more
+valuable than the other two on that basis.
