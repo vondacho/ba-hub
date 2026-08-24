@@ -15,6 +15,7 @@
  * patterns tells you nothing.
  */
 
+import { useRef, useState } from 'react';
 import {
 	CLASSIFICATIONS,
 	PATTERNS,
@@ -22,10 +23,13 @@ import {
 	patternLabel,
 	symmetric,
 	type Classification,
+	type ContainmentEdge,
 	type DddDocument,
+	type Node,
 	type Pattern,
 	type RelationshipEdge,
 } from '../../lib/ddd/model';
+import { removalOf } from '../../lib/graph/edit';
 import { classificationLabel } from '../../lib/graph/style';
 
 interface Props {
@@ -37,6 +41,11 @@ interface Props {
 	setPattern: (edge: RelationshipEdge, pattern: Pattern) => void;
 	setClassification: (subdomainId: string, classification: Classification) => void;
 	removeRelationship: (edge: RelationshipEdge) => void;
+	renameNode: (node: Node, to: string) => void;
+	/** True for a node created a moment ago, whose name is a placeholder. */
+	focusName: boolean;
+	removeNode: (node: Node) => void;
+	removeServes: (edge: ContainmentEdge) => void;
 }
 
 export default function Inspector({
@@ -47,6 +56,10 @@ export default function Inspector({
 	setPattern,
 	setClassification,
 	removeRelationship,
+	renameNode,
+	removeNode,
+	removeServes,
+	focusName,
 }: Props) {
 	if (!selected) return null;
 
@@ -55,8 +68,12 @@ export default function Inspector({
 		(candidate): candidate is RelationshipEdge =>
 			candidate.id === selected && candidate.kind === 'relationship',
 	);
+	const serves = document.edges.find(
+		(candidate): candidate is ContainmentEdge =>
+			candidate.id === selected && candidate.kind === 'containment',
+	);
 
-	if (!node && !edge) return null;
+	if (!node && !edge && !serves) return null;
 
 	const nameOf = (id: string) =>
 		document.nodes.find((candidate) => candidate.id === id)?.name ?? id;
@@ -66,11 +83,17 @@ export default function Inspector({
 			<div className="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
 				<div className="min-w-0">
 					<p className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase dark:text-slate-400">
-						{node ? node.kind : 'relationship'}
+						{node ? node.kind : serves ? 'serves' : 'relationship'}
 					</p>
-					<h2 className="mt-0.5 truncate font-semibold">
-						{node ? node.name : `${nameOf(edge!.from)} → ${nameOf(edge!.to)}`}
-					</h2>
+					{node ? (
+						<NameField node={node} onRename={renameNode} focus={focusName} />
+					) : (
+						<h2 className="mt-0.5 truncate font-semibold">
+							{serves
+								? `${nameOf(serves.from)} → ${nameOf(serves.to)}`
+								: `${nameOf(edge!.from)} → ${nameOf(edge!.to)}`}
+						</h2>
+					)}
 				</div>
 				<button
 					type="button"
@@ -171,13 +194,60 @@ export default function Inspector({
 							</>
 						)}
 
-						<button
-							type="button"
-							onClick={() => onReveal(node.nameSpan.line)}
-							className="mt-4 text-xs font-semibold text-brand hover:underline dark:text-purple-400"
-						>
-							Show in the source (line {node.nameSpan.line})
-						</button>
+						<div className="mt-4 flex items-center justify-between gap-3">
+							<button
+								type="button"
+								onClick={() => onReveal(node.nameSpan.line)}
+								className="text-xs font-semibold text-brand hover:underline dark:text-purple-400"
+							>
+								Show in the source (line {node.nameSpan.line})
+							</button>
+							<button
+								type="button"
+								onClick={() => removeNode(node)}
+								title={removalNote(document, node)}
+								className="shrink-0 text-xs font-semibold text-rose-600 hover:underline dark:text-rose-400"
+							>
+								Remove
+							</button>
+						</div>
+						<p className="mt-1 text-right text-[11px] text-ink-muted dark:text-slate-500">
+							{removalNote(document, node)}
+						</p>
+					</>
+				)}
+
+				{serves && (
+					<>
+						<Field label="What this says">
+							<p>
+								{nameOf(serves.from)} also serves {nameOf(serves.to)} — a straddle, written as
+								a `serves` line rather than implied by nesting.
+							</p>
+							<p className="mt-1.5 text-xs text-ink-muted dark:text-slate-400">
+								Usually the most interesting entry in a catalog: it is the claim that one
+								boundary earns its keep in two parts of the business.
+							</p>
+						</Field>
+
+						<div className="mt-4 flex items-center justify-between">
+							{serves.span && (
+								<button
+									type="button"
+									onClick={() => onReveal(serves.span!.line)}
+									className="text-xs font-semibold text-brand hover:underline dark:text-purple-400"
+								>
+									Show in the source (line {serves.span.line})
+								</button>
+							)}
+							<button
+								type="button"
+								onClick={() => removeServes(serves)}
+								className="text-xs font-semibold text-rose-600 hover:underline dark:text-rose-400"
+							>
+								Remove
+							</button>
+						</div>
 					</>
 				)}
 
@@ -269,6 +339,93 @@ export default function Inspector({
 			</div>
 		</aside>
 	);
+}
+
+/**
+ * The name, edited in place — the same control the map's own title uses, and
+ * for the same reasons: a local draft that commits on Enter or blur, because
+ * the parse it triggers is debounced and a controlled input would echo the
+ * visitor's keystrokes back at them late.
+ *
+ * The one rule it adds is the one the format demands: **a node without a name
+ * is not a node.** The name is the identity here — relationships and `serves`
+ * lines refer to it — so an empty box is not an incomplete node, it is a
+ * document that no longer parses. Emptying the field puts the old name back.
+ */
+function NameField({
+	node,
+	onRename,
+	focus,
+}: {
+	node: Node;
+	onRename: (node: Node, to: string) => void;
+	focus: boolean;
+}) {
+	const [draft, setDraft] = useState<string | null>(null);
+	const abandoned = useRef(false);
+
+	const commit = () => {
+		const pending = draft;
+		setDraft(null);
+		if (abandoned.current) {
+			abandoned.current = false;
+			return;
+		}
+		if (pending === null) return;
+		const next = pending.trim();
+		if (next === '' || next === node.name) return;
+		onRename(node, next);
+	};
+
+	return (
+		<input
+			value={draft ?? node.name}
+			/* A box created a second ago is called "New context" and is asking to
+			   be named. Selecting the placeholder means the first keystroke
+			   replaces it rather than appending to it. */
+			autoFocus={focus}
+			onFocus={(event) => {
+				if (focus) event.currentTarget.select();
+			}}
+			aria-label={`${node.kind} name`}
+			title="Rename — every relationship and `serves` that names it moves too"
+			onChange={(event) => setDraft(event.target.value)}
+			onBlur={commit}
+			onKeyDown={(event) => {
+				if (event.key === 'Enter') event.currentTarget.blur();
+				if (event.key === 'Escape') {
+					abandoned.current = true;
+					setDraft(null);
+					event.currentTarget.blur();
+				}
+			}}
+			className="mt-0.5 w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 font-semibold hover:border-slate-300 focus:border-brand focus:outline-none dark:hover:border-slate-600"
+		/>
+	);
+}
+
+/**
+ * What a delete is about to take with it, said before it is clicked.
+ *
+ * A node's references are not optional to remove — a relationship naming a
+ * context that no longer exists does not parse — so the delete takes them, and
+ * the only honest thing to do is say how many *first*. The count comes from
+ * `removalOf`, the same analysis the delete itself runs, so the sentence and
+ * the edit cannot drift apart.
+ *
+ * A number the visitor can read beats a confirmation dialog they will learn to
+ * dismiss without reading.
+ */
+function removalNote(document: DddDocument, node: Node): string {
+	const { nested, references } = removalOf(document, node);
+	const parts = [
+		nested.length > 0 ? `${nested.length} nested ${nested.length === 1 ? 'node' : 'nodes'}` : null,
+		references.length > 0
+			? `${references.length} ${references.length === 1 ? 'reference' : 'references'}`
+			: null,
+	].filter((part): part is string => part !== null);
+
+	return parts.length === 0 ? 'Nothing else refers to it.' : `Takes ${parts.join(' and ')} with it.`;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

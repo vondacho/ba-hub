@@ -26,7 +26,12 @@ export type IconName =
 	| 'theme-auto'
 	| 'panes-both'
 	| 'panes-source'
-	| 'panes-graph';
+	| 'panes-graph'
+	| 'add-domain'
+	| 'add-subdomain'
+	| 'add-context'
+	| 'connect'
+	| 'remove';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A tray with an arrow coming *in* — the file comes to you.
@@ -79,6 +84,40 @@ const PATHS: Record<IconName, React.ReactNode> = {
 			<path d="M7 7.4 9.25 8.85" />
 		</>
 	),
+	/*
+	 * The three things you can add, drawn as the three things they are: the
+	 * frame, the box inside it, and the round context the map is finally about.
+	 * A plus in the corner of each, so the row reads as "add" before it reads
+	 * as "domain".
+	 */
+	'add-domain': (
+		<>
+			<rect x="2" y="4" width="8" height="7" rx="1" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	'add-subdomain': (
+		<>
+			<rect x="2" y="4" width="8" height="7" rx="1" />
+			<rect x="4" y="6" width="4" height="3" rx="0.5" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	'add-context': (
+		<>
+			<ellipse cx="6" cy="7.5" rx="4" ry="3.5" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	// Two nodes and the line being drawn between them.
+	connect: (
+		<>
+			<circle cx="4" cy="11.5" r="2" />
+			<circle cx="12" cy="4.5" r="2" />
+			<path d="M5.6 10.1 10.4 6" />
+		</>
+	),
+	remove: <path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.2a1 1 0 0 0 1 .8h2.8a1 1 0 0 0 1-.8l.6-8.2" />,
 	// Half-filled: following whatever the page is doing.
 	'theme-auto': (
 		<>

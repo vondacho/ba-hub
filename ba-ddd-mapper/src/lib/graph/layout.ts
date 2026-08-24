@@ -486,6 +486,22 @@ function centre(node: PlacedNode): { x: number; y: number } {
 	return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
 }
 
+/**
+ * Where a line from inside `node` towards `point` leaves its outline.
+ *
+ * Exported for the candidate edge the visitor is dragging: it has no partner
+ * node to be routed between, but it still has to start *on* the box rather
+ * than at its centre — and on the curve, for a context, which is why this goes
+ * through the same `borderPoint` every settled edge uses instead of a second
+ * copy of the arithmetic that would drift from it.
+ */
+export function borderTowards(
+	node: PlacedNode,
+	point: { x: number; y: number },
+): { x: number; y: number } {
+	return borderPoint(node, centre(node), point);
+}
+
 function r(value: number): number {
 	return Math.round(value * 10) / 10;
 }

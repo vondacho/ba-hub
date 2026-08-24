@@ -29,7 +29,10 @@ import { parse } from '../../lib/ddd/parser';
 import { SAMPLE } from '../../lib/ddd/sample';
 import type {
 	Classification,
+	ContainmentEdge,
 	DddDocument,
+	Node,
+	NodeKind,
 	Pattern,
 	RelationshipEdge,
 } from '../../lib/ddd/model';
@@ -77,6 +80,29 @@ import ProblemList from './ProblemList';
 
 const DEBOUNCE_MS = 250;
 
+/** Said whenever a gesture is refused because the text has not parsed. */
+const STALE =
+	'The source has not parsed since the last change, so the spans a gesture would edit are the previous document’s. Fix the errors and the tools come back.';
+
+const NEW_NAME: Record<NodeKind, string> = {
+	domain: 'New domain',
+	subdomain: 'New subdomain',
+	context: 'New context',
+};
+
+/**
+ * The pattern a freshly drawn relationship gets.
+ *
+ * The grammar has no untagged arrow — a relationship *is* its pattern — so
+ * something has to be written, and the choice is between a guess and a modal
+ * that stops the gesture to ask. `customer-supplier` is the guess: it is
+ * directed, which is the shape of the arrow that was just drawn, and it is the
+ * one pattern that claims nothing except that the two teams negotiate. The
+ * inspector opens on the new edge with all nine listed, and the map is only
+ * honest once somebody has looked at that list.
+ */
+const NEW_RELATIONSHIP = { pattern: 'customer-supplier' as const };
+
 /**
  * The layout picker, in the order the panes sit on screen: text, both, map.
  *
@@ -112,9 +138,25 @@ export default function DddMapper() {
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const viewInput = useRef<HTMLInputElement>(null);
-	// Shown after loading a view built for a different map, and after a failed
-	// one. Cleared on the next successful load.
-	const [viewNote, setViewNote] = useState<{ kind: 'warn' | 'error'; text: string } | null>(null);
+	/*
+	 * The one-line banner under the bar.
+	 *
+	 * It began as news about `.dddview` files and now also carries the refusals
+	 * — the edge somebody drew that this format cannot say. One banner rather
+	 * than two, because they are the same thing from the visitor's side: a
+	 * sentence about the gesture they just made, in the place they will look
+	 * for it.
+	 */
+	const [note, setNote] = useState<{ kind: 'warn' | 'error'; text: string } | null>(null);
+	/*
+	 * The node added by the last click of an Add button.
+	 *
+	 * Only so the inspector can put the cursor in its name: a box called "New
+	 * context" is not finished, and the format says so — the name is the
+	 * identity every relationship and `serves` refers to. Cleared as soon as the
+	 * selection moves, so the field does not grab focus again later.
+	 */
+	const [fresh, setFresh] = useState<string | null>(null);
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
@@ -300,6 +342,192 @@ export default function DddMapper() {
 		return () => window.clearTimeout(timer);
 	}, [curves]);
 
+	// ---- creating, deleting, connecting -------------------------------------
+
+
+	useEffect(() => {
+		if (fresh !== null && fresh !== selected) setFresh(null);
+	}, [fresh, selected]);
+
+	const selectedNode = useMemo(
+		() => document_.nodes.find((node) => node.id === selected) ?? null,
+		[document_, selected],
+	);
+
+	/**
+	 * Why each `Add` button is off, or null when it is on.
+	 *
+	 * A subdomain divides a domain and a context sits in one of them, so both
+	 * need somewhere to go — and the selection is that somewhere. Saying so on
+	 * a disabled button beats putting the box in an arbitrary parent and making
+	 * the visitor move it.
+	 */
+	const canAdd = useMemo(
+		() => ({
+			domain: stale ? STALE : null,
+			subdomain: stale
+				? STALE
+				: selectedNode?.kind === 'domain'
+					? null
+					: 'Select a domain first — a subdomain divides one',
+			context: stale
+				? STALE
+				: selectedNode?.kind === 'domain' || selectedNode?.kind === 'subdomain'
+					? null
+					: 'Select a domain or subdomain first — a context sits in one',
+		}),
+		[stale, selectedNode],
+	);
+
+	const addNode = useCallback(
+		(kind: NodeKind) => {
+			if (canAdd[kind] !== null) return;
+			const name = edits.unusedName(document_, NEW_NAME[kind]);
+			applyEdit(edits.addNode(source, kind, name, kind === 'domain' ? null : selectedNode));
+			setFresh(`${kind}:${name}`);
+			// The id is derived from the name, so it can be selected before the
+			// parse that will produce it — the inspector opens on the new box with
+			// its name field ready, which is where the title it needs comes from.
+			setSelected(`${kind}:${name}`);
+		},
+		[applyEdit, canAdd, document_, selectedNode, source],
+	);
+
+	const removeNode = useCallback(
+		(node: Node) => {
+			applyEdit(edits.removeNode(source, document_, node));
+			setSelected(null);
+		},
+		[applyEdit, document_, source],
+	);
+
+	const removeServes = useCallback(
+		(edge: ContainmentEdge) => {
+			applyEdit(edits.removeServes(source, edge));
+			setSelected(null);
+		},
+		[applyEdit, source],
+	);
+
+	const renameNode = useCallback(
+		(node: Node, to: string) => {
+			if (document_.nodes.some((candidate) => candidate.name === to)) {
+				setNote({
+					kind: 'error',
+					text: `"${to}" is already the name of something else. The name is the identity in this format — two nodes cannot share one.`,
+				});
+				return;
+			}
+			applyEdit(edits.renameNode(source, document_, node, to));
+			setSelected(`${node.kind}:${to}`);
+		},
+		[applyEdit, document_, source],
+	);
+
+	/**
+	 * What an edge drawn from one box to another *means*.
+	 *
+	 * The gesture is one gesture and this format has three edges, so the pair of
+	 * kinds decides which one was drawn:
+	 *
+	 *   context → context      a relationship, and the only edge that carries a
+	 *                          pattern. It gets one immediately, because the
+	 *                          grammar has no way to write an untagged arrow —
+	 *                          see `NEW_RELATIONSHIP`.
+	 *   context → subdomain    a `serves` line: the straddle.
+	 *   context → domain       the same, for a context that serves a domain
+	 *                          directly.
+	 *   subdomain → domain     not a line at all. A subdomain divides exactly
+	 *                          one domain and says so by sitting inside it, so
+	 *                          the edge already exists and drawing it re-points
+	 *                          it — the block moves.
+	 *
+	 * Pointing the other way is taken to mean the same thing rather than
+	 * refused. "Draw from the subdomain to the context" and "draw from the
+	 * context to the subdomain" are the same claim about the world, and only one
+	 * of them has a direction the file can hold.
+	 */
+	const connect = useCallback(
+		(fromId: string, toId: string) => {
+			if (stale) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			const a = document_.nodes.find((node) => node.id === fromId);
+			const b = document_.nodes.find((node) => node.id === toId);
+			if (!a || !b) return;
+
+			if (a.kind === 'context' && b.kind === 'context') {
+				applyEdit(
+					edits.addRelationship(source, a.name, b.name, NEW_RELATIONSHIP.pattern, true),
+				);
+				// Selected once it exists: the pattern is a guess and the inspector
+				// is where it stops being one.
+				wanted.current = { from: a.id, to: b.id };
+				return;
+			}
+
+			const context = a.kind === 'context' ? a : b.kind === 'context' ? b : null;
+			const host = context === a ? b : a;
+
+			if (context && host.kind !== 'context') {
+				if (context.serves.includes(host.id)) {
+					setNote({
+						kind: 'warn',
+						text: `"${context.name}" already serves "${host.name}".`,
+					});
+					return;
+				}
+				applyEdit(edits.addServes(source, context, host.name));
+				return;
+			}
+
+			const subdomain = a.kind === 'subdomain' ? a : b.kind === 'subdomain' ? b : null;
+			const domain = a.kind === 'domain' ? a : b.kind === 'domain' ? b : null;
+
+			if (subdomain && domain) {
+				if (subdomain.parent === domain.id) {
+					setNote({
+						kind: 'warn',
+						text: `"${subdomain.name}" already divides "${domain.name}".`,
+					});
+					return;
+				}
+				applyEdit(edits.reparent(source, document_, subdomain, domain));
+				return;
+			}
+
+			setNote({
+				kind: 'warn',
+				text:
+					a.kind === 'domain' && b.kind === 'domain'
+						? 'Domains do not relate to each other. A domain is divided into subdomains, and the relationships worth drawing run between bounded contexts.'
+						: `A ${a.kind} and a ${b.kind} have no edge in this format. Relationships run context to context; membership runs context to subdomain, or subdomain to domain.`,
+			});
+		},
+		[applyEdit, document_, source, stale],
+	);
+
+	/*
+	 * Select a relationship that does not exist yet.
+	 *
+	 * A relationship's id carries the offset of its pattern token, which is not
+	 * knowable until the text has been parsed — unlike a node's, which is its
+	 * name. So the pair is remembered and claimed on the far side of the parse.
+	 */
+	const wanted = useRef<{ from: string; to: string } | null>(null);
+	useEffect(() => {
+		const pair = wanted.current;
+		if (!pair) return;
+		const found = document_.edges.find(
+			(edge) =>
+				edge.kind === 'relationship' && edge.from === pair.from && edge.to === pair.to,
+		);
+		if (!found) return;
+		wanted.current = null;
+		setSelected(found.id);
+	}, [document_]);
+
 	const saveLayout = useCallback(() => {
 		downloadText(
 			viewFilenameFor(document_.title),
@@ -313,12 +541,12 @@ export default function DddMapper() {
 		clearFileInput(viewInput.current);
 
 		if (!result.ok) {
-			setViewNote({ kind: 'error', text: result.error });
+			setNote({ kind: 'error', text: result.error });
 			return;
 		}
 		setPositions(result.view.positions);
 		setCurves(result.view.curves);
-		setViewNote(result.warning ? { kind: 'warn', text: result.warning } : null);
+		setNote(result.warning ? { kind: 'warn', text: result.warning } : null);
 	};
 
 	const onOpen = async (file: File | undefined) => {
@@ -434,18 +662,18 @@ export default function DddMapper() {
 			{/* The legend explains the map's colours, so it goes when the map does. */}
 			{panes !== 'source' && <Legend theme={theme} />}
 
-			{viewNote && (
+			{note && (
 				<p
 					className={
-						viewNote.kind === 'error'
+						note.kind === 'error'
 							? 'flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200'
 							: 'flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200'
 					}
 				>
-					<span className="grow">{viewNote.text}</span>
+					<span className="grow">{note.text}</span>
 					<button
 						type="button"
-						onClick={() => setViewNote(null)}
+						onClick={() => setNote(null)}
 						aria-label="Dismiss"
 						className="shrink-0 font-semibold"
 					>
@@ -516,6 +744,9 @@ export default function DddMapper() {
 							fullscreen={fullscreen}
 							onSaveLayout={saveLayout}
 							onLoadLayout={() => viewInput.current?.click()}
+							onAdd={addNode}
+							canAdd={canAdd}
+							onConnect={connect}
 						/>
 						<Inspector
 							document={document_}
@@ -526,6 +757,10 @@ export default function DddMapper() {
 							setPattern={setPattern}
 							setClassification={setClassification}
 							removeRelationship={removeRelationship}
+							renameNode={renameNode}
+							removeNode={removeNode}
+							removeServes={removeServes}
+							focusName={fresh !== null && fresh === selected}
 						/>
 					</section>
 				)}

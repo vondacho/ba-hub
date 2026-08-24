@@ -157,6 +157,81 @@ A child dragged *above* its parent falls back from the vertical S to a bow,
 because an S between inverted boxes loops back on itself and reads as a bug
 rather than as a moved node.
 
+### Creating and deleting
+
+The gestures that change *what is on the map*, as opposed to
+[what it looks like](#moving-things). All of them are span splices like every
+other edit here — a new node is a fragment inserted, a deleted one is a region
+cut — so the comments and formatting around them come back byte-identical.
+
+**A node** is added from the canvas bar, into the selection: a subdomain needs
+a domain selected, a context needs a domain or a subdomain, and the buttons say
+so when they are off rather than picking a parent for you. The fragment that
+lands is the smallest valid one, and its defaults are chosen to be honest
+rather than convenient — a new subdomain is `supporting`, and a new context is
+`status unmodelled`, because the parser reads an absent status as `modelled`
+and a box drawn a second ago has not been modelled. It arrives with no owner
+and no language, which the problems panel says out loud. That is the point: the
+warnings are the to-do list for the box you just drew.
+
+The name is the exception to "the fragment is enough". The name **is** the
+identity in this format, so a new node is called `New context` and the
+inspector opens with that text selected and the cursor in it. Emptying the
+field puts the old name back, because a nameless node is not an incomplete
+node — it is a file that no longer parses.
+
+**An edge** is drawn by pointing. Take the connect tool, click the box the edge
+starts from, and a dashed candidate follows the pointer until you click the box
+it ends at. Click anywhere else and the candidate is lost; Escape cancels it,
+and a second Escape puts the tool down. It is a mode rather than a drag because
+dragging a box already means moving it, and overloading that would make every
+nudge a possible accidental relationship.
+
+What the edge *means* is decided by the two kinds it joins, because this format
+has three edges and the gesture is one gesture:
+
+| Drawn between | What is written |
+|---|---|
+| context → context | a relationship, at map level, with a pattern |
+| context → subdomain, context → domain | a `serves` line: the straddle |
+| subdomain → domain | nothing — the block moves |
+
+The last row is the interesting one. A subdomain divides exactly one domain and
+says so by *sitting inside it*, so that edge already exists and drawing it
+re-points rather than adds: the subdomain's block is cut and re-inserted, and
+re-indented on the way, because a block landing at its old depth inside a new
+parent is the kind of diff that makes a reviewer distrust a tool that edits
+their source.
+
+Pointing the other way means the same thing rather than being refused. "From
+the subdomain to the context" and "from the context to the subdomain" are the
+same claim about the world and only one of them has a direction the file can
+hold. Two domains have no edge at all, and saying so in the banner is more
+useful than a silently ignored click.
+
+**A relationship gets a pattern immediately**, and it has to: the grammar has
+no untagged arrow, so a relationship *is* its pattern. The choice was between a
+guess and a modal that interrupts the gesture to ask, and the guess wins —
+`customer-supplier`, which is directed like the arrow just drawn and claims
+nothing except that the two teams negotiate. The inspector then opens on the
+new edge with all nine patterns listed, because the map is only honest once
+somebody has looked at that list.
+
+**Deleting** takes the references with it, and this is not politeness. A
+relationship naming a context that no longer exists is a parse *error*, so a
+delete that left one behind would blank the graph and hand the visitor an error
+message instead of the map they were editing. Deleting a subdomain takes the
+contexts nested inside it the same way. The inspector says how many of each
+before the button is pressed — the count comes from the same analysis the
+delete runs, so the sentence and the edit cannot drift apart — which is a
+number you can read instead of a confirmation dialog you would learn to
+dismiss.
+
+The one containment that cannot be deleted is the one implied by nesting: there
+is no line to remove, and taking it away would mean moving the node instead. So
+those edges are drawn solid and do not answer a click, while a written `serves`
+is dashed and does.
+
 ### Moving things
 
 Both the boxes and the edges can be moved, and both moves are
@@ -630,7 +705,11 @@ What has actually been checked, and how.
 | **Parser, error paths** | Unknown classification, unknown pattern, undeclared endpoint, self-relation, duplicate name, unterminated string, empty file. One error per mistake — recovery was fixed twice to stop a single bad token cascading into three reports. |
 | **Pairing rules** | `->` on a mutual pattern, `<->` on a directed one, and two patterns on a mutual arrow all rejected; `big-ball-of-mud` accepted either way. |
 | **Span splices** | Changing a pattern rewrites one line and leaves the file's comments byte-identical. Renaming a context rewrites its declaration and both relationships that name it — and nothing inside `intent` or `because` prose. |
-| **The round-trip property** | Add a relationship, then remove it, and the file is byte-identical to where it started. This is the property the last section of this README names as the first thing a suite should assert. |
+| **The round-trip property** | Add a relationship, then remove it, and the file is byte-identical to where it started. Also holds for a context added into a subdomain and for a domain added at map level, and for a `serves` line added and removed. This is the property the last section of this README names as the first thing a suite should assert. |
+| **Creation fragments** | A context, a subdomain and a domain each parse on the first re-parse after insertion, land in the intended parent, and take the intended defaults — `supporting`, `status unmodelled`. A new relationship parses, is directed with the origin upstream, and carries its pattern; a second one between the same pair gets a distinct id rather than colliding. |
+| **Deletion** | Removing a context takes the 2 relationships that name it; removing a subdomain takes the 2 contexts nested inside it and the `serves` lines pointing at it from contexts that survive. The count the inspector shows comes from the same function the delete calls. |
+| **The block scanner** | A brace inside a quoted `intent` — `"the {invoice} aggregate"` — no longer ends a block early. That counter was string-blind, which was harmless while it only bounded a search and would have cut the wrong half of a file once it was used to delete a node. |
+| **Re-parenting** | A subdomain moved to another domain parses, reports the new parent, keeps every other node, and arrives re-indented to its new depth with no trailing whitespace on blank lines. |
 | **Layout** | Three tiers — domain, 9 subdomains, 9 contexts — with all 11 relationship labels placed. |
 | **Edge geometry** | All 29 edges emit cubics with no `NaN`. Dragging a node re-routes exactly the 3 edges touching it and leaves the other 26 byte-identical. A child dragged above its parent falls back without looping. |
 | **Layout quality** | Measured on the rendered curves, not on a proxy. Seed map: **0 crossings, 0 arcs hidden behind a box**, one row, 508 tall, ~180ms. K4 and K5 — complete relationship graphs no row can draw cleanly — both reach 0 crossings via the spreading pass, in 30ms and 66ms. Deterministic: three runs give byte-identical coordinates. |
@@ -644,9 +723,10 @@ What has actually been checked, and how.
 **Not checked: anything that needs a browser.** The Chrome extension was not
 connected, so no part of the interaction — typing, the debounce, the staleness
 banner, node dragging, edge bending, pan and zoom, the minimap, the widget bar,
-full screen, the inspector's pickers, the theme pin — has been exercised against
-a real DOM. The first person to open the page should expect
-to find something.
+full screen, the inspector's pickers, the theme pin, and everything the connect
+tool does — has been exercised against a real DOM. The edits underneath the
+gestures are tested; the gestures themselves are not. The first person to open
+the page should expect to find something.
 
 There is still no test runner. The checks above were one-off harnesses, which
 is worse than a suite and much better than the nothing the rest of the family
@@ -677,12 +757,18 @@ What is out of scope even now:
   `helm/ba-portal/`. The ingress host is `ddd-mapper.localhost` — the component
   is named for the repository it lives in and the host for the tool it serves,
   which is already what ba-portal's `dddMapperUrl` points at.
-- **No graph-to-text creation gestures.** The inspector can change a pattern, a
-  classification and a status, and can remove a relationship. It cannot yet
-  *draw* one by dragging between two contexts, which is the gesture a graph
-  editor most obviously owes you. `addRelationship` exists in `edit.ts` and is
-  tested; what is missing is the drag.
-- **No rename in the graph.** `renameNode` exists and is tested — including the
-  hard part, rewriting every relationship that names the node — and has no
-  control wired to it.
+- **No undo for a gesture made with the source panel hidden.** Every graph
+  gesture writes through the textarea so that the browser's own history records
+  it and ⌘Z undoes a pattern change exactly as it undoes a keystroke. In
+  map-only layout there is no textarea, so the edit still applies and simply
+  does not land in the undo stack. Keeping the editor mounted but hidden does
+  not fix it — `execCommand` needs a focusable element — so the fix is a real
+  history stack, which is a bigger change than the one that exposed it.
+- **Gestures are refused while the text does not parse.** The spans a gesture
+  splices were measured in the last document that parsed, so applying one to
+  text that has moved on would write at an offset that is no longer the thing
+  it names. The add buttons, the connect tool and the map's name field all go
+  quiet until the errors are fixed. The graph's older gestures — the pattern
+  picker, the classification buttons, node dragging — predate that rule and do
+  not yet follow it.
 - **No test runner.** The verification above was one-off harnesses.

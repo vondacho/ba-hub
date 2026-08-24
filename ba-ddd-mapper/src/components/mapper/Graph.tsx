@@ -18,9 +18,10 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Classification, DddDocument, Node } from '../../lib/ddd/model';
+import type { Classification, DddDocument, Node, NodeKind } from '../../lib/ddd/model';
 import {
 	applyPositions,
+	borderTowards,
 	extentOf,
 	routeEdges,
 	type Curves,
@@ -47,7 +48,32 @@ interface Props {
 	fullscreen: boolean;
 	onSaveLayout: () => void;
 	onLoadLayout: () => void;
+	onAdd: (kind: NodeKind) => void;
+	canAdd: Record<NodeKind, string | null>;
+	/** Draw an edge between two nodes. The parent decides what that means. */
+	onConnect: (fromId: string, toId: string) => void;
 }
+
+/**
+ * How far the pointer must travel before a press becomes a drag or a pan.
+ *
+ * In screen pixels rather than graph ones, because what it is measuring is a
+ * hand rather than a map: the same twitch is the same twitch at every zoom.
+ *
+ * Without it, any movement at all counted — so a mouse that slid one pixel
+ * between press and release both nudged the box and had its click discarded.
+ *
+ * It also decides when the pointer is **captured**, and that is the more
+ * important of its two jobs. Capturing on press retargets everything that
+ * follows to the capture element, the compatibility mouse events included — so
+ * the `click` that ends a press on a box was delivered to the `<svg>` instead
+ * of to the box, `NodeBox`'s own `onClick` never ran, and the canvas read the
+ * click as landing on nothing and cleared the selection. A node could not be
+ * selected at all, and the same went for an edge, whose press starts a pan.
+ * Nothing is captured until a gesture is real, so a plain click is now a plain
+ * click.
+ */
+const DRAG_SLOP = 4;
 
 interface View {
 	x: number;
@@ -69,20 +95,69 @@ export default function Graph({
 	fullscreen,
 	onSaveLayout,
 	onLoadLayout,
+	onAdd,
+	canAdd,
+	onConnect,
 }: Props) {
 	const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
 	const [size, setSize] = useState({ width: 800, height: 600 });
+	/*
+	 * Drawing an edge, in two pieces: the mode, and the half-drawn edge.
+	 *
+	 * `connecting` is the tool being held. `origin` is the node clicked first,
+	 * and while it is set the candidate follows the pointer — so the two are not
+	 * one nullable field: leaving the mode on after a stroke is what lets
+	 * somebody draw six relationships without going back to the bar, and
+	 * abandoning a candidate has to leave the tool in hand.
+	 */
+	const [connecting, setConnecting] = useState(false);
+	const [origin, setOrigin] = useState<string | null>(null);
+	const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
 	const surface = useRef<SVGSVGElement>(null);
-	const pan = useRef<{ x: number; y: number; originX: number; originY: number } | null>(null);
-	const dragging = useRef<{ id: string; offsetX: number; offsetY: number; moved: boolean } | null>(
-		null,
-	);
+	const pan = useRef<{
+		x: number;
+		y: number;
+		originX: number;
+		originY: number;
+		pointerId: number;
+		live: boolean;
+	} | null>(null);
+	const dragging = useRef<{
+		id: string;
+		offsetX: number;
+		offsetY: number;
+		startX: number;
+		startY: number;
+		pointerId: number;
+		moved: boolean;
+	} | null>(null);
+	/*
+	 * Whether the last press on a box turned into a move.
+	 *
+	 * Read by the box on its own click, and kept here rather than in the box
+	 * because here is where the threshold below is applied — two copies of "did
+	 * that count as a drag" would eventually disagree, and the symptom would be
+	 * a click that neither selects nor moves.
+	 *
+	 * It outlives `dragging`, which is cleared on pointer-up: the click event
+	 * arrives after that, and by then the only question left is what just
+	 * happened.
+	 */
+	const draggedLast = useRef(false);
 	// Dragging an edge's handle. Held separately from node dragging because the
 	// two write to different state and a shared ref would need a discriminant
 	// on every read.
-	const bending = useRef<{ id: string; baseDx: number; baseDy: number; fromX: number; fromY: number } | null>(
-		null,
-	);
+	const bending = useRef<{
+		id: string;
+		baseDx: number;
+		baseDy: number;
+		fromX: number;
+		fromY: number;
+		startX: number;
+		startY: number;
+		pointerId: number;
+		live: boolean;
+	} | null>(null);
 
 	const placed = useMemo(
 		() => (layout ? applyPositions(layout.nodes, positions) : []),
@@ -90,6 +165,22 @@ export default function Graph({
 	);
 	const edges = useMemo(() => routeEdges(document, placed, curves), [document, placed, curves]);
 	const extent = useMemo(() => extentOf(placed), [placed]);
+
+	/*
+	 * The containment edges written as a `serves` line, as opposed to the ones
+	 * implied by nesting. They are dashed on the canvas and they are the only
+	 * ones that answer a click — the straddle is a claim somebody made in the
+	 * file, and it is the only containment a gesture can take back.
+	 */
+	const removable = useMemo(
+		() =>
+			new Set(
+				document.edges
+					.filter((edge) => edge.kind === 'containment' && !edge.implied)
+					.map((edge) => edge.id),
+			),
+		[document],
+	);
 
 	const classificationOf = useMemo(() => {
 		const map = new Map<string, Classification>();
@@ -136,6 +227,34 @@ export default function Graph({
 	 * once the resize has actually been observed. Deferring it here is what makes
 	 * the button do what it looks like it does.
 	 */
+	/*
+	 * Escape abandons the candidate, and a second Escape puts the tool down.
+	 * Two steps because losing the tool on the same key that fixes a misclick
+	 * would mean going back to the bar after every slip.
+	 */
+	useEffect(() => {
+		if (!connecting) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			setOrigin((current) => {
+				if (current === null) setConnecting(false);
+				return null;
+			});
+			setTip(null);
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [connecting]);
+
+	// Putting the tool down drops whatever was half-drawn with it — and so does
+	// the origin going away, which happens when the box it started from is
+	// deleted, or renamed out from under it, while the candidate is out.
+	useEffect(() => {
+		if (connecting && (origin === null || placed.some((node) => node.id === origin))) return;
+		setOrigin(null);
+		setTip(null);
+	}, [connecting, origin, placed]);
+
 	const refitOnResize = useRef(false);
 	useEffect(() => {
 		refitOnResize.current = true;
@@ -204,6 +323,27 @@ export default function Graph({
 		};
 	};
 
+	/**
+	 * A click on a node while the connect tool is held.
+	 *
+	 * First click sets the origin. Second commits — unless it landed back on the
+	 * origin, which is a cancel rather than an edge to nowhere: an edge from a
+	 * node to itself is not a thing this format can say, and refusing it with a
+	 * message would be pedantry about an obvious slip.
+	 */
+	const connectTo = (id: string) => {
+		if (origin === null) {
+			setOrigin(id);
+			return;
+		}
+		const from = origin;
+		setOrigin(null);
+		setTip(null);
+		if (from !== id) onConnect(from, id);
+	};
+
+	const originNode = origin === null ? null : placed.find((node) => node.id === origin) ?? null;
+
 	const zoomBy = (factor: number) => {
 		setView((current) => {
 			const scale = clamp(current.scale * factor, 0.1, 3);
@@ -235,6 +375,10 @@ export default function Graph({
 			)}
 
 			<CanvasBar
+				onAdd={onAdd}
+				canAdd={canAdd}
+				connecting={connecting}
+				onConnecting={setConnecting}
 				onZoom={zoomBy}
 				onFit={fit}
 				onReset={() => {
@@ -252,7 +396,7 @@ export default function Graph({
 			<svg
 				ref={surface}
 				className={`h-full w-full touch-none ${stale ? 'opacity-40' : ''} ${
-					dragging.current ? 'cursor-grabbing' : 'cursor-grab'
+					connecting ? 'cursor-crosshair' : dragging.current ? 'cursor-grabbing' : 'cursor-grab'
 				}`}
 				onWheel={(event) => {
 					if (!event.ctrlKey && !event.metaKey) return;
@@ -260,18 +404,38 @@ export default function Graph({
 					zoomBy(event.deltaY < 0 ? 1.1 : 0.9);
 				}}
 				onPointerDown={(event) => {
-					if (event.button !== 0 || dragging.current) return;
+					if (event.button !== 0 || dragging.current || origin !== null) return;
 					pan.current = {
 						x: event.clientX,
 						y: event.clientY,
 						originX: view.x,
 						originY: view.y,
+						pointerId: event.pointerId,
+						live: false,
 					};
-					event.currentTarget.setPointerCapture(event.pointerId);
 				}}
 				onPointerMove={(event) => {
+					// The candidate tracks the pointer and nothing else does while it
+					// is out: panning under a half-drawn edge would leave it pointing
+					// at a place the map has moved away from.
+					if (origin !== null) {
+						setTip(toGraph(event.clientX, event.clientY));
+						return;
+					}
 					const bend = bending.current;
 					if (bend) {
+						if (!bend.live) {
+							const travelled = Math.hypot(
+								event.clientX - bend.startX,
+								event.clientY - bend.startY,
+							);
+							// A press on the handle that never moves is a click, and a
+							// click that captured the pointer would be delivered to the
+							// canvas and clear the very selection the handle belongs to.
+							if (travelled < DRAG_SLOP) return;
+							bend.live = true;
+							surface.current?.setPointerCapture(bend.pointerId);
+						}
 						const point = toGraph(event.clientX, event.clientY);
 						onCurves({
 							...curves,
@@ -284,8 +448,20 @@ export default function Graph({
 					}
 					const drag = dragging.current;
 					if (drag) {
+						if (!drag.moved) {
+							const travelled = Math.hypot(
+								event.clientX - drag.startX,
+								event.clientY - drag.startY,
+							);
+							// Under the slop nothing happens at all: the box does not
+							// creep, and the click that follows still selects.
+							if (travelled < DRAG_SLOP) return;
+							drag.moved = true;
+							draggedLast.current = true;
+							// Taken here rather than on the press: see DRAG_SLOP.
+							surface.current?.setPointerCapture(drag.pointerId);
+						}
 						const point = toGraph(event.clientX, event.clientY);
-						drag.moved = true;
 						onPositions({
 							...positions,
 							[drag.id]: { x: point.x - drag.offsetX, y: point.y - drag.offsetY },
@@ -294,6 +470,15 @@ export default function Graph({
 					}
 					const start = pan.current;
 					if (!start) return;
+					if (!start.live) {
+						const travelled = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+						// Under the slop this is a click on whatever is underneath —
+						// an edge, most usefully — and must be left alone to become
+						// one.
+						if (travelled < DRAG_SLOP) return;
+						start.live = true;
+						surface.current?.setPointerCapture(start.pointerId);
+					}
 					setView((current) => ({
 						...current,
 						x: start.originX + (event.clientX - start.x),
@@ -306,7 +491,15 @@ export default function Graph({
 					bending.current = null;
 				}}
 				onClick={(event) => {
-					if (event.target === event.currentTarget) onSelect(null);
+					if (event.target !== event.currentTarget) return;
+					// Clicking nothing loses the candidate — the gesture's own way
+					// out, and the one the hint line promises.
+					if (origin !== null) {
+						setOrigin(null);
+						setTip(null);
+						return;
+					}
+					onSelect(null);
 				}}
 				role="img"
 				aria-label={`Context map: ${document.nodes.length} nodes, ${document.edges.length} edges`}
@@ -333,6 +526,17 @@ export default function Graph({
 						<path d="M0 1 L9 5 L0 9 z" className="fill-violet-600 dark:fill-violet-400" />
 					</marker>
 					<marker
+						id="head-candidate"
+						viewBox="0 0 10 10"
+						refX="9"
+						refY="5"
+						markerWidth="6"
+						markerHeight="6"
+						orient="auto-start-reverse"
+					>
+						<path d="M0 1 L9 5 L0 9 z" className="fill-brand dark:fill-purple-400" />
+					</marker>
+					<marker
 						id="head-quiet"
 						viewBox="0 0 10 10"
 						refX="9"
@@ -346,27 +550,73 @@ export default function Graph({
 				</defs>
 
 				<g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+					{/*
+					   Decorative, and explicitly not a click target. A filled rect
+					   covering the canvas is the top hit for every click on empty
+					   space, which made "the background" unclickable: selecting
+					   nothing, and losing a half-drawn edge, both need the click to
+					   reach the <svg> itself.
+					*/}
 					<rect
 						x={extent.x - 2000}
 						y={extent.y - 2000}
 						width={extent.width + 4000}
 						height={extent.height + 4000}
 						fill="url(#dots)"
+						className="pointer-events-none"
 					/>
 
+					{/*
+					   Edges stop answering the pointer while an edge is being drawn.
+					   A click on an arc is not a click on a node, so by the rule the
+					   hint line states it must lose the candidate — which means it
+					   has to reach the canvas rather than being eaten by a curve.
+					*/}
+					<g className={origin === null ? undefined : 'pointer-events-none'}>
 					{/* Containment first, so relationships draw over it. */}
 					{edges
 						.filter((edge) => edge.kind === 'containment')
-						.map((edge) => (
-							<path
-								key={edge.id}
-								d={edge.path}
-								fill="none"
-								strokeWidth={1.25}
-								className="stroke-slate-400 dark:stroke-slate-700"
-								markerEnd="url(#head-quiet)"
-							/>
-						))}
+						.map((edge) => {
+							/*
+							 * Only a written `serves` can be selected, because only a
+							 * written `serves` can be deleted. The containment a node
+							 * gets from sitting inside another one has no line of its
+							 * own: removing it would mean moving the node, and a click
+							 * target that opens a panel whose only button is greyed out
+							 * is a worse answer than not being clickable.
+							 */
+							const written = removable.has(edge.id);
+							const chosen = selected === edge.id;
+							return (
+								<g key={edge.id}>
+									{written && (
+										<path
+											d={edge.path}
+											fill="none"
+											strokeWidth={14}
+											stroke="transparent"
+											className="cursor-pointer"
+											onClick={(event) => {
+												event.stopPropagation();
+												onSelect(chosen ? null : edge.id);
+											}}
+										/>
+									)}
+									<path
+										d={edge.path}
+										fill="none"
+										strokeWidth={chosen ? 2.5 : 1.25}
+										strokeDasharray={written ? '5 3' : undefined}
+										className={
+											chosen
+												? 'stroke-violet-600 dark:stroke-violet-300'
+												: 'stroke-slate-400 dark:stroke-slate-700'
+										}
+										markerEnd="url(#head-quiet)"
+									/>
+								</g>
+							);
+						})}
 
 					{edges
 						.filter((edge) => edge.kind === 'relationship')
@@ -423,9 +673,13 @@ export default function Graph({
 													baseDy: existing?.dy ?? 0,
 													fromX: point.x,
 													fromY: point.y,
+													startX: pointer.clientX,
+													startY: pointer.clientY,
+													pointerId: pointer.pointerId,
+													live: false,
 												};
-												surface.current?.setPointerCapture(pointer.pointerId);
 											}}
+											onClick={(pointer) => pointer.stopPropagation()}
 										>
 											<title>Drag to bend this edge</title>
 										</circle>
@@ -455,26 +709,59 @@ export default function Graph({
 							);
 						})}
 
+					</g>
+
 					{placed.map((node) => (
 						<NodeBox
 							key={node.id}
 							placed={node}
 							selected={selected === node.id}
+							pending={origin === node.id}
+							connecting={connecting}
 							moved={positions[node.id] !== undefined}
 							classificationOf={classificationOf}
 							onSelect={onSelect}
+							onConnect={connectTo}
+							didDrag={() => draggedLast.current}
 							onGrab={(event) => {
 								const point = toGraph(event.clientX, event.clientY);
 								dragging.current = {
 									id: node.id,
 									offsetX: point.x - node.x,
 									offsetY: point.y - node.y,
+									startX: event.clientX,
+									startY: event.clientY,
+									pointerId: event.pointerId,
 									moved: false,
 								};
-								surface.current?.setPointerCapture(event.pointerId);
+								draggedLast.current = false;
 							}}
 						/>
 					))}
+
+					{originNode && tip && (
+						/*
+						 * The candidate. Drawn last so it lies over everything, dashed
+						 * because it is not a fact about the map yet, and anchored on
+						 * the origin's outline rather than its centre so it reads as
+						 * leaving the box the way a settled edge does.
+						 */
+						<g className="pointer-events-none">
+							{(() => {
+								const start = borderTowards(originNode, tip);
+								return (
+									<path
+										d={`M ${start.x} ${start.y} L ${tip.x} ${tip.y}`}
+										fill="none"
+										strokeWidth={2}
+										strokeDasharray="7 5"
+										className="stroke-brand dark:stroke-purple-400"
+										markerEnd="url(#head-candidate)"
+									/>
+								);
+							})()}
+						</g>
+					)}
 				</g>
 			</svg>
 
@@ -492,8 +779,11 @@ export default function Graph({
 			/>
 
 			<p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-white/85 px-2 py-1 text-[11px] text-ink-muted dark:bg-slate-900/85 dark:text-slate-400">
-				drag a box to move it · click an edge then drag its handle to bend it · drag the canvas
-				to pan · ⌘/ctrl + scroll to zoom
+				{connecting
+					? origin === null
+						? 'click the box the edge starts from · esc to put the tool down'
+						: 'click the box it ends at · click anywhere else to lose it · esc to cancel'
+					: 'drag a box to move it · click an edge then drag its handle to bend it · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
 			</p>
 		</div>
 	);
@@ -502,22 +792,31 @@ export default function Graph({
 function NodeBox({
 	placed,
 	selected,
+	pending,
+	connecting,
 	moved,
 	classificationOf,
 	onSelect,
+	onConnect,
 	onGrab,
+	didDrag,
 }: {
 	placed: PlacedNode;
 	selected: boolean;
+	/** This is the origin of the edge currently being drawn. */
+	pending: boolean;
+	connecting: boolean;
 	moved: boolean;
 	classificationOf: (id: string) => Classification | null;
 	onSelect: (id: string | null) => void;
+	onConnect: (id: string) => void;
 	onGrab: (event: React.PointerEvent) => void;
+	/** Did the press this click is ending actually move the box? */
+	didDrag: () => boolean;
 }) {
 	const { node, x, y, width, height } = placed;
 	const style = styleFor(node, classificationOf);
 	const second = secondLine(node);
-	const dragged = useRef(false);
 
 	return (
 		<g
@@ -527,20 +826,23 @@ function NodeBox({
 				// Stops the canvas pan from also starting. A box under the pointer
 				// means the gesture is about the box.
 				event.stopPropagation();
-				dragged.current = false;
-				onGrab(event);
-			}}
-			onPointerMove={() => {
-				dragged.current = true;
+				// With the connect tool in hand a box is a target, not a handle:
+				// starting a move here would mean every edge drawn also nudged the
+				// node it started from.
+				if (!connecting) onGrab(event);
 			}}
 			onClick={(event) => {
 				event.stopPropagation();
+				if (connecting) {
+					onConnect(node.id);
+					return;
+				}
 				// A drag that ends over the box must not also select it — otherwise
 				// every move opens the inspector.
-				if (dragged.current) return;
+				if (didDrag()) return;
 				onSelect(selected ? null : node.id);
 			}}
-			className="cursor-move"
+			className={connecting ? 'cursor-crosshair' : 'cursor-move'}
 		>
 			{style.shape === 'ellipse' ? (
 				<ellipse
@@ -548,18 +850,18 @@ function NodeBox({
 					cy={height / 2}
 					rx={width / 2}
 					ry={height / 2}
-					strokeWidth={selected ? 3 : 1.5}
+					strokeWidth={selected || pending ? 3 : 1.5}
 					strokeDasharray={style.dashed ? '6 4' : undefined}
-					className={`${style.box} ${selected ? 'stroke-violet-600 dark:stroke-violet-300' : ''}`}
+					className={`${style.box} ${outline(selected, pending)}`}
 				/>
 			) : (
 				<rect
 					width={width}
 					height={height}
 					rx={style.radius}
-					strokeWidth={selected ? 3 : 1.5}
+					strokeWidth={selected || pending ? 3 : 1.5}
 					strokeDasharray={style.dashed ? '6 4' : undefined}
-					className={`${style.box} ${selected ? 'stroke-violet-600 dark:stroke-violet-300' : ''}`}
+					className={`${style.box} ${outline(selected, pending)}`}
 				/>
 			)}
 			{moved && (
@@ -612,6 +914,19 @@ function NodeBox({
 			)}
 		</g>
 	);
+}
+
+/**
+ * The stroke that says what the box is right now.
+ *
+ * The origin of a half-drawn edge outranks the selection, because it is the
+ * thing the visitor is in the middle of doing and the selection is the thing
+ * they did before it.
+ */
+function outline(selected: boolean, pending: boolean): string {
+	if (pending) return 'stroke-brand dark:stroke-purple-400';
+	if (selected) return 'stroke-violet-600 dark:stroke-violet-300';
+	return '';
 }
 
 function secondLine(node: Node): string {
