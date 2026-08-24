@@ -1,0 +1,42 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ModelEditor from '../components/model/ModelEditor.tsx';
+
+// Server-rendered like `/`, for symmetry with it rather than out of need: this
+// page asks the environment for nothing yet, and will once it links back to a
+// context on the map.
+---
+
+<Layout
+	title="Domain model — DDD mapper"
+	description="Author the inside of one bounded context as text and see it as a class diagram. Aggregates with the invariants they protect, the entities they own, and the identities they hold across a boundary."
+>
+	<main id="main" class="mx-auto w-full max-w-[110rem] px-6 py-10">
+		<header class="mb-8">
+			<p class="text-xs font-semibold tracking-[0.16em] text-ink-muted uppercase dark:text-slate-400">
+				ba-hub · ddd mapper
+			</p>
+			<h1 class="mt-2 text-3xl font-bold sm:text-4xl">The inside of one context</h1>
+			<p class="mt-3 max-w-prose text-ink-muted dark:text-slate-400">
+				The <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/">map</a>
+				says a context has an aggregate called <code>Submission</code>. This says what
+				<code>Submission</code> is: what it holds, what it protects, and what it is allowed to
+				know about the rest of the world.
+			</p>
+		</header>
+
+		<ModelEditor client:only="react" />
+
+		<noscript>
+			<div class="rounded-2xl border border-slate-200 p-6 dark:border-slate-700">
+				<h2 class="font-semibold">The editor needs JavaScript</h2>
+				<p class="mt-2 max-w-prose text-ink-muted dark:text-slate-400">
+					A diagram is direct manipulation, which is not something a page can do without
+					scripting. The <code>.ddm</code> format is plain text, though, so any editor will do
+					— and the <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/dsl">format page</a>
+					describes the one next door.
+				</p>
+			</div>
+		</noscript>
+	</main>
+</Layout>

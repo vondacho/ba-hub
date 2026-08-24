@@ -57,7 +57,9 @@ import {
 	viewFilenameFor,
 } from '../../lib/files';
 import { parseView, serializeView } from '../../lib/view-file';
+import { useFullscreen } from '../../lib/fullscreen';
 import Icon, { type IconName } from './Icon';
+import IconButton from '../ui/IconButton';
 import {
 	loadCurves,
 	loadPanes,
@@ -135,8 +137,7 @@ export default function DddMapper() {
 	// localStorage and never into `source`.
 	const [positions, setPositions] = useState<Positions>({});
 	const [curves, setCurves] = useState<Curves>({});
-	const [fullscreen, setFullscreen] = useState(false);
-	const root = useRef<HTMLDivElement>(null);
+	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const viewInput = useRef<HTMLInputElement>(null);
@@ -171,34 +172,6 @@ export default function DddMapper() {
 		if (storedPanes !== null) setPanes(storedPanes);
 		setPositions(loadPositions());
 		setCurves(loadCurves());
-	}, []);
-
-	/*
-	 * Full screen takes the whole mapper — editor, problems panel and graph —
-	 * rather than the graph alone. Both panels are the tool: a graph on a large
-	 * display with the text it is made of hidden behind it is the wrong half,
-	 * and the text is the source of truth.
-	 *
-	 * The state is read back from the `fullscreenchange` event rather than set
-	 * optimistically on click, because Escape and the browser's own chrome can
-	 * leave full screen without going through the button, and a flag that only
-	 * the button updated would then be wrong.
-	 */
-	useEffect(() => {
-		const sync = () => setFullscreen(window.document.fullscreenElement === root.current);
-		window.document.addEventListener('fullscreenchange', sync);
-		return () => window.document.removeEventListener('fullscreenchange', sync);
-	}, []);
-
-	const toggleFullscreen = useCallback(() => {
-		if (window.document.fullscreenElement) {
-			void window.document.exitFullscreen();
-			return;
-		}
-		// Rejects when the gesture is not user-initiated or the feature is
-		// blocked by permissions policy. Nothing to recover — the button simply
-		// does not work, which is better than an unhandled rejection.
-		void root.current?.requestFullscreen?.().catch(() => undefined);
 	}, []);
 
 	// Parse, debounced. A failure keeps the last good document.
@@ -926,45 +899,6 @@ function MapTitle({
 					: 'hover:border-slate-300 focus:border-brand focus:bg-white focus:outline-none dark:hover:border-slate-600 dark:focus:bg-slate-800'
 			}`}
 		/>
-	);
-}
-
-/**
- * The top bar's buttons.
- *
- * Icon-only, and therefore `title` *and* `aria-label` on every one: an icon
- * with neither is a rebus. The title is what a pointer user gets and the label
- * is what a screen reader gets, and they say the same thing on purpose.
- */
-function IconButton({
-	label,
-	onClick,
-	pressed,
-	children,
-}: {
-	label: string;
-	onClick: (event: React.MouseEvent) => void;
-	/* Omitted by the buttons that *do* something. Present only on the ones that
-	   put the bar into a state, where a reader has to be able to see which
-	   state that is — and `aria-pressed` says the same thing the fill does. */
-	pressed?: boolean;
-	children: React.ReactNode;
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onClick}
-			title={label}
-			aria-label={label}
-			aria-pressed={pressed}
-			className={`flex h-7 w-7 items-center justify-center rounded-md border ${
-				pressed
-					? 'border-brand bg-white text-brand dark:border-purple-400 dark:bg-slate-800 dark:text-purple-300'
-					: 'border-slate-300 hover:bg-white dark:border-slate-600 dark:hover:bg-slate-800'
-			}`}
-		>
-			{children}
-		</button>
 	);
 }
 

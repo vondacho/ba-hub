@@ -45,21 +45,31 @@ import Icon from './Icon';
  */
 
 interface Props {
-	onAdd: (kind: NodeKind) => void;
+	/*
+	 * The drawing tools and the layout sidecar are optional groups.
+	 *
+	 * The domain model editor uses this bar for the half it already has — look
+	 * at the picture, reset it, take it full screen, write it out — and has no
+	 * add-a-domain button and no `.dddview` of its own yet. Omitting a group is
+	 * how it says so; the alternative was a second bar that would drift from
+	 * this one in a week.
+	 */
+	onAdd?: (kind: NodeKind) => void;
 	/** What the selection allows adding right now. */
-	canAdd: Record<NodeKind, string | null>;
-	connecting: boolean;
-	onConnecting: (on: boolean) => void;
+	canAdd?: Record<NodeKind, string | null>;
+	connecting?: boolean;
+	onConnecting?: (on: boolean) => void;
+	onSaveLayout?: () => void;
+	onLoadLayout?: () => void;
 	onZoom: (factor: number) => void;
 	onFit: () => void;
 	onReset: () => void;
-	onSaveLayout: () => void;
-	onLoadLayout: () => void;
 	onExportSvg: () => void;
 	onFullscreen: () => void;
 	fullscreen: boolean;
 	/** How many nodes and edges have been moved. Zero disables Reset. */
 	moved: number;
+	/** In zoom units rather than raw scale — see ZOOM_UNIT. */
 	scale: number;
 }
 
@@ -81,38 +91,45 @@ export default function CanvasBar({
 }: Props) {
 	return (
 		<div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900/95">
-			<Button
-				label={canAdd.domain ?? 'Add a domain'}
-				onClick={() => onAdd('domain')}
-				disabled={canAdd.domain !== null}
-			>
-				<Icon name="add-domain" />
-			</Button>
-			<Button
-				label={canAdd.subdomain ?? 'Add a subdomain to the selected domain'}
-				onClick={() => onAdd('subdomain')}
-				disabled={canAdd.subdomain !== null}
-			>
-				<Icon name="add-subdomain" />
-			</Button>
-			<Button
-				label={canAdd.context ?? 'Add a bounded context to the selection'}
-				onClick={() => onAdd('context')}
-				disabled={canAdd.context !== null}
-			>
-				<Icon name="add-context" />
-			</Button>
-			<Button
-				label={
-					connecting
-						? 'Stop drawing edges'
-						: 'Draw an edge: click the origin, then the target'
-				}
-				onClick={() => onConnecting(!connecting)}
-				pressed={connecting}
-			>
-				<Icon name="connect" />
-			</Button>
+			{onAdd && canAdd && (
+				<>
+					<Button
+						label={canAdd.domain ?? 'Add a domain'}
+						onClick={() => onAdd('domain')}
+						disabled={canAdd.domain !== null}
+					>
+						<Icon name="add-domain" />
+					</Button>
+					<Button
+						label={canAdd.subdomain ?? 'Add a subdomain to the selected domain'}
+						onClick={() => onAdd('subdomain')}
+						disabled={canAdd.subdomain !== null}
+					>
+						<Icon name="add-subdomain" />
+					</Button>
+					<Button
+						label={canAdd.context ?? 'Add a bounded context to the selection'}
+						onClick={() => onAdd('context')}
+						disabled={canAdd.context !== null}
+					>
+						<Icon name="add-context" />
+					</Button>
+				</>
+			)}
+			{onConnecting && (
+				<Button
+					label={
+						connecting ? 'Stop drawing edges' : 'Draw an edge: click the origin, then the target'
+					}
+					onClick={() => onConnecting(!connecting)}
+					pressed={connecting}
+				>
+					<Icon name="connect" />
+				</Button>
+			)}
+			{(onAdd || onConnecting) && (
+				<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			)}
 
 			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
@@ -144,16 +161,22 @@ export default function CanvasBar({
 
 			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
-			<Button
-				label={moved === 0 ? 'Save this layout (nothing moved yet)' : 'Save this layout to a .dddview file'}
-				onClick={onSaveLayout}
-				disabled={moved === 0}
-			>
-				<Icon name="layout-save" />
-			</Button>
-			<Button label="Load a layout from a .dddview file" onClick={onLoadLayout}>
-				<Icon name="layout-open" />
-			</Button>
+			{onSaveLayout && (
+				<Button
+					label={
+						moved === 0 ? 'Save this layout (nothing moved yet)' : 'Save this layout to a .dddview file'
+					}
+					onClick={onSaveLayout}
+					disabled={moved === 0}
+				>
+					<Icon name="layout-save" />
+				</Button>
+			)}
+			{onLoadLayout && (
+				<Button label="Load a layout from a .dddview file" onClick={onLoadLayout}>
+					<Icon name="layout-open" />
+				</Button>
+			)}
 			<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
 				<Icon name="picture" />
 			</Button>

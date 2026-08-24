@@ -17,6 +17,8 @@ const THEME = 'ba-ddd-mapper-mapper:graph-theme';
 const SPLIT = 'ba-ddd-mapper-mapper:split';
 const PANES = 'ba-ddd-mapper-mapper:panes';
 const POSITIONS = 'ba-ddd-mapper-mapper:positions';
+const MODEL_SOURCE = 'ba-ddd-mapper-model:source';
+const MODEL_POSITIONS = 'ba-ddd-mapper-model:positions';
 const CURVES = 'ba-ddd-mapper-mapper:curves';
 
 export type GraphTheme = 'light' | 'dark';
@@ -194,5 +196,63 @@ export function saveCurves(curves: Record<string, { dx: number; dy: number }>): 
 		else store()?.setItem(CURVES, JSON.stringify(curves));
 	} catch {
 		// Same.
+	}
+}
+
+/**
+ * The domain model page's own text and arrangement.
+ *
+ * Its own keys, because they are its own document. The *theme*, the split and
+ * which panes are showing are deliberately **not** duplicated: those are
+ * properties of the desk rather than of either document — somebody who wants
+ * the text on the left and the picture pinned light wants that in both tools,
+ * and making them choose twice would be the two pages admitting they are two
+ * programs.
+ */
+export function saveModelSource(text: string): boolean {
+	try {
+		store()?.setItem(MODEL_SOURCE, text);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export function loadModelSource(): string | null {
+	try {
+		return store()?.getItem(MODEL_SOURCE) ?? null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveModelPositions(positions: Record<string, { x: number; y: number }>): void {
+	try {
+		store()?.setItem(MODEL_POSITIONS, JSON.stringify(positions));
+	} catch {
+		// As everywhere here: a nudge that does not persist beats a crash.
+	}
+}
+
+export function loadModelPositions(): Record<string, { x: number; y: number }> {
+	try {
+		const raw = store()?.getItem(MODEL_POSITIONS);
+		if (!raw) return {};
+		const parsed: unknown = JSON.parse(raw);
+		if (typeof parsed !== 'object' || parsed === null) return {};
+
+		const kept: Record<string, { x: number; y: number }> = {};
+		for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+			if (typeof value !== 'object' || value === null) continue;
+			const { x, y } = value as { x?: unknown; y?: unknown };
+			// Non-finite coordinates are dropped rather than loaded: one NaN in a
+			// transform blanks the whole canvas.
+			if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
+				kept[id] = { x, y };
+			}
+		}
+		return kept;
+	} catch {
+		return {};
 	}
 }
