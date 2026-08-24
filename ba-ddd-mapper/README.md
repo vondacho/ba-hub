@@ -164,6 +164,40 @@ The gestures that change *what is on the map*, as opposed to
 other edit here — a new node is a fragment inserted, a deleted one is a region
 cut — so the comments and formatting around them come back byte-identical.
 
+**A relationship's fields** — `exchange` and `because` — are edited the same
+way, and `because` is the one this component argues for. The characteristic
+failure of a context map is aspiration, and the rationale is where *"the vendor
+will not change for us"* gets written down instead of dressed up; making it
+easy to type is most of the job, exactly as naming each pattern by what it
+admits to is. Clearing it removes the line and the panel goes back to saying
+the rationale is missing, which is the correct outcome — an empty `because` is
+not an answer.
+
+An arrow drawn on the canvas now arrives with no block at all rather than a
+seeded `because ""`. The panel warns about the missing rationale either way,
+and the inspector builds the block the moment one is typed, so nothing is
+written that nobody said.
+
+**A node's fields** are edited in the inspector: `intent` as prose, `owner` as
+a line, and a context's `language` as terms added and removed whole. Each one
+is a splice like everything else — the spacing the file uses between a keyword
+and its value is reused, so the sample's aligned columns stay aligned — and
+clearing a field removes the line rather than writing `owner ""`. That
+distinction is the point: an absent owner is a warning the panel raises, and an
+empty string would silence it while answering nothing.
+
+A term is added and removed whole rather than edited in place, and the whole
+list is rewritten on any change. A term is not addressable in this format: the
+same list can be spread over any number of lines and any number of `language`
+keywords, so "the third one" is a fact about the file's whitespace and not
+about the model. The cost is that a wrapped list comes back as one long line,
+on the list being edited and nowhere else.
+
+The fields are found with the lexer rather than by searching the block, which
+is what keeps the `owner` in `intent "the owner decides"` from being mistaken
+for a field, and a nested context's `owner` from being mistaken for its
+parent's.
+
 **A node** is added from the canvas bar, into the selection: a subdomain needs
 a domain selected, a context needs a domain or a subdomain, and the buttons say
 so when they are off rather than picking a parent for you. The fragment that
@@ -706,6 +740,8 @@ What has actually been checked, and how.
 | **Pairing rules** | `->` on a mutual pattern, `<->` on a directed one, and two patterns on a mutual arrow all rejected; `big-ball-of-mud` accepted either way. |
 | **Span splices** | Changing a pattern rewrites one line and leaves the file's comments byte-identical. Renaming a context rewrites its declaration and both relationships that name it — and nothing inside `intent` or `because` prose. |
 | **The round-trip property** | Add a relationship, then remove it, and the file is byte-identical to where it started. Also holds for a context added into a subdomain and for a domain added at map level, and for a `serves` line added and removed. This is the property the last section of this README names as the first thing a suite should assert. |
+| **Field edits** | `owner` replaced keeps its column and touches one line; cleared, the line goes and no `owner ""` is written; added where there was none, a block is created if the node had no braces. `intent` survives quotes and backslashes. Editing a subdomain's `owner` leaves the ones on its contexts and its domain alone, and a keyword sitting inside prose — `intent "the owner decides"` — is not mistaken for a field. `language` rewritten keeps its column, a wrapped list is replaced whole with the `aggregate` line below it untouched, and emptying it removes the line and brings the warning back. |
+| **Relationship fields** | `because` replaced keeps its column, leaves the `exchange` beside it alone, and leaves every other arrow in the file byte-identical; cleared, the line goes and the warning returns. An arrow with no block gets one built when a field is first written, indented to match. Prose containing the words `because` and `exchange` is not mistaken for either field. |
 | **Creation fragments** | A context, a subdomain and a domain each parse on the first re-parse after insertion, land in the intended parent, and take the intended defaults — `supporting`, `status unmodelled`. A new relationship parses, is directed with the origin upstream, and carries its pattern; a second one between the same pair gets a distinct id rather than colliding. |
 | **Deletion** | Removing a context takes the 2 relationships that name it; removing a subdomain takes the 2 contexts nested inside it and the `serves` lines pointing at it from contexts that survive. The count the inspector shows comes from the same function the delete calls. |
 | **The block scanner** | A brace inside a quoted `intent` — `"the {invoice} aggregate"` — no longer ends a block early. That counter was string-blind, which was harmless while it only bounded a search and would have cut the wrong half of a file once it was used to delete a node. |

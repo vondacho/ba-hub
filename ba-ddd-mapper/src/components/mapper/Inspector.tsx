@@ -29,7 +29,7 @@ import {
 	type Pattern,
 	type RelationshipEdge,
 } from '../../lib/ddd/model';
-import { removalOf } from '../../lib/graph/edit';
+import { removalOf, type EdgeField, type ListField, type ScalarField } from '../../lib/graph/edit';
 import { classificationLabel } from '../../lib/graph/style';
 
 interface Props {
@@ -42,6 +42,9 @@ interface Props {
 	setClassification: (subdomainId: string, classification: Classification) => void;
 	removeRelationship: (edge: RelationshipEdge) => void;
 	renameNode: (node: Node, to: string) => void;
+	setField: (node: Node, field: ScalarField, value: string) => void;
+	setList: (node: Node, field: ListField, values: readonly string[]) => void;
+	setEdgeField: (edge: RelationshipEdge, field: EdgeField, value: string) => void;
 	/** True for a node created a moment ago, whose name is a placeholder. */
 	focusName: boolean;
 	removeNode: (node: Node) => void;
@@ -57,6 +60,9 @@ export default function Inspector({
 	setClassification,
 	removeRelationship,
 	renameNode,
+	setField,
+	setList,
+	setEdgeField,
 	removeNode,
 	removeServes,
 	focusName,
@@ -108,13 +114,24 @@ export default function Inspector({
 			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm">
 				{node && (
 					<>
-						{node.intent && <p className="text-ink-muted dark:text-slate-400">{node.intent}</p>}
+						<Field label="Intent">
+							<Prose
+								value={node.intent ?? ''}
+								placeholder="what this part of the business is for"
+								onCommit={(next) => setField(node, 'intent', next)}
+							/>
+						</Field>
 
 						<Field label="Owner">
-							{node.owner ?? (
-								<em className="text-amber-700 dark:text-amber-400">
-									unowned — a suggestion, and suggestions lose to deadlines
-								</em>
+							<Line
+								value={node.owner ?? ''}
+								placeholder="a person, never a department"
+								onCommit={(next) => setField(node, 'owner', next)}
+							/>
+							{!node.owner && (
+								<p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+									Unowned — a suggestion, and suggestions lose to deadlines.
+								</p>
 							)}
 						</Field>
 
@@ -164,19 +181,16 @@ export default function Inspector({
 								</Field>
 
 								<Field label={`Language (${node.language.length})`}>
-									{node.language.length === 0 ? (
-										<em className="text-amber-700 dark:text-amber-400">none declared</em>
-									) : (
-										<span className="flex flex-wrap gap-1">
-											{node.language.map((term) => (
-												<code
-													key={term}
-													className="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-800"
-												>
-													{term}
-												</code>
-											))}
-										</span>
+									<Terms
+										terms={node.language}
+										noun="term"
+										onChange={(next) => setList(node, 'language', next)}
+									/>
+									{node.language.length === 0 && (
+										<p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+											None declared. The terms that mean something here and not next door are
+											what give a boundary its edge.
+										</p>
 									)}
 								</Field>
 
@@ -259,13 +273,25 @@ export default function Inspector({
 								: 'Mutual — neither side is upstream.'}
 						</Field>
 
-						{edge.exchange && <Field label="What crosses">{edge.exchange}</Field>}
+						<Field label="What crosses">
+							<Prose
+								value={edge.exchange ?? ''}
+								placeholder="in domain terms — not “data”"
+								onCommit={(next) => setEdgeField(edge, 'exchange', next)}
+							/>
+						</Field>
 
 						<Field label="Why this pattern">
-							{edge.because ?? (
-								<em className="text-amber-700 dark:text-amber-400">
-									not recorded — this is the field that keeps a map honest
-								</em>
+							<Prose
+								value={edge.because ?? ''}
+								placeholder="the reason, including the politics"
+								onCommit={(next) => setEdgeField(edge, 'because', next)}
+							/>
+							{!edge.because && (
+								<p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+									Not recorded. This is the field that keeps a map honest — where “the vendor
+									will not change for us” gets written down instead of dressed up.
+								</p>
 							)}
 						</Field>
 
@@ -342,15 +368,170 @@ export default function Inspector({
 }
 
 /**
- * The name, edited in place — the same control the map's own title uses, and
- * for the same reasons: a local draft that commits on Enter or blur, because
- * the parse it triggers is debounced and a controlled input would echo the
- * visitor's keystrokes back at them late.
+ * A draft that commits on Enter or blur, and is abandoned on Escape.
  *
- * The one rule it adds is the one the format demands: **a node without a name
- * is not a node.** The name is the identity here — relationships and `serves`
- * lines refer to it — so an empty box is not an incomplete node, it is a
- * document that no longer parses. Emptying the field puts the old name back.
+ * Every editable field in this panel shares it, and they have to: each commit
+ * is a splice that re-parses on a debounce, so a field bound straight to the
+ * parsed document would echo the visitor's own keystrokes back at them a
+ * quarter-second late and out of order. The draft is what they are typing; the
+ * document is what they have said.
+ *
+ * Escape sets a ref rather than state because the blur that follows it runs
+ * with the pre-Escape render's closure and would otherwise commit the very
+ * text the visitor just asked to throw away.
+ */
+function useDraft(
+	current: string,
+	commit: (next: string) => void,
+	options?: { multiline: boolean },
+) {
+	const [draft, setDraft] = useState<string | null>(null);
+	const abandoned = useRef(false);
+
+	return {
+		value: draft ?? current,
+		onChange: (event: { target: { value: string } }) => setDraft(event.target.value),
+		onBlur: () => {
+			const pending = draft;
+			setDraft(null);
+			if (abandoned.current) {
+				abandoned.current = false;
+				return;
+			}
+			if (pending === null || pending.trim() === current.trim()) return;
+			commit(pending);
+		},
+		onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+			// In prose, Enter is a newline and the commit moves to ⌘/ctrl+Enter.
+			// A field that submitted on Enter would make a two-paragraph intent
+			// impossible to type.
+			const submit = !options?.multiline || event.metaKey || event.ctrlKey;
+			if (event.key === 'Enter' && submit) {
+				event.preventDefault();
+				event.currentTarget.blur();
+			}
+			if (event.key === 'Escape') {
+				abandoned.current = true;
+				setDraft(null);
+				event.currentTarget.blur();
+			}
+		},
+	};
+}
+
+const FIELD_CLASS =
+	'w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm placeholder:text-ink-muted focus:border-brand focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:placeholder:text-slate-500';
+
+/** One line of text: `owner`, and anything else the format keeps short. */
+function Line({
+	value,
+	placeholder,
+	onCommit,
+}: {
+	value: string;
+	placeholder: string;
+	onCommit: (next: string) => void;
+}) {
+	return <input {...useDraft(value, onCommit)} placeholder={placeholder} className={FIELD_CLASS} />;
+}
+
+/**
+ * Prose: `intent`, and the paragraph it is allowed to be.
+ *
+ * Grows with the text rather than scrolling inside four lines, because an
+ * intent is the field most likely to be read by somebody who did not write it
+ * and a box that hides two thirds of it invites the one-line version.
+ */
+function Prose({
+	value,
+	placeholder,
+	onCommit,
+}: {
+	value: string;
+	placeholder: string;
+	onCommit: (next: string) => void;
+}) {
+	const draft = useDraft(value, onCommit, { multiline: true });
+	return (
+		<textarea
+			{...draft}
+			rows={Math.min(10, Math.max(2, draft.value.split('\n').length + Math.floor(draft.value.length / 46)))}
+			placeholder={placeholder}
+			title="⌘/ctrl + enter to save · esc to cancel"
+			className={`${FIELD_CLASS} resize-y leading-snug`}
+		/>
+	);
+}
+
+/**
+ * A list of quoted terms: `language`.
+ *
+ * Terms are added and removed whole rather than edited in place, and the whole
+ * list is rewritten on every change — see `setList`. A term is not addressable
+ * in this format: the same list can be spread over any number of lines and any
+ * number of keywords, so "the third one" is a fact about the file's whitespace
+ * and not about the model.
+ *
+ * Adding commits on Enter only, never on blur. Blur would fire on the way to
+ * clicking a ✕, and half-typed text becoming a term because you removed a
+ * different one is the kind of surprise that makes people stop trusting a
+ * panel.
+ */
+function Terms({
+	terms,
+	noun,
+	onChange,
+}: {
+	terms: readonly string[];
+	noun: string;
+	onChange: (next: readonly string[]) => void;
+}) {
+	const [adding, setAdding] = useState('');
+
+	return (
+		<span className="flex flex-wrap items-center gap-1">
+			{terms.map((term, index) => (
+				<span
+					key={`${term}:${index}`}
+					className="inline-flex items-center gap-1 rounded bg-slate-100 py-0.5 pr-1 pl-1.5 text-xs dark:bg-slate-800"
+				>
+					<code>{term}</code>
+					<button
+						type="button"
+						aria-label={`Remove ${term}`}
+						title={`Remove ${term}`}
+						onClick={() => onChange(terms.filter((_, other) => other !== index))}
+						className="rounded px-0.5 text-ink-muted hover:bg-slate-200 hover:text-rose-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-rose-400"
+					>
+						✕
+					</button>
+				</span>
+			))}
+			<input
+				value={adding}
+				aria-label={`Add a ${noun}`}
+				placeholder={`add a ${noun} ⏎`}
+				onChange={(event) => setAdding(event.target.value)}
+				onKeyDown={(event) => {
+					if (event.key === 'Escape') {
+						setAdding('');
+						event.currentTarget.blur();
+					}
+					if (event.key !== 'Enter') return;
+					event.preventDefault();
+					const term = adding.trim();
+					setAdding('');
+					if (term !== '' && !terms.includes(term)) onChange([...terms, term]);
+				}}
+				className="w-28 rounded border border-dashed border-slate-300 bg-transparent px-1.5 py-0.5 text-xs placeholder:text-ink-muted focus:border-brand focus:border-solid focus:outline-none dark:border-slate-600 dark:placeholder:text-slate-500"
+			/>
+		</span>
+	);
+}
+
+/**
+ * The name, edited in place. `useDraft` above, plus the one rule the format
+ * demands: a node without a name is not a node.
  */
 function NameField({
 	node,
@@ -361,25 +542,18 @@ function NameField({
 	onRename: (node: Node, to: string) => void;
 	focus: boolean;
 }) {
-	const [draft, setDraft] = useState<string | null>(null);
-	const abandoned = useRef(false);
-
-	const commit = () => {
-		const pending = draft;
-		setDraft(null);
-		if (abandoned.current) {
-			abandoned.current = false;
-			return;
-		}
-		if (pending === null) return;
-		const next = pending.trim();
-		if (next === '' || next === node.name) return;
-		onRename(node, next);
-	};
+	const draft = useDraft(node.name, (next) => {
+		const trimmed = next.trim();
+		// An empty name is not an incomplete node, it is a document that no
+		// longer parses: the name is the identity every relationship and
+		// `serves` refers to. Refusing here puts the old one back, because the
+		// draft has already been dropped.
+		if (trimmed !== '') onRename(node, trimmed);
+	});
 
 	return (
 		<input
-			value={draft ?? node.name}
+			{...draft}
 			/* A box created a second ago is called "New context" and is asking to
 			   be named. Selecting the placeholder means the first keystroke
 			   replaces it rather than appending to it. */
@@ -389,16 +563,6 @@ function NameField({
 			}}
 			aria-label={`${node.kind} name`}
 			title="Rename — every relationship and `serves` that names it moves too"
-			onChange={(event) => setDraft(event.target.value)}
-			onBlur={commit}
-			onKeyDown={(event) => {
-				if (event.key === 'Enter') event.currentTarget.blur();
-				if (event.key === 'Escape') {
-					abandoned.current = true;
-					setDraft(null);
-					event.currentTarget.blur();
-				}
-			}}
 			className="mt-0.5 w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 font-semibold hover:border-slate-300 focus:border-brand focus:outline-none dark:hover:border-slate-600"
 		/>
 	);

@@ -16,6 +16,7 @@
  * can see and undo" rather than "your edit was silently refused".
  */
 
+import { tokenize, type Token } from '../ddd/lexer';
 import type {
 	ContainmentEdge,
 	DddDocument,
@@ -85,18 +86,6 @@ export function setClassification(
 	classification: 'core' | 'supporting' | 'generic',
 ): string {
 	return splice(source, span, classification);
-}
-
-/** Change a context's `status`, or add one if the block has none. */
-export function setStatus(
-	source: string,
-	document: DddDocument,
-	node: Node,
-	status: 'modelled' | 'drafted' | 'unmodelled',
-): string {
-	const existing = findKeywordValueSpan(document.source, node, 'status');
-	if (existing) return splice(source, existing, status);
-	return insertIntoBlock(source, node, `status ${status}`);
 }
 
 /**
@@ -174,7 +163,11 @@ export function addRelationship(
 	if (close < 0) return source;
 
 	const arrow = directed ? '->' : '<->';
-	const line = `\n  ${quote(fromName)} ${arrow} ${quote(toName)} : ${pattern} {\n    because ""\n  }\n`;
+	// No block. An arrow's fields are optional in the grammar, and seeding an
+	// empty `because ""` would write an answer nobody gave — the panel warns
+	// about a missing rationale either way, and the inspector builds the block
+	// the moment one is typed.
+	const line = `\n  ${quote(fromName)} ${arrow} ${quote(toName)} : ${pattern}\n`;
 
 	return source.slice(0, close) + line + source.slice(close);
 }
@@ -201,19 +194,6 @@ function endpointSpans(source: string, edge: RelationshipEdge, name: string): Sp
 	return found;
 }
 
-/** The span of the bare word following `keyword` inside a node's block. */
-function findKeywordValueSpan(source: string, node: Node, keyword: string): Span | null {
-	const open = source.indexOf('{', node.nameSpan.end);
-	if (open < 0) return null;
-
-	const region = source.slice(open, blockEnd(source, open));
-	const match = new RegExp(`\\b${keyword}\\s+([a-z-]+)`).exec(region);
-	if (!match) return null;
-
-	const start = open + match.index + match[0].length - match[1]!.length;
-	return { start, end: start + match[1]!.length, line: node.nameSpan.line, column: 1 };
-}
-
 /**
  * Where a fragment goes inside a node's block, and what it looks like there.
  *
@@ -237,7 +217,7 @@ function blockInsertion(
 	const open = openBraceAfter(source, node.nameSpan.end);
 	if (open < 0) return null;
 
-	const body = reindent(fragment, '', indentInside(source, node));
+	const body = reindent(fragment, '', indentInside(source, open));
 
 	if (asBlock) {
 		// Back over the closing brace's own indentation, so the block goes above
@@ -562,9 +542,8 @@ function lineRegion(source: string, span: Span): Span {
 	return { ...span, start, end };
 }
 
-/** The indentation used by the lines inside a node's block. */
-function indentInside(source: string, node: Node): string {
-	const open = openBraceAfter(source, node.nameSpan.end);
+/** The indentation used by the lines inside the block opened at `open`. */
+function indentInside(source: string, open: number): string {
 	if (open < 0) return '  ';
 
 	const nextLine = source.indexOf('\n', open);
@@ -608,4 +587,284 @@ function insertIntoMap(source: string, fragment: string): string {
 	if (close < 0) return source;
 	const indented = reindent(fragment, '', '  ');
 	return `${source.slice(0, close)}\n${indented}\n${source.slice(close)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Fields
+// ---------------------------------------------------------------------------
+
+/** The fields that hold one quoted string. At most one of each, per the grammar. */
+export type ScalarField = 'intent' | 'owner';
+
+/** The fields that hold a list of quoted terms, spread over as many lines as you like. */
+export type ListField = 'language' | 'aggregate';
+
+/** A relationship's two prose fields. */
+export type EdgeField = 'exchange' | 'because';
+
+/**
+ * The head of a declaration: where it starts, and where its block would open.
+ *
+ * A node's head ends after its name; a relationship's ends after its patterns.
+ * Everything below works on this rather than on a node, because the fields are
+ * the same idea in both places — `intent` on a context and `because` on an
+ * arrow are both one keyword and one string inside a block that the grammar
+ * lets you leave out entirely.
+ */
+interface Head {
+	/** For the indentation a new block should take. */
+	readonly start: number;
+	/** The `{`, if there is one, is the next thing after this. */
+	readonly end: number;
+}
+
+const nodeHead = (node: Node): Head => ({ start: node.span.start, end: node.nameSpan.end });
+
+const edgeHead = (edge: RelationshipEdge): Head => ({
+	start: edge.span.start,
+	end: edge.patternSpan.end,
+});
+
+/**
+ * Write one of a node's single-string fields, or remove it.
+ *
+ * An empty value removes the line rather than writing `owner ""`. The
+ * difference matters here more than it would elsewhere: an absent `owner` is a
+ * warning the problems panel raises — *an unowned boundary is a suggestion, and
+ * suggestions lose to deadlines* — and an empty string would silence it while
+ * answering nothing. Clearing the field puts the question back.
+ *
+ * A file with two `intent` lines parses, with a warning, and the later one
+ * wins. Writing collapses them to one, because after an edit the visitor has
+ * made exactly one claim and leaving the loser behind would mean the panel
+ * kept complaining about a line they can no longer see.
+ */
+export function setField(
+	source: string,
+	document: DddDocument,
+	node: Node,
+	field: ScalarField,
+	value: string,
+): string {
+	return writeField(source, document, nodeHead(node), field, value);
+}
+
+/**
+ * Write a relationship's `exchange` or `because`, or remove it.
+ *
+ * `because` is the field this whole component argues for. The characteristic
+ * failure of a context map is aspiration — every arrow labelled
+ * customer/supplier because conformist feels like a defeat — and the rationale
+ * is where *"the vendor will not change for us"* gets written down instead of
+ * being dressed up. So it is editable for the same reason the panel names the
+ * pattern by what it admits to: making the honest answer easy to type is most
+ * of the job.
+ *
+ * Clearing it removes the line, and the panel goes back to saying the
+ * rationale is missing. That is the correct outcome — an empty `because` is
+ * not an answer — and it is why this cannot be a field that quietly holds "".
+ */
+export function setEdgeField(
+	source: string,
+	document: DddDocument,
+	edge: RelationshipEdge,
+	field: EdgeField,
+	value: string,
+): string {
+	return writeField(source, document, edgeHead(edge), field, value);
+}
+
+/** The shared half of the two above. */
+function writeField(
+	source: string,
+	document: DddDocument,
+	head: Head,
+	field: string,
+	value: string,
+): string {
+	const trimmed = value.trim();
+	return writeRuns(
+		source,
+		document,
+		head,
+		field,
+		trimmed === '' ? null : (gap) => `${field}${gap}${quote(trimmed)}`,
+	);
+}
+
+/**
+ * Write a node's `language` or `aggregate` list, or remove it.
+ *
+ * The whole list is rewritten as one line rather than the changed term being
+ * found and patched. A term is not addressable — the format lets the same list
+ * be spread over any number of lines and any number of `language` keywords —
+ * so "the third one" is a fact about the file's whitespace rather than about
+ * the model. Rewriting is the only edit that means what the visitor did.
+ *
+ * The cost is a wrapped list coming back as one long line. That is a real loss
+ * and it is bounded: it happens to the list being edited, on the edit, and
+ * nowhere else in the file.
+ */
+export function setList(
+	source: string,
+	document: DddDocument,
+	node: Node,
+	field: ListField,
+	values: readonly string[],
+): string {
+	const kept = values.map((value) => value.trim()).filter((value) => value !== '');
+	return writeRuns(
+		source,
+		document,
+		nodeHead(node),
+		field,
+		kept.length === 0 ? null : (gap) => `${field}${gap}${kept.map(quote).join(' ')}`,
+	);
+}
+
+/** Change a context's `status`, or add one if the block has none. */
+export function setStatus(
+	source: string,
+	document: DddDocument,
+	node: Node,
+	status: 'modelled' | 'drafted' | 'unmodelled',
+): string {
+	const runs = fieldRuns(document.source, nodeHead(node), 'status');
+	if (runs.length === 0) return insertField(source, nodeHead(node), `status ${status}`);
+	return spliceAll(source, [
+		{ span: runs[0]!.span, replacement: `status${runs[0]!.gap}${status}` },
+		...runs.slice(1).map((run) => ({ span: lineRegion(document.source, run.span), replacement: '' })),
+	]);
+}
+
+// ---------------------------------------------------------------------------
+
+/** One `keyword …` in a node's own block: where it is, and how it is spaced. */
+interface FieldRun {
+	readonly span: Span;
+	/** The whitespace the file puts between the keyword and its first value. */
+	readonly gap: string;
+}
+
+/**
+ * Replace a node's runs of one keyword with a single line, or delete them all.
+ *
+ * The first run is rewritten in place and the rest are cut, so the field stays
+ * where the author put it — near the top of the block, or wherever they moved
+ * it to — instead of migrating to the front on every edit. The spacing is
+ * reused from the run being replaced, which is what keeps the sample's aligned
+ * columns aligned after a change.
+ */
+function writeRuns(
+	source: string,
+	document: DddDocument,
+	head: Head,
+	keyword: string,
+	line: ((gap: string) => string) | null,
+): string {
+	const runs = fieldRuns(document.source, head, keyword);
+
+	if (runs.length === 0) return line === null ? source : insertField(source, head, line(' '));
+
+	const rest = runs.slice(1).map((run) => ({
+		span: lineRegion(document.source, run.span),
+		replacement: '',
+	}));
+
+	if (line === null) {
+		return spliceAll(source, [
+			{ span: lineRegion(document.source, runs[0]!.span), replacement: '' },
+			...rest,
+		]);
+	}
+
+	return spliceAll(source, [
+		{ span: runs[0]!.span, replacement: line(runs[0]!.gap) },
+		...rest,
+	]);
+}
+
+/**
+ * Every `keyword …` written directly in this node's block.
+ *
+ * Found with the lexer rather than with a search, because a search cannot tell
+ * the `owner` that is a field from the one inside `intent "the owner decides"`,
+ * and it cannot tell a context's own `owner` from the `owner` of a context
+ * nested inside it. Depth 1 is this node's block; anything deeper belongs to
+ * something else and is not this edit's business.
+ */
+function fieldRuns(source: string, head: Head, keyword: string): FieldRun[] {
+	const open = openBraceAfter(source, head.end);
+	if (open < 0) return [];
+	const close = blockEnd(source, open);
+
+	let tokens: readonly Token[];
+	try {
+		tokens = tokenize(source);
+	} catch {
+		// An unterminated string somewhere in the file. The caller re-parses and
+		// the panel says so; refusing the edit is better than guessing at spans.
+		return [];
+	}
+
+	const runs: FieldRun[] = [];
+	let depth = 0;
+
+	for (let index = 0; index < tokens.length; index += 1) {
+		const token = tokens[index]!;
+		if (token.span.start < open || token.span.start >= close) continue;
+
+		if (token.type === '{') {
+			depth += 1;
+			continue;
+		}
+		if (token.type === '}') {
+			depth -= 1;
+			continue;
+		}
+		if (depth !== 1 || token.type !== 'word' || token.value !== keyword) continue;
+
+		let end = index + 1;
+		while (tokens[end]?.type === 'string' || (keyword === 'status' && tokens[end]?.type === 'word')) {
+			end += 1;
+			// `status` takes exactly one bare word; a list takes as many strings
+			// as follow.
+			if (keyword === 'status') break;
+		}
+		// A keyword with nothing after it is malformed. The parser reports it;
+		// rewriting it here would hide the error rather than fix it.
+		if (end === index + 1) continue;
+
+		runs.push({
+			span: { ...token.span, end: tokens[end - 1]!.span.end },
+			gap: source.slice(token.span.end, tokens[index + 1]!.span.start),
+		});
+		index = end - 1;
+	}
+
+	return runs;
+}
+
+/**
+ * Add a field to a node that has none of it.
+ *
+ * Fields go at the top of the block, above any nested declarations, which is
+ * where the format puts them and where a reader looks for them. A node written
+ * without braces at all gets a block, because there is nowhere else to put the
+ * line — and the alternative, refusing silently, is the worst of the three.
+ */
+function insertField(source: string, head: Head, line: string): string {
+	const open = openBraceAfter(source, head.end);
+	if (open >= 0) {
+		const nextLine = source.indexOf('\n', open);
+		if (nextLine < 0) return source;
+		const indent = indentInside(source, open);
+		return `${source.slice(0, nextLine + 1)}${indent}${line}\n${source.slice(nextLine + 1)}`;
+	}
+
+	// No block at all — the grammar allows that for both a node and an arrow —
+	// so the field brings one with it.
+	const indent = indentBefore(source, head.start);
+	const at = head.end;
+	return `${source.slice(0, at)} {\n${indent}  ${line}\n${indent}}${source.slice(at)}`;
 }

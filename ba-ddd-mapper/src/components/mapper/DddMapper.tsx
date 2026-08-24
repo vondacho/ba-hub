@@ -45,6 +45,7 @@ import {
 	type Positions,
 } from '../../lib/graph/layout';
 import * as edits from '../../lib/graph/edit';
+import type { EdgeField, ListField, ScalarField } from '../../lib/graph/edit';
 import {
 	clearFileInput,
 	DDD_ACCEPT,
@@ -409,8 +410,61 @@ export default function DddMapper() {
 		[applyEdit, source],
 	);
 
+	/**
+	 * Write one of a node's fields.
+	 *
+	 * Refused while the text does not parse, like every other gesture that
+	 * splices a span: the spans belong to the last document that parsed, and the
+	 * text has moved on.
+	 */
+	const setField = useCallback(
+		(node: Node, field: ScalarField, value: string) => {
+			if (stale) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			applyEdit(edits.setField(source, document_, node, field, value));
+		},
+		[applyEdit, document_, source, stale],
+	);
+
+	const setList = useCallback(
+		(node: Node, field: ListField, values: readonly string[]) => {
+			if (stale) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			applyEdit(edits.setList(source, document_, node, field, values));
+		},
+		[applyEdit, document_, source, stale],
+	);
+
+	/**
+	 * Write a relationship's `exchange` or `because`.
+	 *
+	 * Its own id survives the edit — a relationship is identified by its pattern
+	 * token's offset, and both fields live in the block *after* that — so the
+	 * inspector stays open on the arrow being described. Arrows further down the
+	 * file are renumbered and would lose the selection, which is why this is the
+	 * edit that gets to keep it.
+	 */
+	const setEdgeField = useCallback(
+		(edge: RelationshipEdge, field: EdgeField, value: string) => {
+			if (stale) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			applyEdit(edits.setEdgeField(source, document_, edge, field, value));
+		},
+		[applyEdit, document_, source, stale],
+	);
+
 	const renameNode = useCallback(
 		(node: Node, to: string) => {
+			if (stale) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
 			if (document_.nodes.some((candidate) => candidate.name === to)) {
 				setNote({
 					kind: 'error',
@@ -421,7 +475,7 @@ export default function DddMapper() {
 			applyEdit(edits.renameNode(source, document_, node, to));
 			setSelected(`${node.kind}:${to}`);
 		},
-		[applyEdit, document_, source],
+		[applyEdit, document_, source, stale],
 	);
 
 	/**
@@ -758,6 +812,9 @@ export default function DddMapper() {
 							setClassification={setClassification}
 							removeRelationship={removeRelationship}
 							renameNode={renameNode}
+							setField={setField}
+							setList={setList}
+							setEdgeField={setEdgeField}
 							removeNode={removeNode}
 							removeServes={removeServes}
 							focusName={fresh !== null && fresh === selected}
