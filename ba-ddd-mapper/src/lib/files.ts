@@ -22,8 +22,18 @@ export function clearFileInput(input: HTMLInputElement | null): void {
 	if (input) input.value = '';
 }
 
-export function downloadText(filename: string, text: string): void {
-	const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+export const SVG_EXTENSION = '.svg';
+
+/**
+ * `type` matters for the SVG: a file saved as `text/plain` opens in an editor
+ * rather than a viewer on every desktop this component is likely to meet.
+ */
+export function downloadText(
+	filename: string,
+	text: string,
+	type = 'text/plain;charset=utf-8',
+): void {
+	const blob = new Blob([text], { type });
 	const url = URL.createObjectURL(blob);
 	const anchor = document.createElement('a');
 	anchor.href = url;
@@ -43,6 +53,11 @@ export function filenameFor(title: string): string {
 /** The sidecar takes the map's stem, so the pair sorts together in a folder. */
 export function viewFilenameFor(title: string): string {
 	return `${slug(title, 'map')}${VIEW_EXTENSION}`;
+}
+
+/** And so does the picture. */
+export function svgFilenameFor(title: string): string {
+	return `${slug(title, 'map')}${SVG_EXTENSION}`;
 }
 
 export function slug(text: string, fallback: string): string {

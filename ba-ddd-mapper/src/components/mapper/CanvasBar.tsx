@@ -31,6 +31,12 @@ import Icon from './Icon';
  * goes back to what was computed. That button is why moving things is safe:
  * there is always a way back to the arrangement everybody else sees.
  *
+ * **Export** writes the map as a standalone `.svg`: the whole map at its own
+ * size rather than the current viewport, with the colours of the theme the
+ * panel is showing baked in. It sits with the layout buttons because it is the
+ * same kind of thing — an artefact of how the map looks, next to the file that
+ * says what it means.
+ *
  * **Save and load layout** write and read a `.dddview` sidecar. Positions stay
  * out of the `.ddd` file — otherwise every diff fills with coordinate churn —
  * but an arrangement in which the relationships finally read clearly is worth
@@ -49,6 +55,7 @@ interface Props {
 	onReset: () => void;
 	onSaveLayout: () => void;
 	onLoadLayout: () => void;
+	onExportSvg: () => void;
 	onFullscreen: () => void;
 	fullscreen: boolean;
 	/** How many nodes and edges have been moved. Zero disables Reset. */
@@ -66,6 +73,7 @@ export default function CanvasBar({
 	onReset,
 	onSaveLayout,
 	onLoadLayout,
+	onExportSvg,
 	onFullscreen,
 	fullscreen,
 	moved,
@@ -145,6 +153,9 @@ export default function CanvasBar({
 			</Button>
 			<Button label="Load a layout from a .dddview file" onClick={onLoadLayout}>
 				<Icon name="layout-open" />
+			</Button>
+			<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
+				<Icon name="picture" />
 			</Button>
 
 			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />

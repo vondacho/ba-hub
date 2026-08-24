@@ -31,7 +31,8 @@ export type IconName =
 	| 'add-subdomain'
 	| 'add-context'
 	| 'connect'
-	| 'remove';
+	| 'remove'
+	| 'picture';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A tray with an arrow coming *in* — the file comes to you.
@@ -115,6 +116,15 @@ const PATHS: Record<IconName, React.ReactNode> = {
 			<circle cx="4" cy="11.5" r="2" />
 			<circle cx="12" cy="4.5" r="2" />
 			<path d="M5.6 10.1 10.4 6" />
+		</>
+	),
+	// A framed picture: a horizon and a sun, which is the one glyph everybody
+	// reads as "image" at fourteen pixels.
+	picture: (
+		<>
+			<rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
+			<circle cx="6" cy="6.5" r="1.1" />
+			<path d="M3 11l3-2.5 2.5 2 2-1.5 2.5 2" />
 		</>
 	),
 	remove: <path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.2a1 1 0 0 0 1 .8h2.8a1 1 0 0 0 1-.8l.6-8.2" />,

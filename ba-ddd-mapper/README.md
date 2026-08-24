@@ -292,6 +292,32 @@ contexts, or an arc passing behind a box, are fixed by pulling the curve aside.
 An edge's shape says nothing that its pattern and direction do not already say,
 which is exactly why it belongs to the person looking rather than to the file.
 
+### Exporting a picture
+
+The map can be written out as a standalone `.svg` from the widget bar. It is a
+**copy of the live graph**, not a second renderer, and that is the whole design:
+a function that walked the document and drew boxes would be a second
+implementation of `Graph.tsx`, and the two would drift — the day the contexts
+became ellipses, the export would have gone on drawing rectangles until a
+diagram in a slide deck disagreed with the tool it came from.
+
+What a copy has to fix is the styling. Every colour here is a Tailwind class,
+which resolves against a stylesheet a standalone file does not have; cloning the
+markup alone gives a page of black shapes. So the clone is walked beside the
+live tree and each element's *computed* style is baked on as attributes —
+whatever the browser actually decided, including the theme the panel is pinned
+to. A graph pinned light on a dark page exports light, which is the point of
+being able to pin it.
+
+Four things do not travel. The pan-and-zoom transform, so the file holds the
+whole map at its own size rather than wherever you were looking. The class
+attributes, which would mean nothing to whoever opens it. The invisible fat
+paths that make edges clickable, which are interaction rather than drawing. And
+the session: the selection ring, the bend handle, the dot grid and the "moved
+here in your browser" marks. That last set is handled by the canvas drawing one
+frame without them and the serialiser copying *that* — a list of selectors
+inside the exporter would be a second thing to keep in step.
+
 ### Keeping an arrangement: the `.dddview` sidecar
 
 Positions and curvature can be written to a file and read back, from the widget
@@ -755,6 +781,14 @@ What has actually been checked, and how.
 | **Edge bending** | A handle dragged by `(90, −55)` moves the midpoint by exactly `(90.00, −55.00)`, the label tracks it, every other edge stays byte-identical, and a deliberately absurd drag still emits a valid path. Handles exist on relationships and not on containment. |
 | **Types and build** | `astro check` reports 0 errors across 24 files; `npm run build` prerenders `/404` and `/dsl` and emits the island. |
 | **Routes** | `/`, `/dsl`, `/healthz` all 200. The island is wired into the page as `client:only`. |
+
+**The SVG export is not checked at all.** It is the one piece of this component
+that cannot be exercised without a DOM — it clones a live element and reads
+`getComputedStyle` — and there is no DOM in the harnesses. Read the code, then
+open a file it wrote before trusting it. The known risk is the arrowhead
+markers: they live in `<defs>`, which is not rendered, and a browser that
+declines to resolve a custom property for a non-rendered element would give
+them a default fill.
 
 **Not checked: anything that needs a browser.** The Chrome extension was not
 connected, so no part of the interaction — typing, the debounce, the staleness

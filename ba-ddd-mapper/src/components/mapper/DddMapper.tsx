@@ -52,6 +52,7 @@ import {
 	downloadText,
 	filenameFor,
 	readTextFile,
+	svgFilenameFor,
 	VIEW_ACCEPT,
 	viewFilenameFor,
 } from '../../lib/files';
@@ -582,6 +583,22 @@ export default function DddMapper() {
 		setSelected(found.id);
 	}, [document_]);
 
+	/**
+	 * Write the picture the graph just drew.
+	 *
+	 * The graph hands over a finished string rather than being asked for its
+	 * element: the serialising is the canvas's business — it owns the DOM and
+	 * knows which frame is the exportable one — and the filename and the
+	 * download are this component's, which is where every other file the mapper
+	 * writes comes from.
+	 */
+	const exportSvg = useCallback(
+		(svg: string) => {
+			downloadText(svgFilenameFor(document_.title), svg, 'image/svg+xml;charset=utf-8');
+		},
+		[document_.title],
+	);
+
 	const saveLayout = useCallback(() => {
 		downloadText(
 			viewFilenameFor(document_.title),
@@ -801,6 +818,7 @@ export default function DddMapper() {
 							onAdd={addNode}
 							canAdd={canAdd}
 							onConnect={connect}
+							onExportSvg={exportSvg}
 						/>
 						<Inspector
 							document={document_}

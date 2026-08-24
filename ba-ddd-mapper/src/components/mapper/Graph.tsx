@@ -17,7 +17,7 @@
  * produces.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Classification, DddDocument, Node, NodeKind } from '../../lib/ddd/model';
 import {
 	applyPositions,
@@ -30,6 +30,7 @@ import {
 	type Positions,
 } from '../../lib/graph/layout';
 import { classificationLabel, statusNote, styleFor } from '../../lib/graph/style';
+import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar from './CanvasBar';
 import Minimap from './Minimap';
 
@@ -52,6 +53,7 @@ interface Props {
 	canAdd: Record<NodeKind, string | null>;
 	/** Draw an edge between two nodes. The parent decides what that means. */
 	onConnect: (fromId: string, toId: string) => void;
+	onExportSvg: (svg: string) => void;
 }
 
 /**
@@ -98,6 +100,7 @@ export default function Graph({
 	onAdd,
 	canAdd,
 	onConnect,
+	onExportSvg,
 }: Props) {
 	const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
 	const [size, setSize] = useState({ width: 800, height: 600 });
@@ -110,6 +113,20 @@ export default function Graph({
 	 * somebody draw six relationships without going back to the bar, and
 	 * abandoning a candidate has to leave the tool in hand.
 	 */
+	/*
+	 * Set for exactly one render, and that render is the exported one.
+	 *
+	 * The file should hold the map, not the session: no selection ring, no bend
+	 * handle, no "this box was moved here in your browser" dot. Rather than
+	 * teaching the serialiser which elements those are — a list it would have to
+	 * be kept in step with forever — the graph simply draws a frame without
+	 * them, and the frame is what gets copied.
+	 *
+	 * `useLayoutEffect` rather than `useEffect` so the serialise happens between
+	 * the render and the paint: with the latter the visitor sees their selection
+	 * blink off and on.
+	 */
+	const [exporting, setExporting] = useState(false);
 	const [connecting, setConnecting] = useState(false);
 	const [origin, setOrigin] = useState<string | null>(null);
 	const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
@@ -255,6 +272,13 @@ export default function Graph({
 		setTip(null);
 	}, [connecting, origin, placed]);
 
+	useLayoutEffect(() => {
+		if (!exporting) return;
+		const svg = surface.current;
+		if (svg) onExportSvg(toSvgFile(svg, extent, backgroundOf(svg), document.title));
+		setExporting(false);
+	}, [exporting, extent, document.title, onExportSvg]);
+
 	const refitOnResize = useRef(false);
 	useEffect(() => {
 		refitOnResize.current = true;
@@ -387,6 +411,7 @@ export default function Graph({
 				}}
 				onSaveLayout={onSaveLayout}
 				onLoadLayout={onLoadLayout}
+				onExportSvg={() => setExporting(true)}
 				onFullscreen={onFullscreen}
 				fullscreen={fullscreen}
 				moved={Object.keys(positions).length + Object.keys(curves).length}
@@ -549,22 +574,31 @@ export default function Graph({
 					</marker>
 				</defs>
 
-				<g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+				<g
+					transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}
+					{...{ [VIEWPORT_MARK]: '' }}
+				>
 					{/*
 					   Decorative, and explicitly not a click target. A filled rect
 					   covering the canvas is the top hit for every click on empty
 					   space, which made "the background" unclickable: selecting
 					   nothing, and losing a half-drawn edge, both need the click to
 					   reach the <svg> itself.
+
+					   Absent from the exported frame. The dots say "this is a surface
+					   you can move things on", which is true of the canvas and not of
+					   a picture in somebody's slide deck.
 					*/}
-					<rect
-						x={extent.x - 2000}
-						y={extent.y - 2000}
-						width={extent.width + 4000}
-						height={extent.height + 4000}
-						fill="url(#dots)"
-						className="pointer-events-none"
-					/>
+					{!exporting && (
+						<rect
+							x={extent.x - 2000}
+							y={extent.y - 2000}
+							width={extent.width + 4000}
+							height={extent.height + 4000}
+							fill="url(#dots)"
+							className="pointer-events-none"
+						/>
+					)}
 
 					{/*
 					   Edges stop answering the pointer while an edge is being drawn.
@@ -586,7 +620,7 @@ export default function Graph({
 							 * is a worse answer than not being clickable.
 							 */
 							const written = removable.has(edge.id);
-							const chosen = selected === edge.id;
+							const chosen = !exporting && selected === edge.id;
 							return (
 								<g key={edge.id}>
 									{written && (
@@ -621,7 +655,7 @@ export default function Graph({
 					{edges
 						.filter((edge) => edge.kind === 'relationship')
 						.map((edge) => {
-							const active = selected === edge.id;
+							const active = !exporting && selected === edge.id;
 							return (
 								<g
 									key={edge.id}
@@ -715,10 +749,10 @@ export default function Graph({
 						<NodeBox
 							key={node.id}
 							placed={node}
-							selected={selected === node.id}
-							pending={origin === node.id}
+							selected={!exporting && selected === node.id}
+							pending={!exporting && origin === node.id}
 							connecting={connecting}
-							moved={positions[node.id] !== undefined}
+							moved={!exporting && positions[node.id] !== undefined}
 							classificationOf={classificationOf}
 							onSelect={onSelect}
 							onConnect={connectTo}
@@ -739,7 +773,7 @@ export default function Graph({
 						/>
 					))}
 
-					{originNode && tip && (
+					{originNode && tip && !exporting && (
 						/*
 						 * The candidate. Drawn last so it lies over everything, dashed
 						 * because it is not a fact about the map yet, and anchored on
