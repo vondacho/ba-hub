@@ -23,7 +23,10 @@ export type IconName =
 	| 'fullscreen-exit'
 	| 'theme-dark'
 	| 'theme-light'
-	| 'theme-auto';
+	| 'theme-auto'
+	| 'panes-both'
+	| 'panes-source'
+	| 'panes-graph';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A tray with an arrow coming *in* — the file comes to you.
@@ -50,6 +53,32 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	'fullscreen-exit': <path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4" />,
 	'theme-dark': <path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z" />,
 	'theme-light': <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5ZM8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1m10.9-3.9-1 1m-5.8 5.8-1 1m7.8 0-1-1M5.1 5.1l-1-1" />,
+	/*
+	 * The panel layouts. The same frame in all three, so they read as one
+	 * control rather than as three unrelated pictures: split down the middle for
+	 * two panes, and otherwise whole, holding the one thing that is left — lines
+	 * of text, or two boxes and a relationship.
+	 */
+	'panes-both': (
+		<>
+			<rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
+			<path d="M8 3.5v9" />
+		</>
+	),
+	'panes-source': (
+		<>
+			<rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
+			<path d="M5 6.25h6M5 8h6M5 9.75h3.5" />
+		</>
+	),
+	'panes-graph': (
+		<>
+			<rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
+			<circle cx="6" cy="6.5" r="1.3" />
+			<circle cx="10.25" cy="9.75" r="1.3" />
+			<path d="M7 7.4 9.25 8.85" />
+		</>
+	),
 	// Half-filled: following whatever the page is doing.
 	'theme-auto': (
 		<>

@@ -52,26 +52,44 @@ import {
 	viewFilenameFor,
 } from '../../lib/files';
 import { parseView, serializeView } from '../../lib/view-file';
-import Icon from './Icon';
+import Icon, { type IconName } from './Icon';
 import {
 	loadCurves,
+	loadPanes,
 	loadPositions,
 	loadSource,
 	loadSplit,
 	loadTheme,
 	saveCurves,
+	savePanes,
 	savePositions,
 	saveSource,
 	saveSplit,
 	saveTheme,
 	type GraphTheme,
+	type Panes,
 } from '../../lib/storage';
 import Editor from './Editor';
 import Graph from './Graph';
 import Inspector from './Inspector';
+import { Legend } from './Legend';
 import ProblemList from './ProblemList';
 
 const DEBOUNCE_MS = 250;
+
+/**
+ * The layout picker, in the order the panes sit on screen: text, both, map.
+ *
+ * Two panels are the tool — the graph is a view of the text and editing either
+ * one edits the same document — so `both` is the default and stays the middle
+ * button. One panel is for the two moments when the other half is in the way:
+ * writing a long map on a laptop, and showing the finished one to a room.
+ */
+const PANE_CHOICES: readonly { panes: Panes; icon: IconName; label: string }[] = [
+	{ panes: 'source', icon: 'panes-source', label: 'Show the source only' },
+	{ panes: 'both', icon: 'panes-both', label: 'Show the source and the map' },
+	{ panes: 'graph', icon: 'panes-graph', label: 'Show the map only' },
+];
 
 export default function DddMapper() {
 	const [source, setSource] = useState(SAMPLE);
@@ -83,6 +101,7 @@ export default function DddMapper() {
 	const [revealLine, setRevealLine] = useState<number | null>(null);
 	const [collapsed, setCollapsed] = useState(false);
 	const [split, setSplit] = useState(42);
+	const [panes, setPanes] = useState<Panes>('both');
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	// Where the visitor has dragged boxes to. View state: it goes to
 	// localStorage and never into `source`.
@@ -104,6 +123,8 @@ export default function DddMapper() {
 		setTheme(loadTheme());
 		const storedSplit = loadSplit();
 		if (storedSplit !== null) setSplit(storedSplit);
+		const storedPanes = loadPanes();
+		if (storedPanes !== null) setPanes(storedPanes);
 		setPositions(loadPositions());
 		setCurves(loadCurves());
 	}, []);
@@ -201,6 +222,26 @@ export default function DddMapper() {
 		}
 		setSource(next);
 	}, []);
+
+	/**
+	 * Show a line of the source, from a problem or from the inspector.
+	 *
+	 * Asking to see a line in the text is asking for the text, so a reveal with
+	 * the source pane hidden opens it rather than doing nothing — a control that
+	 * silently does nothing is worse than one that is not there. The nudge keeps
+	 * every call a distinct value, so asking for the same line twice scrolls to
+	 * it twice.
+	 */
+	const reveal = useCallback(
+		(line: number) => {
+			if (panes === 'graph') {
+				setPanes('both');
+				savePanes('both');
+			}
+			setRevealLine(line + Math.random() * 0.0001);
+		},
+		[panes],
+	);
 
 	const setPattern = useCallback(
 		(edge: RelationshipEdge, pattern: Pattern) => {
@@ -301,13 +342,35 @@ export default function DddMapper() {
 			}
 		>
 			<div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
-				<strong className="mr-1 truncate">{document_.title}</strong>
+				<MapTitle
+					title={document_.title}
+					stale={stale}
+					onRename={(next) => applyEdit(edits.setTitle(source, document_, next))}
+				/>
 				<span className="text-xs text-ink-muted dark:text-slate-400">
 					{counts.subdomains} subdomains · {counts.contexts} contexts · {counts.relationships}{' '}
 					relationships
 				</span>
 
 				<span className="ml-auto flex flex-wrap items-center gap-2">
+					{/* The layout picker leads the group, because it decides what the
+					    other buttons are even acting on. */}
+					<span role="group" aria-label="Panels" className="flex items-center gap-1">
+						{PANE_CHOICES.map((choice) => (
+							<IconButton
+								key={choice.panes}
+								label={choice.label}
+								pressed={panes === choice.panes}
+								onClick={() => {
+									setPanes(choice.panes);
+									savePanes(choice.panes);
+								}}
+							>
+								<Icon name={choice.icon} />
+							</IconButton>
+						))}
+					</span>
+
 					{saveFailed && (
 						<span className="text-xs text-amber-700 dark:text-amber-400">
 							Not saving in this browser
@@ -368,6 +431,9 @@ export default function DddMapper() {
 				/>
 			</div>
 
+			{/* The legend explains the map's colours, so it goes when the map does. */}
+			{panes !== 'source' && <Legend theme={theme} />}
+
 			{viewNote && (
 				<p
 					className={
@@ -391,67 +457,165 @@ export default function DddMapper() {
 			<div className="flex min-h-0 flex-1 flex-col lg:flex-row">
 				{/* Editor first in the DOM, and first when stacked: on a narrow
 				    viewport this is a thing you read, and the text is the source. */}
-				<section
-					aria-label="Source"
-					className="flex min-h-0 flex-col border-b border-slate-200 lg:border-r lg:border-b-0 dark:border-slate-800"
-					style={{ flexBasis: `${split}%` }}
-				>
-					<div className="min-h-0 flex-1 overflow-auto">
-						<Editor
-							value={source}
-							onChange={setSource}
+				{panes !== 'graph' && (
+					<section
+						aria-label="Source"
+						className={`flex min-h-0 flex-col ${
+							panes === 'both'
+								? 'border-b border-slate-200 lg:border-r lg:border-b-0 dark:border-slate-800'
+								: 'flex-1'
+						}`}
+						/* The split is a proportion between two panes and means nothing
+						   to one, which grows instead — and the stored percentage is left
+						   alone, so coming back to two restores the proportions. */
+						style={panes === 'both' ? { flexBasis: `${split}%` } : undefined}
+					>
+						<div className="min-h-0 flex-1 overflow-auto">
+							<Editor
+								value={source}
+								onChange={setSource}
+								problems={problems}
+								revealLine={revealLine}
+							/>
+						</div>
+						<ProblemList
 							problems={problems}
-							revealLine={revealLine}
+							onReveal={reveal}
+							collapsed={collapsed}
+							onToggle={() => setCollapsed((value) => !value)}
 						/>
-					</div>
-					<ProblemList
-						problems={problems}
-						onReveal={(line) => setRevealLine(line + Math.random() * 0.0001)}
-						collapsed={collapsed}
-						onToggle={() => setCollapsed((value) => !value)}
-					/>
-				</section>
+					</section>
+				)}
 
-				<Divider onMove={(percent) => {
-					setSplit(percent);
-					saveSplit(percent);
-				}} />
-
-				<section
-					aria-label="Context map"
-					data-theme={theme ?? undefined}
-					className="relative min-h-0 flex-1 bg-white text-ink dark:bg-night dark:text-slate-100"
-				>
-					<Graph
-						document={document_}
-						layout={layout}
-						stale={stale}
-						selected={selected}
-						onSelect={setSelected}
-						positions={positions}
-						onPositions={setPositions}
-						curves={curves}
-						onCurves={setCurves}
-						onFullscreen={toggleFullscreen}
-						fullscreen={fullscreen}
-						onSaveLayout={saveLayout}
-						onLoadLayout={() => viewInput.current?.click()}
-					/>
-					<Inspector
-						document={document_}
-						selected={selected}
-						onSource={applyEdit}
-						onReveal={(line) => {
-							setRevealLine(line + Math.random() * 0.0001);
+				{panes === 'both' && (
+					<Divider
+						onMove={(percent) => {
+							setSplit(percent);
+							saveSplit(percent);
 						}}
-						onClose={() => setSelected(null)}
-						setPattern={setPattern}
-						setClassification={setClassification}
-						removeRelationship={removeRelationship}
 					/>
-				</section>
+				)}
+
+				{panes !== 'source' && (
+					<section
+						aria-label="Context map"
+						data-theme={theme ?? undefined}
+						className="relative min-h-0 flex-1 bg-white text-ink dark:bg-night dark:text-slate-100"
+					>
+						<Graph
+							document={document_}
+							layout={layout}
+							stale={stale}
+							selected={selected}
+							onSelect={setSelected}
+							positions={positions}
+							onPositions={setPositions}
+							curves={curves}
+							onCurves={setCurves}
+							onFullscreen={toggleFullscreen}
+							fullscreen={fullscreen}
+							onSaveLayout={saveLayout}
+							onLoadLayout={() => viewInput.current?.click()}
+						/>
+						<Inspector
+							document={document_}
+							selected={selected}
+							onSource={applyEdit}
+							onReveal={reveal}
+							onClose={() => setSelected(null)}
+							setPattern={setPattern}
+							setClassification={setClassification}
+							removeRelationship={removeRelationship}
+						/>
+					</section>
+				)}
 			</div>
 		</div>
+	);
+}
+
+/**
+ * The map's name, edited in place.
+ *
+ * An input that looks like a heading until you touch it, rather than a heading
+ * with a pencil next to it: the title is one short string and a mode to change
+ * it costs more than it saves. Tab reaches it, which a click-to-edit heading
+ * would not.
+ *
+ * The draft is local and commits on Enter or blur, because every commit is a
+ * splice into the source that reparses on a debounce — a controlled input fed
+ * from the parsed document would show the visitor their own keystrokes
+ * arriving a quarter-second late and out of order. Escape abandons the draft,
+ * and the flag is a ref because the blur that follows it runs with the
+ * pre-Escape render's closure.
+ *
+ * Read-only while the text is unparsed. The title's span was measured in the
+ * last document that parsed, and splicing it into text that has moved on since
+ * would write the new name at an offset that is no longer the title.
+ */
+function MapTitle({
+	title,
+	stale,
+	onRename,
+}: {
+	title: string;
+	stale: boolean;
+	onRename: (to: string) => void;
+}) {
+	const [draft, setDraft] = useState<string | null>(null);
+	const abandoned = useRef(false);
+
+	const commit = () => {
+		const pending = draft;
+		setDraft(null);
+		if (abandoned.current) {
+			abandoned.current = false;
+			return;
+		}
+		if (pending === null) return;
+		const next = pending.trim();
+		// An empty name would take the export filename with it, and a rename to
+		// the same name is not a rename. Both put the heading back.
+		if (next === '' || next === title) return;
+		onRename(next);
+	};
+
+	const shown = draft ?? title;
+
+	return (
+		<input
+			value={shown}
+			/*
+			 * As long as the name is, rather than a fixed width: map names run from
+			 * two words to a sentence, and a field that fits "Claims" wastes the bar
+			 * on every other map while a field that fits the sample's thirty-two
+			 * characters is a trench next to a short one. `size` counts characters
+			 * and works everywhere, which `field-sizing: content` does not yet.
+			 *
+			 * The floor keeps an empty draft from collapsing to a sliver you cannot
+			 * click back into; the ceiling and `max-w` keep a pasted paragraph from
+			 * pushing the buttons off the bar.
+			 */
+			size={Math.min(44, Math.max(12, shown.length + 1))}
+			readOnly={stale}
+			aria-label="Map name"
+			title={stale ? 'The map is renamed once the source parses again' : 'Rename the map'}
+			onChange={(event) => setDraft(event.target.value)}
+			onBlur={commit}
+			onKeyDown={(event) => {
+				if (event.key === 'Enter') event.currentTarget.blur();
+				if (event.key === 'Escape') {
+					abandoned.current = true;
+					setDraft(null);
+					event.currentTarget.blur();
+				}
+			}}
+			className={`mr-1 max-w-[40vw] min-w-0 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 font-semibold ${
+				stale
+					? 'cursor-default'
+					: 'hover:border-slate-300 focus:border-brand focus:bg-white focus:outline-none dark:hover:border-slate-600 dark:focus:bg-slate-800'
+			}`}
+		/>
 	);
 }
 
@@ -465,10 +629,15 @@ export default function DddMapper() {
 function IconButton({
 	label,
 	onClick,
+	pressed,
 	children,
 }: {
 	label: string;
 	onClick: (event: React.MouseEvent) => void;
+	/* Omitted by the buttons that *do* something. Present only on the ones that
+	   put the bar into a state, where a reader has to be able to see which
+	   state that is — and `aria-pressed` says the same thing the fill does. */
+	pressed?: boolean;
 	children: React.ReactNode;
 }) {
 	return (
@@ -477,7 +646,12 @@ function IconButton({
 			onClick={onClick}
 			title={label}
 			aria-label={label}
-			className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 hover:bg-white dark:border-slate-600 dark:hover:bg-slate-800"
+			aria-pressed={pressed}
+			className={`flex h-7 w-7 items-center justify-center rounded-md border ${
+				pressed
+					? 'border-brand bg-white text-brand dark:border-purple-400 dark:bg-slate-800 dark:text-purple-300'
+					: 'border-slate-300 hover:bg-white dark:border-slate-600 dark:hover:bg-slate-800'
+			}`}
 		>
 			{children}
 		</button>

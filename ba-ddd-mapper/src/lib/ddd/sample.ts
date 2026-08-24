@@ -1,4 +1,23 @@
-// The seed catalog from ba-portal, in the format ba-ddd authors.
+/**
+ * The sample map, embedded.
+ *
+ * Byte-for-byte `samples/insurance.ddd`, which is itself the seed catalog from
+ * ba-portal — the same nine subdomains, nine contexts and eleven relationships
+ * that `ba-portal/src/lib/catalog.ts` and `landscapes.ts` hold as hand-written
+ * TypeScript. Generating those two files from this one is the obvious next
+ * step and is not built.
+ *
+ * It opens on a first visit rather than an empty map. An empty text editor
+ * beside an empty canvas teaches nothing about a notation, and the fastest way
+ * to learn this one is to change something in a map that already means
+ * something.
+ *
+ * It carries two deliberate warnings — the domain has no owner, and the
+ * Notifications subdomain has no context — so the problems panel has something
+ * true to show on first load rather than looking broken when it later does.
+ */
+
+export const SAMPLE = `// The seed catalog from ba-portal, in the format ba-ddd-mapper-mapper authors.
 //
 // This file is the same model as ba-portal's src/lib/catalog.ts and
 // src/lib/landscapes.ts, written once instead of twice. That is the point of
@@ -57,7 +76,7 @@ map "Personal and commercial insurance" {
 
       context "Claims" {
         intent    "From first notification to settlement or repudiation.
-                   \"Policy\" here is a snapshot of cover as it stood on the
+                   \\"Policy\\" here is a snapshot of cover as it stood on the
                    date of loss, not the live policy."
         language  "Notification" "Claim" "Reserve" "Settlement" "Repudiation"
                   "Cover snapshot"
@@ -74,8 +93,8 @@ map "Personal and commercial insurance" {
 
       context "Policy lifecycle" {
         intent    "The policy as a thing with a history. Every change is an
-                   event with an effective date, because \"what did the cover
-                   say on 3 March\" gets asked in court."
+                   event with an effective date, because \\"what did the cover
+                   say on 3 March\\" gets asked in court."
         language  "Policy" "Inception" "Endorsement" "Effective date" "Renewal"
                   "Cancellation"
         aggregate "Policy" "Endorsement"
@@ -227,3 +246,4 @@ map "Personal and commercial insurance" {
               are changed in the same conversation."
   }
 }
+`;

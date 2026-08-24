@@ -401,23 +401,35 @@ function anchor(
 	// Mostly-vertical perpendicular means a mostly-horizontal chord: the boxes
 	// are side by side and the arc will swing under them.
 	if (Math.abs(py) > 0.55) {
-		const edgeY = py > 0 ? node.y + node.height : node.y;
 		const reach = node.width * 0.32;
 		const slide = Math.max(-reach, Math.min(reach, towards.x - middle.x));
-		return { x: middle.x + slide, y: edgeY };
+		const drop = (node.height / 2) * edgeFactor(node, slide / (node.width / 2));
+		return { x: middle.x + slide, y: middle.y + (py > 0 ? drop : -drop) };
 	}
 
 	if (Math.abs(px) > 0.55) {
-		const edgeX = px > 0 ? node.x + node.width : node.x;
 		const reach = node.height * 0.32;
 		const slide = Math.max(-reach, Math.min(reach, towards.y - middle.y));
-		return { x: edgeX, y: middle.y + slide };
+		const out = (node.width / 2) * edgeFactor(node, slide / (node.height / 2));
+		return { x: middle.x + (px > 0 ? out : -out), y: middle.y + slide };
 	}
 
 	return borderPoint(node, middle, towards);
 }
 
-/** Where the segment from `inside` towards `towards` leaves the node's box. */
+/**
+ * A context is drawn as an ellipse, so an anchor slid away from the middle of
+ * an edge has to ride the curve inwards or the arc leaves from a point in the
+ * air. `slid` is how far along the half-axis the anchor has moved, 0 at the
+ * middle and 1 at the extreme; the answer is the fraction of the perpendicular
+ * half-axis still available there — always 1 for a box, which has flat sides.
+ */
+function edgeFactor(node: PlacedNode, slid: number): number {
+	if (node.node.kind !== 'context') return 1;
+	return Math.sqrt(Math.max(0, 1 - slid * slid));
+}
+
+/** Where the segment from `inside` towards `towards` leaves the node's outline. */
 function borderPoint(
 	node: PlacedNode,
 	inside: { x: number; y: number },
@@ -429,6 +441,13 @@ function borderPoint(
 
 	const halfWidth = node.width / 2;
 	const halfHeight = node.height / 2;
+
+	if (node.node.kind === 'context') {
+		// The ellipse in its own units is the unit circle, so the ray hits it at
+		// exactly one scale rather than at whichever of two sides comes first.
+		const scale = 1 / Math.hypot(dx / halfWidth, dy / halfHeight);
+		return { x: inside.x + dx * scale, y: inside.y + dy * scale };
+	}
 
 	// Scale the direction until it hits whichever side comes first.
 	const scaleX = dx === 0 ? Infinity : halfWidth / Math.abs(dx);

@@ -12,13 +12,17 @@
  * failure banner says.
  */
 
-const SOURCE = 'ba-ddd:source';
-const THEME = 'ba-ddd:graph-theme';
-const SPLIT = 'ba-ddd:split';
-const POSITIONS = 'ba-ddd:positions';
-const CURVES = 'ba-ddd:curves';
+const SOURCE = 'ba-ddd-mapper-mapper:source';
+const THEME = 'ba-ddd-mapper-mapper:graph-theme';
+const SPLIT = 'ba-ddd-mapper-mapper:split';
+const PANES = 'ba-ddd-mapper-mapper:panes';
+const POSITIONS = 'ba-ddd-mapper-mapper:positions';
+const CURVES = 'ba-ddd-mapper-mapper:curves';
 
 export type GraphTheme = 'light' | 'dark';
+
+/** Which panels are on screen: both, the text alone, or the map alone. */
+export type Panes = 'both' | 'source' | 'graph';
 
 function store(): Storage | null {
 	try {
@@ -66,6 +70,34 @@ export function saveTheme(theme: GraphTheme | null): void {
 		else store()?.setItem(THEME, theme);
 	} catch {
 		// A theme that does not persist is a much smaller problem than a crash.
+	}
+}
+
+/**
+ * Which panels are showing, in its own key and next to the split rather than
+ * inside it.
+ *
+ * Same reasoning as the theme: this is a property of the desk, not of the map.
+ * Somebody who reads maps on a laptop wants the graph alone every time they
+ * open the mapper, and somebody writing one wants both — and neither of them
+ * wants the file they opened to have an opinion about it. The split percentage
+ * survives untouched while a single pane is showing, so going back to two
+ * restores the proportions rather than a default.
+ */
+export function loadPanes(): Panes | null {
+	try {
+		const value = store()?.getItem(PANES);
+		return value === 'both' || value === 'source' || value === 'graph' ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+export function savePanes(panes: Panes): void {
+	try {
+		store()?.setItem(PANES, panes);
+	} catch {
+		// As with the theme: a preference that does not persist is survivable.
 	}
 }
 

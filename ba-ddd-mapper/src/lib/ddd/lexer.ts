@@ -4,7 +4,7 @@
  * Adapted from doc-es's, with one change that drives the whole component: every
  * token carries the byte offsets it came from, not only a line and column.
  *
- * doc-es needs line/column to report a problem. ba-ddd needs `start`/`end`
+ * doc-es needs line/column to report a problem. ba-ddd-mapper-mapper needs `start`/`end`
  * because a gesture in the graph is a *splice into the source text* — see the
  * inversion argument in README.md. A parser that only tracked line numbers
  * could report an error and could not rename a node without rewriting the file.

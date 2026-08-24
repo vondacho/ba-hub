@@ -341,7 +341,7 @@ export default function Graph({
 						markerHeight="5"
 						orient="auto-start-reverse"
 					>
-						<path d="M0 1 L9 5 L0 9 z" className="fill-slate-400 dark:fill-slate-600" />
+						<path d="M0 1 L9 5 L0 9 z" className="fill-slate-500 dark:fill-slate-600" />
 					</marker>
 				</defs>
 
@@ -363,7 +363,7 @@ export default function Graph({
 								d={edge.path}
 								fill="none"
 								strokeWidth={1.25}
-								className="stroke-slate-300 dark:stroke-slate-700"
+								className="stroke-slate-400 dark:stroke-slate-700"
 								markerEnd="url(#head-quiet)"
 							/>
 						))}
@@ -391,7 +391,7 @@ export default function Graph({
 										className={
 											active
 												? 'stroke-violet-600 dark:stroke-violet-300'
-												: 'stroke-violet-500/70 dark:stroke-violet-400/70'
+												: 'stroke-violet-600/85 dark:stroke-violet-400/70'
 										}
 										markerEnd="url(#head)"
 										markerStart={edge.directed ? undefined : 'url(#head)'}
@@ -438,7 +438,7 @@ export default function Graph({
 												width={labelWidth(edge.label.text)}
 												height={18}
 												rx={4}
-												className="fill-white stroke-violet-300 dark:fill-slate-900 dark:stroke-violet-700"
+												className="fill-white stroke-violet-400 dark:fill-slate-900 dark:stroke-violet-700"
 												strokeWidth={1}
 											/>
 											<text
@@ -542,19 +542,37 @@ function NodeBox({
 			}}
 			className="cursor-move"
 		>
-			<rect
-				width={width}
-				height={height}
-				rx={style.radius}
-				strokeWidth={selected ? 3 : 1.5}
-				strokeDasharray={style.dashed ? '6 4' : undefined}
-				className={`${style.box} ${selected ? 'stroke-violet-600 dark:stroke-violet-300' : ''}`}
-			/>
+			{style.shape === 'ellipse' ? (
+				<ellipse
+					cx={width / 2}
+					cy={height / 2}
+					rx={width / 2}
+					ry={height / 2}
+					strokeWidth={selected ? 3 : 1.5}
+					strokeDasharray={style.dashed ? '6 4' : undefined}
+					className={`${style.box} ${selected ? 'stroke-violet-600 dark:stroke-violet-300' : ''}`}
+				/>
+			) : (
+				<rect
+					width={width}
+					height={height}
+					rx={style.radius}
+					strokeWidth={selected ? 3 : 1.5}
+					strokeDasharray={style.dashed ? '6 4' : undefined}
+					className={`${style.box} ${selected ? 'stroke-violet-600 dark:stroke-violet-300' : ''}`}
+				/>
+			)}
 			{moved && (
 				/* A moved box is marked, because its position is view state and does
 				   not travel with the file — the next person to open it sees the
-				   computed arrangement, not this one. */
-				<circle cx={width - 9} cy={9} r={3} className="fill-brand dark:fill-purple-400">
+				   computed arrangement, not this one. The corner an ellipse does not
+				   have is traded for a point on its upper right curve. */
+				<circle
+					cx={style.shape === 'ellipse' ? width * 0.82 : width - 9}
+					cy={style.shape === 'ellipse' ? height * 0.17 : 9}
+					r={3}
+					className="fill-brand dark:fill-purple-400"
+				>
 					<title>Moved — position is local to this browser</title>
 				</circle>
 			)}
@@ -564,7 +582,9 @@ function NodeBox({
 				textAnchor="middle"
 				className={`${style.label} pointer-events-none text-[13px] font-semibold`}
 			>
-				{truncate(node.name, node.kind === 'domain' ? 34 : 24)}
+				{/* A context gets fewer characters than a subdomain of the same width:
+				    an ellipse narrows away from its waist, and the name sits above it. */}
+				{truncate(node.name, node.kind === 'domain' ? 34 : node.kind === 'context' ? 22 : 24)}
 			</text>
 			{second && (
 				<text

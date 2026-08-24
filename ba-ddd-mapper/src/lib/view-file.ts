@@ -30,7 +30,7 @@ export interface ViewFile {
 	map: string;
 }
 
-const FORMAT = 'ba-ddd-view';
+const FORMAT = 'ba-ddd-mapper-view';
 const VERSION = 1;
 
 export function serializeView(view: ViewFile): string {
@@ -69,7 +69,7 @@ export function parseView(text: string, currentMap: string): ViewParse {
 	if (record.format !== FORMAT) {
 		return {
 			ok: false,
-			error: 'Not a view file — it has no `"format": "ba-ddd-view"`. A .ddd map goes in Open, not here.',
+			error: 'Not a view file — it has no `"format": "ba-ddd-mapper-view"`. A .ddd map goes in Open, not here.',
 		};
 	}
 	if (typeof record.version !== 'number' || record.version > VERSION) {

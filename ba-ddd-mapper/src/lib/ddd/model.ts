@@ -1,7 +1,7 @@
 /**
  * The `.ddd` document model.
  *
- * This file is the *decided interface* of ba-ddd: the shapes the parser
+ * This file is the *decided interface* of ba-ddd-mapper-mapper: the shapes the parser
  * produces, the graph renders, and the serialiser writes back. It is written
  * before the parser on purpose — the argument in README.md turns on what a node
  * and an edge are, and that argument is easier to have against types than

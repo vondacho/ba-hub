@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Multi-stage build for the ba-ddd Astro frontend.
+# Multi-stage build for the ba-ddd-mapper-mapper Astro frontend.
 #
 # `astro build` with the @astrojs/node adapter in standalone mode emits a Node
 # HTTP server at dist/server/entry.mjs plus the client assets under dist/client.

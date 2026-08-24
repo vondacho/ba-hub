@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /*
- * ba-ddd's theme. ba-portal's palette, so the two read as one hub.
+ * ba-ddd-mapper's theme. ba-portal's palette, so the two read as one hub.
  *
  * Dark mode is NOT the bare `prefers-color-scheme` media query Tailwind ships.
  * It is a `@custom-variant` that resolves against the nearest ancestor carrying

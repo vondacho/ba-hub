@@ -124,6 +124,20 @@ export function renameNode(source: string, document: DddDocument, node: Node, to
 	return spliceAll(source, edits);
 }
 
+/**
+ * Rename the map.
+ *
+ * One splice and no search, which is the whole difference from `renameNode`
+ * above: the title is a label on the file rather than an identifier, so nothing
+ * refers back to it. Every mention of it elsewhere — in a `serves`, in an
+ * endpoint — is a mention of a *domain* that happens to share the words, and
+ * rewriting those because the file was renamed would silently repoint the
+ * model.
+ */
+export function setTitle(source: string, document: DddDocument, to: string): string {
+	return splice(source, document.titleSpan, quote(to));
+}
+
 /** Delete a relationship, including its block and the blank line after it. */
 export function removeRelationship(source: string, edge: RelationshipEdge): string {
 	let end = edge.span.end;

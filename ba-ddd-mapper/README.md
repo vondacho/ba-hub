@@ -1,4 +1,4 @@
-# ba-ddd
+# ba-ddd-mapper-mapper
 
 The **DDD mapper**. A context map authored as text in one panel and drawn as a
 graph in the other, where the two are the same document and neither is a copy.
@@ -27,9 +27,9 @@ render of it. Its README says so outright: comments, blank lines and your
 indentation are lost on a round trip. That is correct there. A wall is built in
 a room, by hand, in ninety minutes, and nobody reviews the file.
 
-In **ba-ddd the text is the source of truth** and the graph is a render of it.
+In **ba-ddd-mapper-mapper the text is the source of truth** and the graph is a render of it.
 
-| | doc-es | ba-ddd |
+| | doc-es | ba-ddd-mapper-mapper |
 |---|---|---|
 | Source of truth | the board | the text |
 | The file is | an export | the artefact |
@@ -673,7 +673,7 @@ What is out of scope even now:
 - **No language collision detection.** Contexts declare their `language`, so the
   data to find one word meaning two things is present in the file. The check is
   ba-portal's language workbench and it is not built either.
-- **No chart.** `helm/ba-ddd/` does not exist, and neither does
+- **No chart.** `helm/ba-ddd-mapper-mapper/` does not exist, and neither does
   `helm/ba-portal/`. The ingress host is `ddd-mapper.localhost` — the component
   is named for the repository it lives in and the host for the tool it serves,
   which is already what ba-portal's `dddMapperUrl` points at.
