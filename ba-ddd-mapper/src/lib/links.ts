@@ -50,3 +50,15 @@ export function archPortalUrl(): string {
 export function modelHref(context: string): string {
   return `/model?context=${encodeURIComponent(context)}`;
 }
+
+/**
+ * The map page, for one map.
+ *
+ * `modelHref`'s twin, and it takes the same liberty: the value may be the
+ * document's name or the stem its keys were built from, because slugging a stem
+ * yields the stem. The store panel has stems and the map has titles, and this
+ * lets neither of them care.
+ */
+export function mapHref(title: string): string {
+  return `/?map=${encodeURIComponent(title)}`;
+}

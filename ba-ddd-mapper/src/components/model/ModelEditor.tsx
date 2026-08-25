@@ -53,11 +53,12 @@ import {
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
-import { seedModel } from '../../lib/ddm/seed';
+import { freshModel, seedModel } from '../../lib/ddm/seed';
 import { serializeModelView } from '../../lib/view-file';
 import Editor from '../mapper/Editor';
 import StoreState from '../ui/StoreState';
 import Inspector from './Inspector';
+import EmptyState from '../ui/EmptyState';
 import { Legend } from './Legend';
 import Icon, { type IconName } from '../mapper/Icon';
 import ProblemList from '../mapper/ProblemList';
@@ -84,9 +85,100 @@ const DOWNLOAD_GAP_MS = 250;
 /** Parsed once, so the initial model and the initial key agree. */
 const SEED = parse(SAMPLE).document;
 
+/**
+ * Nothing at all, as a document.
+ *
+ * The sample used to be what an empty visit rendered, and it was the wrong
+ * default for the same reason a word processor does not open onto somebody
+ * else's letter: it puts a document you did not write where yours goes, and
+ * every visit begins by clearing it. It is still one click away — see the empty
+ * state — and now it arrives because it was asked for.
+ */
+const EMPTY: DomainModel = {
+	context: '',
+	contextSpan: { start: 0, end: 0, line: 1, column: 1 },
+	aggregates: [],
+	members: [],
+	links: [],
+	source: '',
+};
+
+interface Arrival {
+	readonly name: string;
+	readonly source: string;
+	readonly document: DomainModel;
+	readonly positions: Positions;
+	readonly keys: DocumentKeys;
+	/** True when this is the sample rather than anything the visitor has. */
+	readonly fresh: boolean;
+}
+
+/**
+ * Which model this visit is about, decided **before the first render**.
+ *
+ * Three ways in, in order of how explicitly they were asked for:
+ *
+ *   `?context=Claims`   a link from the map, or one somebody pasted. The name
+ *                       in the URL wins over anything remembered: it is the
+ *                       request.
+ *   the pointer         no URL, so the last model worked on.
+ *   the sample          neither, or a name with nothing stored and no link that
+ *                       asked for it.
+ *
+ * This used to run in a mount effect, and the cost was visible: the page
+ * painted the *sample* — text, diagram and all — and then replaced it a frame
+ * later with what the visitor had actually asked for. Arriving from the map on
+ * a context with no model yet, the swap was sample-then-four-lines-of-stub,
+ * which reads exactly like the editor clearing itself.
+ *
+ * Reading the store during render is safe here and only here: the page is a
+ * `client:only` island, so this never runs on the server, and every branch
+ * below only *reads*. The one branch that writes — taking the legacy keys,
+ * which deletes them — stays in an effect, where running twice cannot cost
+ * anybody their work.
+ */
+function arrival(): Arrival {
+	const asked = new URLSearchParams(window.location.search).get('context');
+	const name = asked ?? lastModel();
+
+	if (name) {
+		const keys = modelKeys(name);
+		const stored = loadText(keys.doc);
+		// An entry that exists but is empty is not a document. It cannot be
+		// parsed, it would autosave itself back over the key, and it is the one
+		// thing a half-finished write can leave behind — so it falls through to
+		// the stub rather than opening as a blank editor.
+		if (stored) {
+			return { name, source: stored, document: documentOf(stored), positions: loadModelView(keys.view), keys, fresh: false };
+		}
+		if (asked !== null) {
+			// Asked for by name with nothing stored: a context whose model has not
+			// been written yet, reached by a link the map did not seed — pasted, or
+			// typed. The stub is the map's, minus what only the map knows.
+			const seed = seedModel(asked, []);
+			return { name: asked, source: seed, document: documentOf(seed), positions: {}, keys, fresh: false };
+		}
+	}
+
+	return { name: '', source: '', document: EMPTY, positions: {}, keys: modelKeys(''), fresh: true };
+}
+
+/** The parse, or nothing if the text does not parse. */
+function documentOf(text: string): DomainModel {
+	const result = parse(text);
+	return result.ok ? result.document : EMPTY;
+}
+
+/** Whitespace and comments are not a model. */
+function blank(source: string): boolean {
+	return source.trim() === '';
+}
+
 export default function ModelEditor() {
-	const [source, setSource] = useState(SAMPLE);
-	const [document_, setDocument] = useState<DomainModel>(SEED);
+	// Computed once, on the first render, and never again.
+	const [start] = useState(arrival);
+	const [source, setSource] = useState(start.source);
+	const [document_, setDocument] = useState<DomainModel>(start.document);
 	const [problems, setProblems] = useState<readonly Problem[]>([]);
 	const [stale, setStale] = useState(false);
 	const [placement, setPlacement] = useState<Placement | null>(null);
@@ -96,7 +188,7 @@ export default function ModelEditor() {
 	const [split, setSplit] = useState(42);
 	const [panes, setPanes] = useState<Panes>('both');
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
-	const [positions, setPositions] = useState<Positions>({});
+	const [positions, setPositions] = useState<Positions>(start.positions);
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
@@ -108,17 +200,30 @@ export default function ModelEditor() {
 	 * does not parse leaves `document_` describing the previous model, and this
 	 * one's text must not be written under that one's key.
 	 */
-	const [modelName, setModelName] = useState(SEED.context);
+	const [modelName, setModelName] = useState(start.name);
 	/** `<modelName>.ddm` and `<modelName>.ddmview`. */
 	const keys = useMemo(() => modelKeys(modelName), [modelName]);
-	const keysRef = useRef<DocumentKeys | null>(null);
-	/** Set by Open alone, and read once by the effect that moves the entries. */
-	const opened = useRef(false);
+	const keysRef = useRef<DocumentKeys | null>(start.keys);
+	/**
+	 * The document key a load is heading for, or null when nothing is loading.
+	 *
+	 * The effect that moves entries cannot tell a load from a rename on its own,
+	 * because both end with the name changing — and read wrong it does real
+	 * damage: it copies the arriving document onto the departing one's key and
+	 * deletes the original. So every way a different model arrives *after the
+	 * first render* — Open, and the legacy migration — says where it is going,
+	 * and that effect stands down until `keys` gets there.
+	 *
+	 * The way in from the map needs none of this any more: `arrival()` settles
+	 * the name during the first render, so there is no gap between mounting and
+	 * knowing to be misread.
+	 */
+	const loading = useRef<string | null>(null);
 	/** The store panel. Read-only, and read fresh each time it opens. */
 	const [showStore, setShowStore] = useState(false);
 
 	useEffect(() => {
-		restore();
+		migrate();
 		setTheme(loadTheme());
 		const storedSplit = loadSplit();
 		if (storedSplit !== null) setSplit(storedSplit);
@@ -127,60 +232,41 @@ export default function ModelEditor() {
 	}, []);
 
 	/**
-	 * Open the model this visit is about.
+	 * The one part of arriving that cannot happen during a render: the legacy
+	 * keys, whose reading deletes them.
 	 *
-	 * Three ways in, in order of how explicitly they were asked for:
-	 *
-	 *   `?context=Risk appetite`  a link from the map, or one somebody pasted.
-	 *                             The name in the URL wins over anything
-	 *                             remembered: it is the request.
-	 *   the pointer               no URL, so the last model worked on.
-	 *   the sample                neither, or a name with nothing stored and no
-	 *                             link that asked for it.
-	 *
-	 * The keys derive from the name, so the name has to be known before anything
-	 * can be read — which is why one arrives rather than being discovered.
+	 * Only reachable on a first visit since the store stopped being one slot per
+	 * page, and only when nothing else claimed this visit — a URL or a pointer
+	 * means the visitor has moved on and whatever is under the old keys is a
+	 * copy of something already migrated.
 	 */
-	function restore(): void {
-		const asked = new URLSearchParams(window.location.search).get('context');
-		const name = asked ?? lastModel();
+	function migrate(): void {
+		if (!start.fresh) return;
 
-		if (name) {
-			const found = modelKeys(name);
-			const stored = loadText(found.doc);
-			if (stored !== null) {
-				// Already written — the nodes and, from the sidecar key, the
-				// arrangement. Arriving from the map must not disturb either.
-				keysRef.current = found;
-				setModelName(name);
-				setSource(stored);
-				setPositions(loadModelView(found.view));
-				return;
-			}
-
-			if (asked !== null) {
-				// Asked for by name with nothing stored: a context whose model has
-				// not been written yet, reached by a link the map did not seed —
-				// pasted, or typed. The stub is the map's, minus what only the map
-				// knows.
-				keysRef.current = found;
-				setModelName(asked);
-				setSource(seedModel(asked, []));
-				setPositions({});
-				return;
-			}
-		}
-
-		// First visit since the entries stopped being one slot per page.
 		const legacy = takeLegacyModel();
-		if (legacy) {
-			setSource(legacy.source);
-			setPositions(legacy.positions);
-		}
+		if (!legacy) return;
+
+		// Parsed now rather than waited for: the name is what the key is made of,
+		// and the effect that moves entries has to be told where this load is
+		// going before the debounced parse could tell it.
+		const parsed = parse(legacy.source);
+		loading.current = parsed.ok ? modelKeys(parsed.document.context).doc : null;
+		setSource(legacy.source);
+		setPositions(legacy.positions);
 	}
 
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
+			// An empty editor is not a broken model. Parsing it would report that a
+			// model starts with `model`, which is true, unhelpful, and the first
+			// thing a visitor would see on an empty page.
+			if (blank(source)) {
+				setProblems([]);
+				setDocument(EMPTY);
+				setStale(false);
+				return;
+			}
+
 			const result = parse(source);
 			setProblems(result.problems);
 			if (result.ok) {
@@ -195,6 +281,12 @@ export default function ModelEditor() {
 	}, [source]);
 
 	useEffect(() => {
+		// An empty editor writes nothing. There is no document to name, the key it
+		// would take is the fallback slug, and an empty entry is precisely what
+		// `arrival` refuses to open — so saving one would be the store creating
+		// the anomaly the reader is written to survive.
+		if (blank(source)) return;
+
 		const timer = window.setTimeout(() => {
 			setSaveFailed(!saveText(keys.doc, source));
 			rememberModel(modelName);
@@ -203,9 +295,11 @@ export default function ModelEditor() {
 	}, [source, keys.doc, modelName]);
 
 	useEffect(() => {
+		if (blank(source)) return;
+
 		const timer = window.setTimeout(() => saveModelView(keys.view, modelName, { ...positions }), 400);
 		return () => window.clearTimeout(timer);
-	}, [positions, keys.view, modelName]);
+	}, [positions, keys.view, modelName, source]);
 
 	/**
 	 * Renaming the context moves the entries; opening another model leaves them.
@@ -217,9 +311,15 @@ export default function ModelEditor() {
 	useEffect(() => {
 		const previous = keysRef.current;
 		keysRef.current = keys;
-		const wasOpen = opened.current;
-		opened.current = false;
-		if (!previous || previous.doc === keys.doc || wasOpen) return;
+
+		// A load in flight is never a rename. The entries under the old name
+		// belong to a document that still exists and that nobody asked to move.
+		if (loading.current !== null) {
+			if (loading.current === keys.doc) loading.current = null;
+			return;
+		}
+
+		if (!previous || previous.doc === keys.doc) return;
 
 		const carried = loadText(previous.doc);
 		if (carried !== null) saveText(keys.doc, carried);
@@ -275,12 +375,76 @@ export default function ModelEditor() {
 		window.setTimeout(() => downloadText(`${stem}${MODEL_VIEW_EXTENSION}`, sidecar), DOWNLOAD_GAP_MS);
 	}, [document_.context, source, positions]);
 
+	/**
+	 * Write this model out now, rather than at the end of the debounce.
+	 *
+	 * `DddMapper`'s twin, for the same moment: the store panel is about to send
+	 * this page somewhere else, and the debounce has not fired yet. An empty
+	 * editor writes nothing, here as everywhere.
+	 */
+	const flush = useCallback(() => {
+		if (blank(source)) return;
+		saveText(keys.doc, source);
+		saveModelView(keys.view, modelName, { ...positions });
+		rememberModel(modelName);
+	}, [keys, modelName, source, positions]);
+
+	/**
+	 * Put the example in the editor, by request.
+	 *
+	 * Flagged as a load rather than left to look like one. The example carries
+	 * its own context name, so the keys are about to change — and a change of
+	 * name that nobody flags is read as a rename, which would move the entries
+	 * of whatever was open onto the example's key.
+	 */
+	const loadExample = useCallback(() => {
+		open_(SAMPLE, SEED.context);
+	}, []);
+
+	/**
+	 * A model that did not exist a second ago.
+	 *
+	 * Keeps the context name when there is one — arriving from the map on an
+	 * unmodelled context and pressing this means "yes, model *this*", not "give
+	 * me something called New model".
+	 */
+	const startFresh = useCallback(() => {
+		const name = document_.context || 'New model';
+		open_(freshModel(name), name);
+	}, [document_.context]);
+
+	/**
+	 * Put a document in the editor, by request, and show both halves of it.
+	 *
+	 * Flagged as a load rather than left to look like one: the text carries its
+	 * own context name, so the keys are about to change, and a change of name
+	 * that nobody flags is read as a rename — which would move the entries of
+	 * whatever was open onto the new key.
+	 *
+	 * The panes open because a document nobody can see is not a document. The
+	 * notation is what the text is for and the shape is what the picture is for,
+	 * and somebody who has just asked for one to exist should not have to go
+	 * looking for the other pane.
+	 */
+	function open_(text: string, name: string): void {
+		loading.current = modelKeys(name).doc;
+		setSelected(null);
+		setPositions({});
+		setSource(text);
+		setPanes('both');
+		savePanes('both');
+	}
+
 	const onOpen = async (file: File | undefined) => {
 		if (!file) return;
 		// Another model is another document: the one on screen keeps its entries
-		// under its own name rather than being moved onto this one's.
-		opened.current = true;
-		setSource(await readTextFile(file));
+		// under its own name rather than being moved onto this one's. Parsed now
+		// to learn where this load is going — the debounced parse would answer a
+		// quarter of a second after the question stops mattering.
+		const text = await readTextFile(file);
+		const parsed = parse(text);
+		loading.current = parsed.ok ? modelKeys(parsed.document.context).doc : keys.doc;
+		setSource(text);
 		setSelected(null);
 		setPositions({});
 		clearFileInput(fileInput.current);
@@ -305,7 +469,11 @@ export default function ModelEditor() {
 			}
 		>
 			<div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
-				<strong className="mr-1 truncate">{document_.context}</strong>
+				{/* An empty editor has no name to show, and a blank space where the
+				    title goes reads as a bug rather than as a state. */}
+				<strong className="mr-1 truncate">
+					{document_.context || <span className="text-ink-muted dark:text-slate-400">No model open</span>}
+				</strong>
 				<span className="text-xs text-ink-muted dark:text-slate-400">
 					{counts.aggregates} aggregates · {counts.classes} classes · {counts.links} links
 				</span>
@@ -389,7 +557,9 @@ export default function ModelEditor() {
 
 			{/* The legend explains the diagram's shapes, so it goes when the diagram
 			    does — the map's rule, in the map's place. */}
-			{showStore && <StoreState current={keys.doc} onClose={() => setShowStore(false)} />}
+			{showStore && (
+				<StoreState current={keys.doc} onLeaving={flush} onClose={() => setShowStore(false)} />
+			)}
 
 			{panes !== 'source' && <Legend theme={theme} />}
 
@@ -454,6 +624,21 @@ export default function ModelEditor() {
 								)
 							}
 						/>
+						{document_.aggregates.length === 0 && document_.members.length === 0 && (
+							<EmptyState
+								heading={
+									blank(source) ? 'Nothing open' : `Nothing in “${document_.context}” yet`
+								}
+								blurb={
+									blank(source)
+										? 'A domain model is the inside of one bounded context: its aggregates, what they hold, and what each one keeps true.'
+										: 'The map says this context exists. What its aggregates hold and protect is written here, in the text on the left.'
+								}
+								startLabel={blank(source) ? 'Start a fresh model' : 'Start modelling it'}
+								onLoadExample={loadExample}
+								onStart={startFresh}
+							/>
+						)}
 						<Inspector
 							document={document_}
 							selected={selected}

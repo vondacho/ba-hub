@@ -56,6 +56,7 @@ import {
 	VIEW_ACCEPT,
 	viewFilenameFor,
 } from '../../lib/files';
+import { freshMap } from '../../lib/ddd/seed';
 import { seedModel } from '../../lib/ddm/seed';
 import { modelHref } from '../../lib/links';
 import { parseView, serializeView } from '../../lib/view-file';
@@ -72,6 +73,7 @@ import {
 	loadTheme,
 	mapKeys,
 	modelKeys,
+	saveModelView,
 	rememberMap,
 	rememberModel,
 	saveMapView,
@@ -84,6 +86,7 @@ import {
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
+import EmptyState from '../ui/EmptyState';
 import StoreState from '../ui/StoreState';
 import Editor from './Editor';
 import Graph from './Graph';
@@ -140,12 +143,87 @@ const PANE_CHOICES: readonly { panes: Panes; icon: IconName; label: string }[] =
 	{ panes: 'graph', icon: 'panes-graph', label: 'Show the map only' },
 ];
 
-/** Parsed once, so the initial document and the initial key agree. */
-const SEED = parse(SAMPLE).document;
+/**
+ * Nothing at all, as a document.
+ *
+ * The sample used to be what an empty visit rendered. It was the wrong default
+ * for the reason a word processor does not open onto somebody else's letter: it
+ * puts a document you did not write where yours goes, and every visit begins by
+ * clearing it. It is still one click away — see the empty state — and now it
+ * arrives because it was asked for.
+ */
+const EMPTY: DddDocument = {
+	title: '',
+	titleSpan: { start: 0, end: 0, line: 1, column: 1 },
+	nodes: [],
+	edges: [],
+	source: '',
+};
+
+interface Arrival {
+	readonly name: string;
+	readonly source: string;
+	readonly document: DddDocument;
+	readonly positions: Positions;
+	readonly curves: Curves;
+	readonly keys: DocumentKeys;
+	/** True when nothing claimed this visit — no URL, no pointer, no entry. */
+	readonly fresh: boolean;
+}
+
+/**
+ * Which map this visit is about, decided **before the first render**.
+ *
+ * `?map=Insurance` first, because a link naming a document is a request; then
+ * the pointer, which is a habit; then nothing.
+ *
+ * Computed in a render rather than a mount effect so there is no first paint to
+ * be replaced — the model page's `arrival` says more about why. Every branch
+ * here only reads, and the page is a `client:only` island, so this never runs
+ * on a server.
+ */
+function arrival(): Arrival {
+	const asked = new URLSearchParams(window.location.search).get('map');
+	const title = asked ?? lastMap();
+
+	if (title) {
+		const keys = mapKeys(title);
+		const stored = loadText(keys.doc);
+		// An entry that exists but is empty is not a document: it cannot be
+		// parsed, and it would autosave itself straight back over the key.
+		if (stored) {
+			const view = loadMapView(keys.view);
+			return {
+				name: title,
+				source: stored,
+				document: documentOf(stored),
+				positions: view.positions,
+				curves: view.curves,
+				keys,
+				fresh: false,
+			};
+		}
+	}
+
+	return { name: '', source: '', document: EMPTY, positions: {}, curves: {}, keys: mapKeys(''), fresh: true };
+}
+
+/** The parse, or nothing if the text does not parse. */
+function documentOf(text: string): DddDocument {
+	const result = parse(text);
+	return result.ok ? result.document : EMPTY;
+}
+
+/** Whitespace and comments are not a map. */
+function blank(source: string): boolean {
+	return source.trim() === '';
+}
 
 export default function DddMapper() {
-	const [source, setSource] = useState(SAMPLE);
-	const [document_, setDocument] = useState<DddDocument>(SEED);
+	// Computed once, on the first render, and never again.
+	const [start] = useState(arrival);
+	const [source, setSource] = useState(start.source);
+	const [document_, setDocument] = useState<DddDocument>(start.document);
 	const [problems, setProblems] = useState<readonly Problem[]>([]);
 	const [stale, setStale] = useState(false);
 	const [layout, setLayout] = useState<Layout | null>(null);
@@ -157,8 +235,8 @@ export default function DddMapper() {
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	// Where the visitor has dragged boxes to. View state: it goes to
 	// localStorage and never into `source`.
-	const [positions, setPositions] = useState<Positions>({});
-	const [curves, setCurves] = useState<Curves>({});
+	const [positions, setPositions] = useState<Positions>(start.positions);
+	const [curves, setCurves] = useState<Curves>(start.curves);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
@@ -191,10 +269,10 @@ export default function DddMapper() {
 	 * document the visitor never opened. So this only ever moves on a successful
 	 * parse, or when a stored map is reopened by name.
 	 */
-	const [mapName, setMapName] = useState(SEED.title);
+	const [mapName, setMapName] = useState(start.name);
 	/** `<mapName>.ddd` and `<mapName>.dddview` — what it would be called on disk. */
 	const keys = useMemo(() => mapKeys(mapName), [mapName]);
-	const keysRef = useRef<DocumentKeys | null>(null);
+	const keysRef = useRef<DocumentKeys | null>(start.keys);
 	/**
 	 * Set by the title field alone, and read once by the effect below.
 	 *
@@ -210,7 +288,7 @@ export default function DddMapper() {
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
-		restore();
+		migrate();
 		setTheme(loadTheme());
 		const storedSplit = loadSplit();
 		if (storedSplit !== null) setSplit(storedSplit);
@@ -219,43 +297,37 @@ export default function DddMapper() {
 	}, []);
 
 	/**
-	 * Reopen the last map, by name.
+	 * The one part of arriving that cannot happen during a render: the legacy
+	 * keys, whose reading deletes them.
 	 *
-	 * The keys are derived from the title, so the title has to come from
-	 * somewhere before anything can be read — and the source it would be parsed
-	 * from is the thing being looked for. Hence the pointer. A pointer naming a
-	 * map whose entry has since gone falls through to the sample rather than
-	 * opening a blank editor.
+	 * Only reachable when nothing else claimed this visit — a URL or a pointer
+	 * means the visitor has moved on, and what sits under the old keys is a copy
+	 * of something already migrated.
 	 */
-	function restore(): void {
-		const title = lastMap();
-		if (title !== null) {
-			const keys = mapKeys(title);
-			const stored = loadText(keys.doc);
-			if (stored !== null) {
-				keysRef.current = keys;
-				setMapName(title);
-				setSource(stored);
-				const view = loadMapView(keys.view);
-				setPositions(view.positions);
-				setCurves(view.curves);
-				return;
-			}
-		}
+	function migrate(): void {
+		if (!start.fresh) return;
 
-		// Nothing under the new naming: this is the first visit since it shipped,
-		// and whatever was in the single-slot keys is the visitor's open map.
 		const legacy = takeLegacyMap();
-		if (legacy) {
-			setSource(legacy.source);
-			setPositions(legacy.view.positions);
-			setCurves(legacy.view.curves);
-		}
+		if (!legacy) return;
+
+		setSource(legacy.source);
+		setPositions(legacy.view.positions);
+		setCurves(legacy.view.curves);
 	}
 
 	// Parse, debounced. A failure keeps the last good document.
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
+			// An empty editor is not a broken map. Parsing it would report that a
+			// map starts with `map`, which is true, unhelpful, and the first thing
+			// a visitor would see on an empty page.
+			if (blank(source)) {
+				setProblems([]);
+				setDocument(EMPTY);
+				setStale(false);
+				return;
+			}
+
 			const result = parse(source);
 			setProblems(result.problems);
 			if (result.ok) {
@@ -271,6 +343,10 @@ export default function DddMapper() {
 
 	// Autosave, on the same rhythm, under the title's own key.
 	useEffect(() => {
+		// An empty editor writes nothing: there is no document to name, and an
+		// empty entry is precisely what `arrival` refuses to open.
+		if (blank(source)) return;
+
 		const timer = window.setTimeout(() => {
 			setSaveFailed(!saveText(keys.doc, source));
 			rememberMap(mapName);
@@ -416,9 +492,11 @@ export default function DddMapper() {
 	// Persist the arrangement, debounced — a drag fires this on every frame. One
 	// key rather than two, because `.dddview` is one file.
 	useEffect(() => {
+		if (blank(source)) return;
+
 		const timer = window.setTimeout(() => saveMapView(keys.view, mapName, { positions, curves }), 400);
 		return () => window.clearTimeout(timer);
-	}, [positions, curves, keys.view, mapName]);
+	}, [positions, curves, keys.view, mapName, source]);
 
 	// ---- creating, deleting, connecting -------------------------------------
 
@@ -725,6 +803,49 @@ export default function DddMapper() {
 	 *
 	 * Returns the address, so the caller that has to open a tab itself can.
 	 */
+	/**
+	 * Put a document in the editor, by request, and show both halves of it.
+	 *
+	 * Not routed through `applyEdit`: that writes into the textarea so ⌘Z can
+	 * take it back, which is right for a gesture on the graph and wrong for
+	 * replacing the whole document — undoing your way back into an empty editor
+	 * is not something anybody means.
+	 *
+	 * The panes open because a document nobody can see is not a document. The
+	 * notation is what the text is for and the shape is what the picture is for,
+	 * and somebody who has just asked for one to exist should not have to go
+	 * looking for the other pane.
+	 */
+	const open_ = useCallback((text: string) => {
+		// Not a rename: the map that was here keeps whatever it had under its own
+		// name. `renamed` is only ever set by the title field.
+		renamed.current = false;
+		setSelected(null);
+		setPositions({});
+		setCurves({});
+		setSource(text);
+		setPanes('both');
+		savePanes('both');
+	}, []);
+
+	const loadExample = useCallback(() => open_(SAMPLE), [open_]);
+	const startFresh = useCallback(() => open_(freshMap()), [open_]);
+
+	/**
+	 * Write this map out now, rather than at the end of the debounce.
+	 *
+	 * Called whenever something is about to make this editor stop being the only
+	 * thing that knows the current text: another tab opening on the same store,
+	 * or this page navigating to another document. A line typed a moment ago
+	 * should be there when the next thing looks.
+	 */
+	const flush = useCallback(() => {
+		if (blank(source)) return;
+		saveText(keys.doc, source);
+		saveMapView(keys.view, mapName, { positions, curves });
+		rememberMap(mapName);
+	}, [keys, mapName, source, positions, curves]);
+
 	const prepareModel = useCallback(
 		(id: string): string | null => {
 			const node = document_.nodes.find((candidate) => candidate.id === id);
@@ -732,22 +853,22 @@ export default function DddMapper() {
 			// nothing needs to be said about it: the gesture does not apply.
 			if (node?.kind !== 'context') return null;
 
-			// The map is written out before the other tab exists, not because this
-			// one is going anywhere — it is not — but because both tabs now share
-			// one store, and the model page reads the map's keys on the way in.
-			// A line typed a moment ago should be there when it looks.
-			saveText(keys.doc, source);
-			saveMapView(keys.view, mapName, { positions, curves });
-			rememberMap(mapName);
+			// Before the other tab exists: both tabs share one store, and the model
+			// page reads on the way in.
+			flush();
 
 			const model = modelKeys(node.name);
 			if (loadText(model.doc) === null) {
+				// Both halves, because the pair is the document. A stub with no
+				// sidecar is the shape the store stopped producing, and the model
+				// page arriving on one would be the only thing still making them.
 				saveText(model.doc, seedModel(node.name, node.aggregates));
+				saveModelView(model.view, node.name, {});
 			}
 			rememberModel(node.name);
 			return modelHref(node.name);
 		},
-		[document_, keys, mapName, source, positions, curves],
+		[document_, flush],
 	);
 
 	/**
@@ -804,7 +925,7 @@ export default function DddMapper() {
 		>
 			<div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900">
 				<MapTitle
-					title={document_.title}
+					title={document_.title || 'No map open'}
 					stale={stale}
 					onRename={(next) => {
 						renamed.current = true;
@@ -855,15 +976,7 @@ export default function DddMapper() {
 					>
 						<Icon name="store" />
 					</IconButton>
-					<IconButton
-						label="Replace with the sample map"
-						onClick={() => {
-							applyEdit(SAMPLE);
-							setSelected(null);
-							setPositions({});
-							setCurves({});
-						}}
-					>
+					<IconButton label="Replace with the sample map" onClick={loadExample}>
 						<Icon name="sample" />
 					</IconButton>
 					<IconButton
@@ -902,7 +1015,9 @@ export default function DddMapper() {
 			</div>
 
 			{/* The legend explains the map's colours, so it goes when the map does. */}
-			{showStore && <StoreState current={keys.doc} onClose={() => setShowStore(false)} />}
+			{showStore && (
+				<StoreState current={keys.doc} onLeaving={flush} onClose={() => setShowStore(false)} />
+			)}
 
 			{panes !== 'source' && <Legend theme={theme} />}
 
@@ -994,6 +1109,15 @@ export default function DddMapper() {
 							onExportSvg={exportSvg}
 							onOpenNode={openModel}
 						/>
+						{document_.nodes.length === 0 && (
+							<EmptyState
+								heading="Nothing open"
+								blurb="A context map is the shape of a business: its domains, the subdomains they divide into, and the bounded contexts that serve them."
+								startLabel="Start a fresh map"
+								onLoadExample={loadExample}
+								onStart={startFresh}
+							/>
+						)}
 						<Inspector
 							document={document_}
 							selected={selected}

@@ -398,6 +398,28 @@ export function inventory(): Inventory {
 }
 
 /**
+ * Delete one document's entries, whichever of the pair exist.
+ *
+ * The store's only destructive operation that a person asks for directly, and
+ * the reason it exists is corruption: an entry that will not parse, a sidecar
+ * whose document is gone, something a half-finished write left behind. Every
+ * other write here is a consequence of typing.
+ *
+ * Takes the entry the inventory produced rather than a name, so what disappears
+ * is exactly what was listed — including the case with no document at all,
+ * which is the one a name could not have addressed.
+ */
+export function removeDocument(entry: StoredDocument): void {
+	try {
+		if (entry.doc) store()?.removeItem(entry.doc.key);
+		if (entry.view) store()?.removeItem(entry.view.key);
+	} catch {
+		// A store that will not delete is a store that will not do anything else
+		// either; the list re-reads after this and will still show the entry.
+	}
+}
+
+/**
  * What the single-slot keys held, read once and then removed.
  *
  * Somebody who had a map open when this shipped should find it open on their
