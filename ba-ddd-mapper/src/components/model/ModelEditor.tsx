@@ -255,6 +255,19 @@ export default function ModelEditor() {
 		setPositions(legacy.positions);
 	}
 
+	/**
+	 * The browser tab says which context this is. See `DddMapper`'s.
+	 *
+	 * `· model` rather than nothing, because the map tab next to it is a `· map`
+	 * and the two names can be the same word: a context called Billing has a
+	 * model, and a map of Billing is a different document.
+	 */
+	useEffect(() => {
+		window.document.title = document_.context
+			? `${document_.context} · model — DDD mapper`
+			: 'Domain model — DDD mapper';
+	}, [document_.context]);
+
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
 			// An empty editor is not a broken model. Parsing it would report that a

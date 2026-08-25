@@ -315,6 +315,23 @@ export default function DddMapper() {
 		setCurves(legacy.view.curves);
 	}
 
+	/**
+	 * The browser tab says which document this is.
+	 *
+	 * Two tabs of the same tool are the ordinary case now — the map, and a
+	 * context's model opened from it — and two tabs both called "DDD mapper" are
+	 * two tabs you have to click to tell apart. The name goes first because a
+	 * tab is about twenty characters wide and truncates from the right.
+	 *
+	 * `document_.title` rather than `mapName`: this is what the visitor sees, so
+	 * it follows the last parse that worked, exactly as the header does.
+	 */
+	useEffect(() => {
+		window.document.title = document_.title
+			? `${document_.title} · map — DDD mapper`
+			: 'DDD mapper — ba-hub';
+	}, [document_.title]);
+
 	// Parse, debounced. A failure keeps the last good document.
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
