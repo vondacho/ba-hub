@@ -10,21 +10,64 @@
  * store all present as a throw from `localStorage`, and none of them should
  * cost the visitor their work — they cost the autosave, which is what the
  * failure banner says.
+ *
+ * ## Keys are filenames
+ *
+ * A document's entries are keyed by what it would be called on disk:
+ *
+ *   `insurance.ddd`       the map's source
+ *   `insurance.dddview`   its arrangement, byte-identical to the sidecar the
+ *                         Save layout button downloads
+ *   `risk-appetite.ddm`   one context's model
+ *   `risk-appetite.ddmview`   its arrangement
+ *
+ * So the store holds documents rather than one slot per page, and a second map
+ * no longer evicts the first. What it costs is a way back in: a reload knows
+ * the visitor's last title only because `LAST_MAP` and `LAST_MODEL` remember
+ * it. Those two are the only keys here that are not a filename, and they carry
+ * the title rather than the key so that both of a document's entries can be
+ * derived from one string.
+ *
+ * The desk keys — theme, split, panes — stay global and stay outside this
+ * scheme. They are properties of the person, not of any document.
  */
 
-const SOURCE = 'ba-ddd-mapper-mapper:source';
+import { slug } from './files';
+import { parseView, serializeView } from './view-file';
+
 const THEME = 'ba-ddd-mapper-mapper:graph-theme';
 const SPLIT = 'ba-ddd-mapper-mapper:split';
 const PANES = 'ba-ddd-mapper-mapper:panes';
-const POSITIONS = 'ba-ddd-mapper-mapper:positions';
-const MODEL_SOURCE = 'ba-ddd-mapper-model:source';
-const MODEL_POSITIONS = 'ba-ddd-mapper-model:positions';
-const CURVES = 'ba-ddd-mapper-mapper:curves';
+const LAST_MAP = 'ba-ddd-mapper:last-map';
+const LAST_MODEL = 'ba-ddd-mapper:last-model';
+
+/** The keys the entries before per-document naming lived under. */
+const LEGACY_SOURCE = 'ba-ddd-mapper-mapper:source';
+const LEGACY_POSITIONS = 'ba-ddd-mapper-mapper:positions';
+const LEGACY_CURVES = 'ba-ddd-mapper-mapper:curves';
+const LEGACY_MODEL_SOURCE = 'ba-ddd-mapper-model:source';
+const LEGACY_MODEL_POSITIONS = 'ba-ddd-mapper-model:positions';
 
 export type GraphTheme = 'light' | 'dark';
 
 /** Which panels are on screen: both, the text alone, or the map alone. */
 export type Panes = 'both' | 'source' | 'graph';
+
+/** A document's two keys, derived from its name exactly as its filenames are. */
+export interface DocumentKeys {
+	readonly doc: string;
+	readonly view: string;
+}
+
+export function mapKeys(title: string): DocumentKeys {
+	const stem = slug(title, 'map');
+	return { doc: `${stem}.ddd`, view: `${stem}.dddview` };
+}
+
+export function modelKeys(context: string): DocumentKeys {
+	const stem = slug(context, 'model');
+	return { doc: `${stem}.ddm`, view: `${stem}.ddmview` };
+}
 
 function store(): Storage | null {
 	try {
@@ -34,21 +77,68 @@ function store(): Storage | null {
 	}
 }
 
-export function saveSource(text: string): boolean {
+export function saveText(key: string, text: string): boolean {
 	try {
-		store()?.setItem(SOURCE, text);
+		store()?.setItem(key, text);
 		return true;
 	} catch {
 		return false;
 	}
 }
 
-export function loadSource(): string | null {
+export function loadText(key: string): string | null {
 	try {
-		return store()?.getItem(SOURCE) ?? null;
+		return store()?.getItem(key) ?? null;
 	} catch {
 		return null;
 	}
+}
+
+/**
+ * Drop a document's entries.
+ *
+ * Called on a rename, which is the one gesture that changes a document's keys
+ * without changing the document: the next autosave writes the new pair, and
+ * without this the old pair would sit there for ever as a copy of the map under
+ * a name nobody uses.
+ */
+export function forget(keys: DocumentKeys): void {
+	try {
+		store()?.removeItem(keys.doc);
+		store()?.removeItem(keys.view);
+	} catch {
+		// Nothing to do about it, and nothing lost that the visitor can see.
+	}
+}
+
+/**
+ * Which document to reopen.
+ *
+ * The title rather than the key, because the keys are derived from it and a
+ * pointer that holds the derived form would have to hold both.
+ */
+export function rememberMap(title: string): void {
+	try {
+		store()?.setItem(LAST_MAP, title);
+	} catch {
+		// Then the next visit opens the sample. Survivable.
+	}
+}
+
+export function lastMap(): string | null {
+	return loadText(LAST_MAP);
+}
+
+export function rememberModel(context: string): void {
+	try {
+		store()?.setItem(LAST_MODEL, context);
+	} catch {
+		// Same.
+	}
+}
+
+export function lastModel(): string | null {
+	return loadText(LAST_MODEL);
 }
 
 /**
@@ -120,28 +210,80 @@ export function saveSplit(percent: number): void {
 	}
 }
 
+export interface MapView {
+	positions: Record<string, { x: number; y: number }>;
+	curves: Record<string, { dx: number; dy: number }>;
+}
+
 /**
- * Node positions the visitor has nudged.
+ * The map's arrangement: node positions the visitor has nudged, and how far
+ * each edge's midpoint has been dragged.
  *
  * View state, deliberately — the same category as the theme and the split, and
  * emphatically **not** part of the document. A `.ddd` file carries no
  * coordinates, so opening one somewhere else shows the computed arrangement;
  * these are one browser's local preference about how to look at it.
  *
+ * Stored as the sidecar file itself rather than as a private shape, which is
+ * what makes `insurance.dddview` in the store and `insurance.dddview` in the
+ * downloads folder the same thing: one format, one parser, one place where a
+ * hand-edited coordinate is checked before it can reach an SVG transform.
+ *
  * Keyed by node id, which is derived from the node's name. Renaming a context
  * therefore drops its override and the box returns to where ELK puts it. That
  * is a small surprise and the alternative — a second identifier that survives a
  * rename — is the thing the format refuses to have.
  */
-export function loadPositions(): Record<string, { x: number; y: number }> {
+export function saveMapView(key: string, title: string, view: MapView): void {
 	try {
-		const raw = store()?.getItem(POSITIONS);
+		if (Object.keys(view.positions).length === 0 && Object.keys(view.curves).length === 0) {
+			store()?.removeItem(key);
+		} else {
+			store()?.setItem(key, serializeView({ ...view, map: title }));
+		}
+	} catch {
+		// A layout that does not persist is a much smaller problem than a crash.
+	}
+}
+
+export function loadMapView(key: string): MapView {
+	const raw = loadText(key);
+	if (raw === null) return { positions: {}, curves: {} };
+	// The title is passed as its own, so the mismatch warning cannot fire: this
+	// entry was written under a key derived from that title.
+	const result = parseView(raw, '');
+	return result.ok ? { positions: result.view.positions, curves: result.view.curves } : { positions: {}, curves: {} };
+}
+
+/**
+ * The domain model's arrangement.
+ *
+ * Plain JSON rather than a sidecar, because `.ddm` has no view file to be
+ * identical to yet. When it grows one this becomes `saveMapView`'s twin.
+ */
+export function saveModelView(key: string, positions: Record<string, { x: number; y: number }>): void {
+	try {
+		if (Object.keys(positions).length === 0) store()?.removeItem(key);
+		else store()?.setItem(key, JSON.stringify(positions));
+	} catch {
+		// As everywhere here: a nudge that does not persist beats a crash.
+	}
+}
+
+export function loadModelView(key: string): Record<string, { x: number; y: number }> {
+	return readPoints(loadText(key));
+}
+
+/**
+ * Coordinates from the store, validated rather than trusted: this came from a
+ * store a user can edit, and one NaN in a transform blanks the whole canvas.
+ */
+function readPoints(raw: string | null): Record<string, { x: number; y: number }> {
+	try {
 		if (!raw) return {};
 		const parsed: unknown = JSON.parse(raw);
 		if (!parsed || typeof parsed !== 'object') return {};
 
-		// Validated rather than trusted: this came from a store a user can edit,
-		// and a NaN reaching the SVG transform silently blanks the whole graph.
 		const clean: Record<string, { x: number; y: number }> = {};
 		for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
 			const point = value as { x?: unknown; y?: unknown };
@@ -155,24 +297,48 @@ export function loadPositions(): Record<string, { x: number; y: number }> {
 	}
 }
 
-export function savePositions(positions: Record<string, { x: number; y: number }>): void {
+/**
+ * What the single-slot keys held, read once and then removed.
+ *
+ * Somebody who had a map open when this shipped should find it open on their
+ * next visit, and the only way to give them that is to read the old keys before
+ * a title is known — the new ones cannot be derived until the source has been
+ * parsed. Read here, held in React state, and written back under the document's
+ * own keys within a second; the removal is what stops it being read a second
+ * time and overwriting whatever the visitor has done since.
+ */
+export function takeLegacyMap(): { source: string; view: MapView } | null {
+	const source = loadText(LEGACY_SOURCE);
+	if (source === null) return null;
+	const view = {
+		positions: readPoints(loadText(LEGACY_POSITIONS)),
+		curves: readCurves(loadText(LEGACY_CURVES)),
+	};
 	try {
-		if (Object.keys(positions).length === 0) store()?.removeItem(POSITIONS);
-		else store()?.setItem(POSITIONS, JSON.stringify(positions));
+		store()?.removeItem(LEGACY_SOURCE);
+		store()?.removeItem(LEGACY_POSITIONS);
+		store()?.removeItem(LEGACY_CURVES);
 	} catch {
-		// A layout that does not persist is a much smaller problem than a crash.
+		// Left behind, and read once more on the next visit. Harmless.
 	}
+	return { source, view };
 }
 
-/**
- * How far each edge's midpoint has been dragged. View state, like the
- * positions above and for the same reason: an edge's shape says nothing the
- * pattern and the direction do not already say, so it has no business in the
- * document.
- */
-export function loadCurves(): Record<string, { dx: number; dy: number }> {
+export function takeLegacyModel(): { source: string; positions: Record<string, { x: number; y: number }> } | null {
+	const source = loadText(LEGACY_MODEL_SOURCE);
+	if (source === null) return null;
+	const positions = readPoints(loadText(LEGACY_MODEL_POSITIONS));
 	try {
-		const raw = store()?.getItem(CURVES);
+		store()?.removeItem(LEGACY_MODEL_SOURCE);
+		store()?.removeItem(LEGACY_MODEL_POSITIONS);
+	} catch {
+		// Same.
+	}
+	return { source, positions };
+}
+
+function readCurves(raw: string | null): Record<string, { dx: number; dy: number }> {
+	try {
 		if (!raw) return {};
 		const parsed: unknown = JSON.parse(raw);
 		if (!parsed || typeof parsed !== 'object') return {};
@@ -185,73 +351,6 @@ export function loadCurves(): Record<string, { dx: number; dy: number }> {
 			}
 		}
 		return clean;
-	} catch {
-		return {};
-	}
-}
-
-export function saveCurves(curves: Record<string, { dx: number; dy: number }>): void {
-	try {
-		if (Object.keys(curves).length === 0) store()?.removeItem(CURVES);
-		else store()?.setItem(CURVES, JSON.stringify(curves));
-	} catch {
-		// Same.
-	}
-}
-
-/**
- * The domain model page's own text and arrangement.
- *
- * Its own keys, because they are its own document. The *theme*, the split and
- * which panes are showing are deliberately **not** duplicated: those are
- * properties of the desk rather than of either document — somebody who wants
- * the text on the left and the picture pinned light wants that in both tools,
- * and making them choose twice would be the two pages admitting they are two
- * programs.
- */
-export function saveModelSource(text: string): boolean {
-	try {
-		store()?.setItem(MODEL_SOURCE, text);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-export function loadModelSource(): string | null {
-	try {
-		return store()?.getItem(MODEL_SOURCE) ?? null;
-	} catch {
-		return null;
-	}
-}
-
-export function saveModelPositions(positions: Record<string, { x: number; y: number }>): void {
-	try {
-		store()?.setItem(MODEL_POSITIONS, JSON.stringify(positions));
-	} catch {
-		// As everywhere here: a nudge that does not persist beats a crash.
-	}
-}
-
-export function loadModelPositions(): Record<string, { x: number; y: number }> {
-	try {
-		const raw = store()?.getItem(MODEL_POSITIONS);
-		if (!raw) return {};
-		const parsed: unknown = JSON.parse(raw);
-		if (typeof parsed !== 'object' || parsed === null) return {};
-
-		const kept: Record<string, { x: number; y: number }> = {};
-		for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
-			if (typeof value !== 'object' || value === null) continue;
-			const { x, y } = value as { x?: unknown; y?: unknown };
-			// Non-finite coordinates are dropped rather than loaded: one NaN in a
-			// transform blanks the whole canvas.
-			if (typeof x === 'number' && typeof y === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
-				kept[id] = { x, y };
-			}
-		}
-		return kept;
 	} catch {
 		return {};
 	}

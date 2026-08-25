@@ -61,18 +61,22 @@ import { useFullscreen } from '../../lib/fullscreen';
 import Icon, { type IconName } from './Icon';
 import IconButton from '../ui/IconButton';
 import {
-	loadCurves,
+	forget,
+	lastMap,
+	loadMapView,
 	loadPanes,
-	loadPositions,
-	loadSource,
 	loadSplit,
+	loadText,
 	loadTheme,
-	saveCurves,
+	mapKeys,
+	rememberMap,
+	saveMapView,
 	savePanes,
-	savePositions,
-	saveSource,
 	saveSplit,
+	saveText,
 	saveTheme,
+	takeLegacyMap,
+	type DocumentKeys,
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
@@ -121,9 +125,12 @@ const PANE_CHOICES: readonly { panes: Panes; icon: IconName; label: string }[] =
 	{ panes: 'graph', icon: 'panes-graph', label: 'Show the map only' },
 ];
 
+/** Parsed once, so the initial document and the initial key agree. */
+const SEED = parse(SAMPLE).document;
+
 export default function DddMapper() {
 	const [source, setSource] = useState(SAMPLE);
-	const [document_, setDocument] = useState<DddDocument>(() => parse(SAMPLE).document);
+	const [document_, setDocument] = useState<DddDocument>(SEED);
 	const [problems, setProblems] = useState<readonly Problem[]>([]);
 	const [stale, setStale] = useState(false);
 	const [layout, setLayout] = useState<Layout | null>(null);
@@ -160,19 +167,74 @@ export default function DddMapper() {
 	 * selection moves, so the field does not grab focus again later.
 	 */
 	const [fresh, setFresh] = useState<string | null>(null);
+	/**
+	 * The name the map's entries are stored under.
+	 *
+	 * `document_.title` almost always, and deliberately not the same variable: a
+	 * source that does not parse leaves `document_` describing the *previous*
+	 * map, and writing this one's text under that one's key would overwrite a
+	 * document the visitor never opened. So this only ever moves on a successful
+	 * parse, or when a stored map is reopened by name.
+	 */
+	const [mapName, setMapName] = useState(SEED.title);
+	/** `<mapName>.ddd` and `<mapName>.dddview` — what it would be called on disk. */
+	const keys = useMemo(() => mapKeys(mapName), [mapName]);
+	const keysRef = useRef<DocumentKeys | null>(null);
+	/**
+	 * Set by the title field alone, and read once by the effect below.
+	 *
+	 * A rename and an Open both change the name the keys derive from, and they
+	 * mean opposite things about the entries under the old name: a rename should
+	 * move them, an Open must leave them exactly where they are, because the map
+	 * they belong to still exists and the visitor has simply gone to another one.
+	 * Nothing in the resulting title distinguishes the two, so the gesture says.
+	 */
+	const renamed = useRef(false);
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
-		const stored = loadSource();
-		if (stored !== null) setSource(stored);
+		restore();
 		setTheme(loadTheme());
 		const storedSplit = loadSplit();
 		if (storedSplit !== null) setSplit(storedSplit);
 		const storedPanes = loadPanes();
 		if (storedPanes !== null) setPanes(storedPanes);
-		setPositions(loadPositions());
-		setCurves(loadCurves());
 	}, []);
+
+	/**
+	 * Reopen the last map, by name.
+	 *
+	 * The keys are derived from the title, so the title has to come from
+	 * somewhere before anything can be read — and the source it would be parsed
+	 * from is the thing being looked for. Hence the pointer. A pointer naming a
+	 * map whose entry has since gone falls through to the sample rather than
+	 * opening a blank editor.
+	 */
+	function restore(): void {
+		const title = lastMap();
+		if (title !== null) {
+			const keys = mapKeys(title);
+			const stored = loadText(keys.doc);
+			if (stored !== null) {
+				keysRef.current = keys;
+				setMapName(title);
+				setSource(stored);
+				const view = loadMapView(keys.view);
+				setPositions(view.positions);
+				setCurves(view.curves);
+				return;
+			}
+		}
+
+		// Nothing under the new naming: this is the first visit since it shipped,
+		// and whatever was in the single-slot keys is the visitor's open map.
+		const legacy = takeLegacyMap();
+		if (legacy) {
+			setSource(legacy.source);
+			setPositions(legacy.view.positions);
+			setCurves(legacy.view.curves);
+		}
+	}
 
 	// Parse, debounced. A failure keeps the last good document.
 	useEffect(() => {
@@ -181,6 +243,7 @@ export default function DddMapper() {
 			setProblems(result.problems);
 			if (result.ok) {
 				setDocument(result.document);
+				setMapName(result.document.title);
 				setStale(false);
 			} else {
 				setStale(true);
@@ -189,11 +252,38 @@ export default function DddMapper() {
 		return () => window.clearTimeout(timer);
 	}, [source]);
 
-	// Autosave, on the same rhythm.
+	// Autosave, on the same rhythm, under the title's own key.
 	useEffect(() => {
-		const timer = window.setTimeout(() => setSaveFailed(!saveSource(source)), 1000);
+		const timer = window.setTimeout(() => {
+			setSaveFailed(!saveText(keys.doc, source));
+			rememberMap(mapName);
+		}, 1000);
 		return () => window.clearTimeout(timer);
-	}, [source]);
+	}, [source, keys.doc, mapName]);
+
+	/**
+	 * A rename moves the entries; an Open leaves them.
+	 *
+	 * Renaming a map changes what it would be called on disk, and the store
+	 * follows the disk. Without the move, `insurance.ddd` would sit there for
+	 * ever as a copy under a name nobody uses, and the arrangement — whose node
+	 * ids survive a *title* change untouched — would be lost to the map that
+	 * kept it.
+	 */
+	useEffect(() => {
+		const previous = keysRef.current;
+		keysRef.current = keys;
+		const wasRename = renamed.current;
+		renamed.current = false;
+		if (!previous || previous.doc === keys.doc || !wasRename) return;
+
+		// The source too, even though the autosave writes it within the second:
+		// a reload in that second should find the map under its new name.
+		const carried = loadText(previous.doc);
+		if (carried !== null) saveText(keys.doc, carried);
+		saveMapView(keys.view, mapName, loadMapView(previous.view));
+		forget(previous);
+	}, [keys, mapName]);
 
 	// Lay out whenever the document changes. Cancelled on the way out so a slow
 	// layout cannot land after a newer one and show an older graph.
@@ -306,16 +396,12 @@ export default function DddMapper() {
 		return { contexts, subdomains, relationships };
 	}, [document_]);
 
-	// Persist positions and curves, debounced — a drag fires these on every frame.
+	// Persist the arrangement, debounced — a drag fires this on every frame. One
+	// key rather than two, because `.dddview` is one file.
 	useEffect(() => {
-		const timer = window.setTimeout(() => savePositions(positions), 400);
+		const timer = window.setTimeout(() => saveMapView(keys.view, mapName, { positions, curves }), 400);
 		return () => window.clearTimeout(timer);
-	}, [positions]);
-
-	useEffect(() => {
-		const timer = window.setTimeout(() => saveCurves(curves), 400);
-		return () => window.clearTimeout(timer);
-	}, [curves]);
+	}, [positions, curves, keys.view, mapName]);
 
 	// ---- creating, deleting, connecting -------------------------------------
 
@@ -572,6 +658,31 @@ export default function DddMapper() {
 		[document_.title],
 	);
 
+	/**
+	 * Export: the map and its sidecar, in one gesture.
+	 *
+	 * Two files because the map *is* two files — `insurance.ddd` and
+	 * `insurance.dddview`, the same pair the store keeps and the same stem — and
+	 * an export that wrote only the first would hand somebody a map that redraws
+	 * to the computed layout, silently dropping an arrangement they had worked
+	 * out. The sidecar is written even when nothing has been dragged: an empty
+	 * one costs nothing and means the export always produces the same two files
+	 * rather than one or two depending on history.
+	 *
+	 * The second download is deferred a beat. Two anchor clicks in the same task
+	 * are treated as one gesture by some browsers, and the one that gets dropped
+	 * is the second.
+	 */
+	const exportMap = useCallback(() => {
+		downloadText(filenameFor(document_.title), source);
+		const sidecar = serializeView({
+			positions: { ...positions },
+			curves: { ...curves },
+			map: document_.title,
+		});
+		window.setTimeout(() => downloadText(viewFilenameFor(document_.title), sidecar), 150);
+	}, [document_.title, source, positions, curves]);
+
 	const saveLayout = useCallback(() => {
 		downloadText(
 			viewFilenameFor(document_.title),
@@ -595,6 +706,7 @@ export default function DddMapper() {
 
 	const onOpen = async (file: File | undefined) => {
 		if (!file) return;
+		renamed.current = false;
 		applyEdit(await readTextFile(file));
 		setSelected(null);
 		// A different map's boxes are not this map's boxes. Keeping the overrides
@@ -617,7 +729,10 @@ export default function DddMapper() {
 				<MapTitle
 					title={document_.title}
 					stale={stale}
-					onRename={(next) => applyEdit(edits.setTitle(source, document_, next))}
+					onRename={(next) => {
+						renamed.current = true;
+						applyEdit(edits.setTitle(source, document_, next));
+					}}
 				/>
 				<span className="text-xs text-ink-muted dark:text-slate-400">
 					{counts.subdomains} subdomains · {counts.contexts} contexts · {counts.relationships}{' '}
@@ -652,8 +767,8 @@ export default function DddMapper() {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this map as a .ddd file"
-						onClick={() => downloadText(filenameFor(document_.title), source)}
+						label="Export this map: a .ddd file and its .dddview sidecar"
+						onClick={exportMap}
 					>
 						<Icon name="export" />
 					</IconButton>

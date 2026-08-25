@@ -34,16 +34,22 @@ import {
 	SVG_EXTENSION,
 } from '../../lib/files';
 import {
-	loadModelPositions,
-	loadModelSource,
+	forget,
+	lastModel,
+	loadModelView,
 	loadPanes,
 	loadSplit,
+	loadText,
 	loadTheme,
-	saveModelPositions,
-	saveModelSource,
+	modelKeys,
+	rememberModel,
+	saveModelView,
 	savePanes,
 	saveSplit,
+	saveText,
 	saveTheme,
+	takeLegacyModel,
+	type DocumentKeys,
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
@@ -58,9 +64,12 @@ const DEBOUNCE_MS = 250;
 const MODEL_EXTENSION = '.ddm';
 const MODEL_ACCEPT = '.ddm,text/plain';
 
+/** Parsed once, so the initial model and the initial key agree. */
+const SEED = parse(SAMPLE).document;
+
 export default function ModelEditor() {
 	const [source, setSource] = useState(SAMPLE);
-	const [document_, setDocument] = useState<DomainModel>(() => parse(SAMPLE).document);
+	const [document_, setDocument] = useState<DomainModel>(SEED);
 	const [problems, setProblems] = useState<readonly Problem[]>([]);
 	const [stale, setStale] = useState(false);
 	const [placement, setPlacement] = useState<Placement | null>(null);
@@ -74,17 +83,58 @@ export default function ModelEditor() {
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
+	/**
+	 * The name the model's entries are stored under: the context it is the
+	 * inside of, which is what it would be called on disk.
+	 *
+	 * Not `document_.context` directly, for the mapper's reason — a source that
+	 * does not parse leaves `document_` describing the previous model, and this
+	 * one's text must not be written under that one's key.
+	 */
+	const [modelName, setModelName] = useState(SEED.context);
+	/** `<modelName>.ddm` and `<modelName>.ddmview`. */
+	const keys = useMemo(() => modelKeys(modelName), [modelName]);
+	const keysRef = useRef<DocumentKeys | null>(null);
+	/** Set by Open alone, and read once by the effect that moves the entries. */
+	const opened = useRef(false);
 
 	useEffect(() => {
-		const stored = loadModelSource();
-		if (stored !== null) setSource(stored);
+		restore();
 		setTheme(loadTheme());
 		const storedSplit = loadSplit();
 		if (storedSplit !== null) setSplit(storedSplit);
 		const storedPanes = loadPanes();
 		if (storedPanes !== null) setPanes(storedPanes);
-		setPositions(loadModelPositions());
 	}, []);
+
+	/**
+	 * Reopen the last model, by the name of its context.
+	 *
+	 * The keys derive from that name, so it has to be known before anything can
+	 * be read — hence the pointer, and hence the fall through to the sample when
+	 * it names a model whose entry has gone.
+	 */
+	function restore(): void {
+		const context = lastModel();
+		if (context !== null) {
+			const found = modelKeys(context);
+			const stored = loadText(found.doc);
+			if (stored !== null) {
+				keysRef.current = found;
+				setModelName(context);
+				setSource(stored);
+				setPositions(loadModelView(found.view));
+				return;
+			}
+		}
+
+		// First visit since the entries stopped being one slot per page.
+		const legacy = takeLegacyModel();
+		if (legacy) {
+			setSource(legacy.source);
+			setPositions(legacy.positions);
+		}
+	}
 
 	useEffect(() => {
 		const timer = window.setTimeout(() => {
@@ -92,6 +142,7 @@ export default function ModelEditor() {
 			setProblems(result.problems);
 			if (result.ok) {
 				setDocument(result.document);
+				setModelName(result.document.context);
 				setStale(false);
 			} else {
 				setStale(true);
@@ -101,14 +152,37 @@ export default function ModelEditor() {
 	}, [source]);
 
 	useEffect(() => {
-		const timer = window.setTimeout(() => setSaveFailed(!saveModelSource(source)), 400);
+		const timer = window.setTimeout(() => {
+			setSaveFailed(!saveText(keys.doc, source));
+			rememberModel(modelName);
+		}, 400);
 		return () => window.clearTimeout(timer);
-	}, [source]);
+	}, [source, keys.doc, modelName]);
 
 	useEffect(() => {
-		const timer = window.setTimeout(() => saveModelPositions({ ...positions }), 400);
+		const timer = window.setTimeout(() => saveModelView(keys.view, { ...positions }), 400);
 		return () => window.clearTimeout(timer);
-	}, [positions]);
+	}, [positions, keys.view]);
+
+	/**
+	 * Renaming the context moves the entries; opening another model leaves them.
+	 *
+	 * The model has no title field of its own — the name is edited in the source
+	 * — so the two are told apart by where the new text came from: `onOpen` says
+	 * so, and everything else is the visitor typing in the context's name.
+	 */
+	useEffect(() => {
+		const previous = keysRef.current;
+		keysRef.current = keys;
+		const wasOpen = opened.current;
+		opened.current = false;
+		if (!previous || previous.doc === keys.doc || wasOpen) return;
+
+		const carried = loadText(previous.doc);
+		if (carried !== null) saveText(keys.doc, carried);
+		saveModelView(keys.view, loadModelView(previous.view));
+		forget(previous);
+	}, [keys]);
 
 	/*
 	 * ELK is asynchronous and a stale answer must not win.
@@ -139,6 +213,9 @@ export default function ModelEditor() {
 
 	const onOpen = async (file: File | undefined) => {
 		if (!file) return;
+		// Another model is another document: the one on screen keeps its entries
+		// under its own name rather than being moved onto this one's.
+		opened.current = true;
 		setSource(await readTextFile(file));
 		setSelected(null);
 		setPositions({});
