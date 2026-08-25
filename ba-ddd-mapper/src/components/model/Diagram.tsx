@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-	AGGREGATE_HEADER,
+	AGGREGATE_RULE,
 	applyPositions,
 	BOX,
 	extentOf,
@@ -416,18 +416,18 @@ function AggregateBox({
 					selected ? 'stroke-violet-600 dark:stroke-violet-300' : 'stroke-violet-400 dark:stroke-violet-700'
 				}`}
 			/>
-			<text x={16} y={26} className="pointer-events-none fill-violet-900 text-[15px] font-semibold dark:fill-violet-200">
+			<text x={16} y={35} className="pointer-events-none fill-violet-900 text-[15px] font-semibold dark:fill-violet-200">
 				{aggregate.name}
 			</text>
-			<text x={16} y={43} className="pointer-events-none fill-violet-700 text-[11px] dark:fill-violet-400">
+			<text x={16} y={52} className="pointer-events-none fill-violet-700 text-[11px] dark:fill-violet-400">
 				{/* From the sizer, which reserved room for exactly this string. */}
 				{subtitleOf(aggregate)}
 			</text>
 			<line
 				x1={0}
-				y1={AGGREGATE_HEADER - 6}
+				y1={AGGREGATE_RULE}
 				x2={box.width}
-				y2={AGGREGATE_HEADER - 6}
+				y2={AGGREGATE_RULE}
 				className="stroke-violet-300 dark:stroke-violet-800"
 				strokeWidth={1}
 			/>

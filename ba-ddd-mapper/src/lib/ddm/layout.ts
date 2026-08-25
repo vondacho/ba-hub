@@ -25,6 +25,14 @@
  * **ELK gives children coordinates relative to their parent**, and everything
  * downstream — dragging, routing, the minimap, the exporter — works in one flat
  * space. They are absolutised on the way out, once, here.
+ *
+ * **It lays out rightwards.** The map runs downwards and comes out wide anyway,
+ * because its shape is broad rather than deep: one domain over a handful of
+ * subdomains over their contexts, three tiers and done. A model's shape is the
+ * other way round — an aggregate over its members, referencing an aggregate
+ * over its members — so laying it downwards spends the height on a chain and
+ * leaves the board's width empty. Turning the layering on its side spends the
+ * width on the chain instead, which is the dimension a screen has to spare.
  */
 
 import ELK, { type ElkExtendedEdge, type ElkNode } from 'elkjs/lib/elk.bundled.js';
@@ -143,8 +151,25 @@ export function stereotypeOf(member: Member): string {
  *
  * Grown with the class boxes: an aggregate whose title is smaller than the
  * titles of the classes inside it reads as one of them.
+ *
+ * The arithmetic, top to bottom, and `Diagram.tsx` draws to these numbers:
+ *
+ *   20  above the name, so the title is not sitting on the border
+ *   15  the name itself, baseline at 35
+ *    6  gap
+ *   11  the subtitle, baseline at 52
+ *   13  gap, then the rule at 65
+ *   15  below the rule, before the first member
+ *
+ * The last two are the point of the height. A header that clears the text and
+ * nothing more makes the first class look like the aggregate's own first
+ * attribute, which is precisely the reading the box exists to prevent: the
+ * boundary is a container, and a container has to look like one.
  */
-export const AGGREGATE_HEADER = 54;
+export const AGGREGATE_HEADER = 80;
+
+/** Where the rule under an aggregate's name sits, measured from its top. */
+export const AGGREGATE_RULE = AGGREGATE_HEADER - 15;
 
 /** The gap between a member and its aggregate's border, on the other three sides. */
 export const AGGREGATE_PAD = 18;
@@ -185,17 +210,22 @@ export async function layout(document: DomainModel): Promise<Placement> {
 			id: aggregate.id,
 			layoutOptions: {
 				'elk.algorithm': 'layered',
-				'elk.direction': 'DOWN',
+				'elk.direction': 'RIGHT',
 				'elk.padding': `[top=${AGGREGATE_HEADER},left=${AGGREGATE_PAD},bottom=${AGGREGATE_PAD},right=${AGGREGATE_PAD}]`,
-				'elk.spacing.nodeNode': '24',
-				'elk.layered.spacing.nodeNodeBetweenLayers': '34',
+				// Room for what runs between them. A diamond is 14 long before the
+				// line even starts, and the multiplicity sits beside the far end, so
+				// a gap sized to keep boxes apart leaves the notation stacked on top
+				// of the boxes it describes. This is sized for the notation.
+				'elk.spacing.nodeNode': '32',
+				'elk.layered.spacing.nodeNodeBetweenLayers': '68',
 			},
 			children: (inside.get(aggregate.id) ?? []).map<ElkNode>((member) => ({
 				id: member.id,
 				...sizeOf(member),
-				// The root goes on top of its own aggregate, always. It is the way
-				// in, and a box you enter through drawn below the things it owns
-				// reads as one of them.
+				// The root leads its own aggregate, always. It is the way in, and a
+				// box you enter through drawn after the things it owns reads as one
+				// of them. Laying out rightwards, leading means leftmost — the same
+				// constraint, read in the direction the eye is already going.
 				...(member.kind === 'entity' && member.root
 					? { layoutOptions: { 'elk.layered.layering.layerConstraint': 'FIRST' } }
 					: {}),
@@ -208,7 +238,9 @@ export async function layout(document: DomainModel): Promise<Placement> {
 		id: 'root',
 		layoutOptions: {
 			'elk.algorithm': 'layered',
-			'elk.direction': 'DOWN',
+			// Rightwards: see the note at the top of this file. The chain is the
+			// long dimension of a model, and width is what a board has spare.
+			'elk.direction': 'RIGHT',
 			// Without this a `references` from an entity to another aggregate is
 			// an edge between two different levels of the tree, which the layered
 			// algorithm will not route — the boxes end up placed as though the

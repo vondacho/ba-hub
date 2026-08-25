@@ -18,18 +18,67 @@
  * Routed as orthogonal polylines rather than the map's bows. A class diagram is
  * read as a structure, and a structure drawn with swooping arcs reads as a
  * network; right angles are what make it look like the thing it is.
+ *
+ * ## The side is the whole routing decision
+ *
+ * Everything here follows from *which side of the box a line leaves through*.
+ * The exit point is on that side, the first segment runs along that side's
+ * outward normal, and the diamond is rotated to the same normal — so it sits
+ * flat against the edge with the line running straight out of its tip.
+ *
+ * Deriving those three from one another is the fix for a bug that read as
+ * "the diamonds are slightly rotated". The angle used to be taken from the
+ * straight line between the two box centres, while the path drawn was an
+ * elbow that left vertically or horizontally. The two agreed only when the
+ * boxes happened to be aligned, and everywhere else the marker pointed a few
+ * degrees off the line it was supposed to cap.
  */
 
 import type { Link } from './model';
 import type { PlacedBox } from './layout';
+
+/** Which side of a box a line leaves or arrives through. */
+type Side = 'top' | 'right' | 'bottom' | 'left';
+
+interface Point {
+	readonly x: number;
+	readonly y: number;
+}
+
+interface Exit extends Point {
+	readonly side: Side;
+}
+
+/** Degrees, clockwise from east — SVG's convention, and `rotate()`'s. */
+const NORMAL: Record<Side, number> = { right: 0, bottom: 90, left: 180, top: -90 };
+
+/** Unit outward vectors, the same four facts in the form the router needs. */
+const OUTWARD: Record<Side, Point> = {
+	right: { x: 1, y: 0 },
+	bottom: { x: 0, y: 1 },
+	left: { x: -1, y: 0 },
+	top: { x: 0, y: -1 },
+};
+
+/**
+ * How far a line runs straight out of a box before it may turn.
+ *
+ * The diamond's own length, so the line starts at the back of the marker
+ * rather than underneath it — and, more importantly, so the first segment is
+ * *always* the side's normal. Without it the first segment is only usually the
+ * normal, and "usually" is what a rotated diamond looks like: on overlapping
+ * boxes the turn can fall behind the exit, and the line then leaves in the
+ * opposite direction to the marker capping it.
+ */
+const STUB = 14;
 
 export interface RoutedLink {
 	readonly id: string;
 	readonly link: Link;
 	readonly path: string;
 	/** Where the diamond or arrowhead sits, and which way it points. */
-	readonly from: { x: number; y: number };
-	readonly to: { x: number; y: number };
+	readonly from: Point;
+	readonly to: Point;
 	readonly angle: number;
 	readonly label?: { x: number; y: number; text: string };
 }
@@ -47,7 +96,12 @@ export function routeLinks(
 		if (!from || !to) return [];
 
 		const start = border(from, centre(to));
-		const end = border(to, centre(from));
+		// Faced at the line's actual origin rather than at the other box's centre.
+		// The two agree everywhere the boxes are apart, and where they overlap —
+		// a member dragged clear of its aggregate, whose boundary then reflows
+		// around a neighbour — only this one still names a side the line can
+		// plausibly arrive through.
+		const end = border(to, start);
 		const path = elbow(start, end);
 
 		const mark = marks[link.multiplicity];
@@ -58,16 +112,16 @@ export function routeLinks(
 				path,
 				from: start,
 				to: end,
-				angle: (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI,
+				// The side's outward normal, not the direction of the far box. The
+				// first segment of the path runs along exactly this, so the diamond
+				// caps the line rather than crossing it at an angle.
+				angle: NORMAL[start.side],
 				...(mark && mark !== '1'
 					? {
-							label: {
-								// On the target end, where UML puts multiplicity: it
-								// says how many of *that* the owner has.
-								x: end.x + (end.x > start.x ? -14 : 14),
-								y: end.y + (end.y > start.y ? -8 : 14),
-								text: mark,
-							},
+							// On the target end, where UML puts multiplicity: it says
+							// how many of *that* the owner has. Placed off the side the
+							// line arrives through, so it never lands on the box.
+							label: { ...labelAt(end), text: mark },
 						}
 					: {}),
 			},
@@ -76,42 +130,88 @@ export function routeLinks(
 }
 
 /**
- * An orthogonal path with one turn, biased to leave the way the boxes lie.
+ * An orthogonal path leaving and arriving perpendicular to the sides it uses.
  *
- * One turn rather than a routed channel: with the boxes laid out in layers the
- * simple elbow lands cleanly almost always, and a real orthogonal router is a
- * lot of code to remove the "almost".
+ * Three shapes, chosen by the two sides rather than by the geometry:
+ *
+ *   both horizontal   a Z. Out sideways, across at the midpoint, in sideways.
+ *   both vertical     the same, turned a quarter.
+ *   one of each       an L. One turn, and it arrives square either way.
+ *
+ * Deciding from the sides rather than from `dx` and `dy` is what keeps the
+ * first segment collinear with the marker at its tip — the sides were already
+ * chosen to face each other, so the path that follows them is also the short
+ * one.
  */
-function elbow(start: { x: number; y: number }, end: { x: number; y: number }): string {
-	const dx = Math.abs(end.x - start.x);
-	const dy = Math.abs(end.y - start.y);
+function elbow(start: Exit, end: Exit): string {
+	const from = horizontal(start.side);
+	const to = horizontal(end.side);
 
-	if (dx < 2 || dy < 2) return `M ${r(start.x)} ${r(start.y)} L ${r(end.x)} ${r(end.y)}`;
+	const turns: Point[] =
+		from && to
+			? [{ x: (start.x + end.x) / 2, y: start.y }, { x: (start.x + end.x) / 2, y: end.y }]
+			: !from && !to
+				? [{ x: start.x, y: (start.y + end.y) / 2 }, { x: end.x, y: (start.y + end.y) / 2 }]
+				: from
+					? [{ x: end.x, y: start.y }]
+					: [{ x: start.x, y: end.y }];
 
-	// Turn on the long axis, so the line leaves its box perpendicular to the
-	// side it left — which is what makes a diamond sit flat against the edge.
-	const mid = dy >= dx ? { x: start.x, y: (start.y + end.y) / 2 } : { x: (start.x + end.x) / 2, y: start.y };
-	const second = dy >= dx ? { x: end.x, y: mid.y } : { x: mid.x, y: end.y };
+	// A turn on top of an end is not a turn: it happens whenever the boxes line
+	// up, and drawing it costs a zero-length segment that some renderers cap
+	// with a stray marker.
+	// The stub comes before any turn, which is what makes the marker's angle a
+	// fact about the path rather than a guess about it. Where the turn is ahead
+	// of the stub — every ordinary arrangement — the two are collinear and it
+	// costs nothing but a vertex.
+	const stub: Point = {
+		x: start.x + OUTWARD[start.side].x * STUB,
+		y: start.y + OUTWARD[start.side].y * STUB,
+	};
 
-	return `M ${r(start.x)} ${r(start.y)} L ${r(mid.x)} ${r(mid.y)} L ${r(second.x)} ${r(second.y)} L ${r(end.x)} ${r(end.y)}`;
+	const points = [start, stub, ...turns, end].filter(
+		(point, index, all) => index === 0 || Math.hypot(point.x - all[index - 1]!.x, point.y - all[index - 1]!.y) > 1,
+	);
+
+	return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${r(point.x)} ${r(point.y)}`).join(' ');
 }
 
-function centre(box: PlacedBox): { x: number; y: number } {
+function horizontal(side: Side): boolean {
+	return side === 'left' || side === 'right';
+}
+
+/** Just outside the box, on the side the line arrives through. */
+function labelAt(end: Exit): Point {
+	if (end.side === 'left') return { x: end.x - 14, y: end.y - 7 };
+	if (end.side === 'right') return { x: end.x + 14, y: end.y - 7 };
+	if (end.side === 'top') return { x: end.x + 14, y: end.y - 7 };
+	return { x: end.x + 14, y: end.y + 15 };
+}
+
+function centre(box: PlacedBox): Point {
 	return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-/** Where the line from the middle of `box` towards `towards` leaves it. */
-function border(box: PlacedBox, towards: { x: number; y: number }): { x: number; y: number } {
+/**
+ * Where the line from the middle of `box` towards `towards` leaves it, and
+ * through which side.
+ *
+ * Radial rather than "the middle of the nearest side", so several links out of
+ * one box fan across its edge instead of stacking their diamonds on one point.
+ * The side falls out of the same arithmetic: whichever half-extent the ray ran
+ * out of first is the side it crossed.
+ */
+function border(box: PlacedBox, towards: Point): Exit {
 	const middle = centre(box);
 	const dx = towards.x - middle.x;
 	const dy = towards.y - middle.y;
-	if (dx === 0 && dy === 0) return middle;
+	if (dx === 0 && dy === 0) return { ...middle, side: 'right' };
 
 	const scaleX = dx === 0 ? Infinity : box.width / 2 / Math.abs(dx);
 	const scaleY = dy === 0 ? Infinity : box.height / 2 / Math.abs(dy);
 	const scale = Math.min(scaleX, scaleY);
+	const side: Side = scaleX <= scaleY ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'bottom' : 'top';
 
-	return { x: middle.x + dx * scale, y: middle.y + dy * scale };
+	return { x: middle.x + dx * scale, y: middle.y + dy * scale, side };
 }
 
 function r(value: number): number {
