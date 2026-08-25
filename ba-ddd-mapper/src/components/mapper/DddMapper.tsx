@@ -84,6 +84,7 @@ import {
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
+import StoreState from '../ui/StoreState';
 import Editor from './Editor';
 import Graph from './Graph';
 import Inspector from './Inspector';
@@ -204,6 +205,8 @@ export default function DddMapper() {
 	 * Nothing in the resulting title distinguishes the two, so the gesture says.
 	 */
 	const renamed = useRef(false);
+	/** The store panel. Read-only, and read fresh each time it opens. */
+	const [showStore, setShowStore] = useState(false);
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
@@ -847,6 +850,12 @@ export default function DddMapper() {
 						<Icon name="export" />
 					</IconButton>
 					<IconButton
+						label="What this browser is holding"
+						onClick={() => setShowStore(true)}
+					>
+						<Icon name="store" />
+					</IconButton>
+					<IconButton
 						label="Replace with the sample map"
 						onClick={() => {
 							applyEdit(SAMPLE);
@@ -893,6 +902,8 @@ export default function DddMapper() {
 			</div>
 
 			{/* The legend explains the map's colours, so it goes when the map does. */}
+			{showStore && <StoreState current={keys.doc} onClose={() => setShowStore(false)} />}
+
 			{panes !== 'source' && <Legend theme={theme} />}
 
 			{note && (

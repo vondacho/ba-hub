@@ -56,6 +56,7 @@ import {
 import { seedModel } from '../../lib/ddm/seed';
 import { serializeModelView } from '../../lib/view-file';
 import Editor from '../mapper/Editor';
+import StoreState from '../ui/StoreState';
 import Inspector from './Inspector';
 import { Legend } from './Legend';
 import Icon, { type IconName } from '../mapper/Icon';
@@ -113,6 +114,8 @@ export default function ModelEditor() {
 	const keysRef = useRef<DocumentKeys | null>(null);
 	/** Set by Open alone, and read once by the effect that moves the entries. */
 	const opened = useRef(false);
+	/** The store panel. Read-only, and read fresh each time it opens. */
+	const [showStore, setShowStore] = useState(false);
 
 	useEffect(() => {
 		restore();
@@ -336,6 +339,12 @@ export default function ModelEditor() {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
+						label="What this browser is holding"
+						onClick={() => setShowStore(true)}
+					>
+						<Icon name="store" />
+					</IconButton>
+					<IconButton
 						label="Export this model: a .ddm file and its .ddmview sidecar"
 						onClick={exportModel}
 					>
@@ -380,6 +389,8 @@ export default function ModelEditor() {
 
 			{/* The legend explains the diagram's shapes, so it goes when the diagram
 			    does — the map's rule, in the map's place. */}
+			{showStore && <StoreState current={keys.doc} onClose={() => setShowStore(false)} />}
+
 			{panes !== 'source' && <Legend theme={theme} />}
 
 			<div className="flex min-h-0 flex-1 flex-col lg:flex-row">

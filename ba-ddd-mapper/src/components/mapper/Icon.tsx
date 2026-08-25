@@ -32,7 +32,8 @@ export type IconName =
 	| 'add-context'
 	| 'connect'
 	| 'remove'
-	| 'picture';
+	| 'picture'
+	| 'store';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A tray with an arrow coming *in* — the file comes to you.
@@ -116,6 +117,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
 			<circle cx="4" cy="11.5" r="2" />
 			<circle cx="12" cy="4.5" r="2" />
 			<path d="M5.6 10.1 10.4 6" />
+		</>
+	),
+	// Stacked discs: the drum every interface has meant "stored" with since
+	// before anybody reading this was writing software.
+	store: (
+		<>
+			<ellipse cx="8" cy="4" rx="5" ry="2" />
+			<path d="M3 4v8c0 1.1 2.24 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.24 2 5 2s5-.9 5-2" />
 		</>
 	),
 	// A framed picture: a horizon and a sun, which is the one glyph everybody

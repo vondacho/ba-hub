@@ -236,11 +236,15 @@ export interface MapView {
  */
 export function saveMapView(key: string, title: string, view: MapView): void {
 	try {
-		if (Object.keys(view.positions).length === 0 && Object.keys(view.curves).length === 0) {
-			store()?.removeItem(key);
-		} else {
-			store()?.setItem(key, serializeView({ ...view, map: title }));
-		}
+		// Written whether or not anything has been dragged.
+		//
+		// It used to drop the key when the arrangement was empty, on the theory
+		// that an empty file says nothing. It says one thing, and it is the thing
+		// this pair is for: **the document has a sidecar**. Without it the store
+		// held a `.ddd` and no `.dddview` until the first drag, which made the
+		// two halves of a document look like one document and an accident — and
+		// left Export writing a pair the store had never held.
+		store()?.setItem(key, serializeView({ ...view, map: title }));
 	} catch {
 		// A layout that does not persist is a much smaller problem than a crash.
 	}
@@ -266,8 +270,8 @@ export function saveModelView(
 	positions: Record<string, { x: number; y: number }>,
 ): void {
 	try {
-		if (Object.keys(positions).length === 0) store()?.removeItem(key);
-		else store()?.setItem(key, serializeModelView({ positions, model: context }));
+		// Always, for `saveMapView`'s reason: the pair is the document.
+		store()?.setItem(key, serializeModelView({ positions, model: context }));
 	} catch {
 		// As everywhere here: a nudge that does not persist beats a crash.
 	}
@@ -303,6 +307,94 @@ function readPoints(raw: string | null): Record<string, { x: number; y: number }
 	} catch {
 		return {};
 	}
+}
+
+// ---------------------------------------------------------------------------
+// What is in there
+// ---------------------------------------------------------------------------
+
+/** One document's entries, as the store actually holds them. */
+export interface StoredDocument {
+	/** The shared filename stem: `insurance`, `risk-appetite`. */
+	readonly stem: string;
+	readonly kind: 'map' | 'model';
+	/** Null when only a sidecar is present — an arrangement with nothing to arrange. */
+	readonly doc: { readonly key: string; readonly bytes: number } | null;
+	readonly view: { readonly key: string; readonly bytes: number } | null;
+}
+
+export interface Inventory {
+	readonly documents: readonly StoredDocument[];
+	/** What the documents cost, in UTF-16 units — the unit the quota counts in. */
+	readonly bytes: number;
+}
+
+const EXTENSIONS: Record<string, { kind: 'map' | 'model'; part: 'doc' | 'view' }> = {
+	'.ddd': { kind: 'map', part: 'doc' },
+	'.dddview': { kind: 'map', part: 'view' },
+	'.ddm': { kind: 'model', part: 'doc' },
+	'.ddmview': { kind: 'model', part: 'view' },
+};
+
+/**
+ * The documents this origin holds, and only those.
+ *
+ * The one place that enumerates the store rather than addressing it by name.
+ * Autosave is silent by design — it has to be, or it would be a dialog every
+ * four hundred milliseconds — and the cost of silence is that a visitor has no
+ * idea what has accumulated under their browser. This is the answer to that,
+ * and it is deliberately a *reading*: nothing here writes, and nothing here
+ * deletes.
+ *
+ * Documents only. The theme, the split, which panes are showing and the two
+ * pointers are all in the store as well, and none of them is a thing anybody
+ * opens a panel to look at — they are settings, and a list that mixed them in
+ * with the visitor's work would be a dump of the store rather than an account
+ * of it.
+ *
+ * A `.dddview` whose `.ddd` has gone is listed rather than hidden. It is the
+ * one anomaly this store can produce — a rename that half-succeeded on a full
+ * quota — and a list that quietly omitted it would be a list you could not use
+ * to explain what happened.
+ */
+export function inventory(): Inventory {
+	const from = store();
+	if (!from) return { documents: [], bytes: 0 };
+
+	const documents = new Map<string, { kind: 'map' | 'model'; doc: { key: string; bytes: number } | null; view: { key: string; bytes: number } | null }>();
+	let bytes = 0;
+
+	try {
+		for (let index = 0; index < from.length; index += 1) {
+			const key = from.key(index);
+			if (key === null) continue;
+
+			const extension = Object.keys(EXTENSIONS).find((candidate) => key.endsWith(candidate));
+			// Settings, pointers, and anything another tool put on this origin.
+			if (!extension) continue;
+
+			// UTF-16 code units, which is what the quota is counted in.
+			const size = key.length + (from.getItem(key) ?? '').length;
+			bytes += size;
+
+			const { kind, part } = EXTENSIONS[extension]!;
+			const stem = key.slice(0, -extension.length);
+			const found = documents.get(`${kind}:${stem}`) ?? { kind, doc: null, view: null };
+			found[part] = { key, bytes: size };
+			documents.set(`${kind}:${stem}`, found);
+		}
+	} catch {
+		// A store that throws mid-scan reports what it managed to say.
+	}
+
+	return {
+		documents: [...documents.entries()]
+			.map(([id, found]) => ({ stem: id.slice(id.indexOf(':') + 1), ...found }))
+			// Maps first, then models, each alphabetically: the same order the two
+			// pages sit in, and stable between visits so the list can be scanned.
+			.sort((a, b) => (a.kind === b.kind ? a.stem.localeCompare(b.stem) : a.kind === 'map' ? -1 : 1)),
+		bytes,
+	};
 }
 
 /**
