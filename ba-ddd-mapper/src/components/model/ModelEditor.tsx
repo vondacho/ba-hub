@@ -53,7 +53,7 @@ import {
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
-import { toPuml } from '../../lib/ddm/puml';
+import { seedModel } from '../../lib/ddm/seed';
 import { serializeModelView } from '../../lib/view-file';
 import Editor from '../mapper/Editor';
 import Icon, { type IconName } from '../mapper/Icon';
@@ -67,15 +67,14 @@ const MODEL_EXTENSION = '.ddm';
 const MODEL_ACCEPT = '.ddm,text/plain';
 /** The layout sidecar. See src/lib/view-file.ts for why it is a separate file. */
 const MODEL_VIEW_EXTENSION = '.ddmview';
-const PUML_EXTENSION = '.puml';
 
 /**
  * How far apart the exported files are handed to the browser.
  *
- * Four downloads from one click, and browsers that treat several anchor clicks
- * in the same task as one gesture drop everything after the first. Spacing them
- * is the only reliable answer; a quarter of a second is under notice and well
- * clear of the coalescing window.
+ * Two downloads from one click, and browsers that treat two anchor clicks in
+ * the same task as one gesture drop the second. Spacing them is the only
+ * reliable answer; a quarter of a second is under notice and well clear of the
+ * coalescing window.
  */
 const DOWNLOAD_GAP_MS = 250;
 
@@ -112,10 +111,6 @@ export default function ModelEditor() {
 	const keysRef = useRef<DocumentKeys | null>(null);
 	/** Set by Open alone, and read once by the effect that moves the entries. */
 	const opened = useRef(false);
-	/** Bumped to ask the canvas for the picture. See `exportModel`. */
-	const [svgRequest, setSvgRequest] = useState(0);
-	/** True while the SVG on its way back belongs to a four-file export. */
-	const bundling = useRef(false);
 
 	useEffect(() => {
 		restore();
@@ -127,22 +122,46 @@ export default function ModelEditor() {
 	}, []);
 
 	/**
-	 * Reopen the last model, by the name of its context.
+	 * Open the model this visit is about.
 	 *
-	 * The keys derive from that name, so it has to be known before anything can
-	 * be read — hence the pointer, and hence the fall through to the sample when
-	 * it names a model whose entry has gone.
+	 * Three ways in, in order of how explicitly they were asked for:
+	 *
+	 *   `?context=Risk appetite`  a link from the map, or one somebody pasted.
+	 *                             The name in the URL wins over anything
+	 *                             remembered: it is the request.
+	 *   the pointer               no URL, so the last model worked on.
+	 *   the sample                neither, or a name with nothing stored and no
+	 *                             link that asked for it.
+	 *
+	 * The keys derive from the name, so the name has to be known before anything
+	 * can be read — which is why one arrives rather than being discovered.
 	 */
 	function restore(): void {
-		const context = lastModel();
-		if (context !== null) {
-			const found = modelKeys(context);
+		const asked = new URLSearchParams(window.location.search).get('context');
+		const name = asked ?? lastModel();
+
+		if (name) {
+			const found = modelKeys(name);
 			const stored = loadText(found.doc);
 			if (stored !== null) {
+				// Already written — the nodes and, from the sidecar key, the
+				// arrangement. Arriving from the map must not disturb either.
 				keysRef.current = found;
-				setModelName(context);
+				setModelName(name);
 				setSource(stored);
 				setPositions(loadModelView(found.view));
+				return;
+			}
+
+			if (asked !== null) {
+				// Asked for by name with nothing stored: a context whose model has
+				// not been written yet, reached by a link the map did not seed —
+				// pasted, or typed. The stub is the map's, minus what only the map
+				// knows.
+				keysRef.current = found;
+				setModelName(asked);
+				setSource(seedModel(asked, []));
+				setPositions({});
 				return;
 			}
 		}
@@ -231,22 +250,17 @@ export default function ModelEditor() {
 	);
 
 	/**
-	 * Export: the whole context, in one gesture — four files on one stem.
+	 * Export: the model and its sidecar, in one gesture.
 	 *
-	 *   `risk-appetite.ddm`       the model. The source of truth.
-	 *   `risk-appetite.ddmview`   the arrangement. Optional, and losing it costs
-	 *                             nothing but the arrangement.
-	 *   `risk-appetite.puml`      for whoever renders diagrams in a wiki.
-	 *   `risk-appetite.svg`       the picture as the canvas draws it.
+	 * The map's pair exactly, one zoom level down — `risk-appetite.ddm` and
+	 * `risk-appetite.ddmview`, the same two keys the store holds and the same
+	 * stem. Writing only the first would hand somebody a model that redraws to
+	 * the computed layout, silently dropping an arrangement they had worked out,
+	 * so the sidecar goes out even when nothing has been dragged.
 	 *
-	 * One button rather than four, because they are one thing: a bounded context
-	 * handed to somebody else. The three derived files go out even when nothing
-	 * has been dragged and even when the visitor has never opened the canvas, so
-	 * an export is always the same four files rather than however many the
-	 * session happens to justify.
-	 *
-	 * Only the `.ddm` is authoritative. The other three are renders, and the
-	 * `.puml` says so in its own first line.
+	 * The picture is not here. It belongs to the canvas — it is a copy of the
+	 * live tree rather than a second renderer — and it stays where the thing it
+	 * copies is, on the canvas's own toolbar.
 	 */
 	const exportModel = useCallback(() => {
 		const stem = slug(document_.context, 'model');
@@ -254,21 +268,7 @@ export default function ModelEditor() {
 
 		const sidecar = serializeModelView({ positions: { ...positions }, model: document_.context });
 		window.setTimeout(() => downloadText(`${stem}${MODEL_VIEW_EXTENSION}`, sidecar), DOWNLOAD_GAP_MS);
-
-		const puml = toPuml(document_);
-		window.setTimeout(
-			() => downloadText(`${stem}${PUML_EXTENSION}`, puml, 'text/plain;charset=utf-8'),
-			DOWNLOAD_GAP_MS * 2,
-		);
-
-		// The picture has to come from the canvas, which is the only thing that
-		// knows what the diagram looks like — and which is not mounted at all
-		// when the text is showing alone. So the panes open first: somebody
-		// exporting a diagram is asking for the diagram.
-		if (panes === 'source') setPanes('both');
-		bundling.current = true;
-		setSvgRequest((request) => request + 1);
-	}, [document_, source, positions, panes]);
+	}, [document_.context, source, positions]);
 
 	const onOpen = async (file: File | undefined) => {
 		if (!file) return;
@@ -334,7 +334,7 @@ export default function ModelEditor() {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this context: .ddm, .ddmview, .puml and .svg"
+						label="Export this model: a .ddm file and its .ddmview sidecar"
 						onClick={exportModel}
 					>
 						<Icon name="export" />
@@ -429,20 +429,12 @@ export default function ModelEditor() {
 							onPositions={setPositions}
 							onFullscreen={toggleFullscreen}
 							fullscreen={fullscreen}
-							exportRequest={svgRequest}
-							onExportSvg={(svg) => {
-								const name = `${slug(document_.context, 'model')}${SVG_EXTENSION}`;
-								const write = () => downloadText(name, svg, 'image/svg+xml;charset=utf-8');
-								// The canvas answers within a frame, which would put this on top
-								// of the .ddm. As part of an export it takes the fourth slot; on
-								// its own, from the canvas bar, it is the only file and goes now.
-								if (bundling.current) {
-									bundling.current = false;
-									window.setTimeout(write, DOWNLOAD_GAP_MS * 3);
-								} else {
-									write();
-								}
-							}
+							onExportSvg={(svg) =>
+								downloadText(
+									`${slug(document_.context, 'model')}${SVG_EXTENSION}`,
+									svg,
+									'image/svg+xml;charset=utf-8',
+								)
 							}
 						/>
 					</section>

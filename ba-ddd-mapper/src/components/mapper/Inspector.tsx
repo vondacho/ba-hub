@@ -31,6 +31,7 @@ import {
 } from '../../lib/ddd/model';
 import { removalOf, type EdgeField, type ListField, type ScalarField } from '../../lib/graph/edit';
 import { classificationLabel } from '../../lib/graph/style';
+import { modelHref } from '../../lib/links';
 
 interface Props {
 	document: DddDocument;
@@ -45,6 +46,11 @@ interface Props {
 	setField: (node: Node, field: ScalarField, value: string) => void;
 	setList: (node: Node, field: ListField, values: readonly string[]) => void;
 	setEdgeField: (edge: RelationshipEdge, field: EdgeField, value: string) => void;
+	/**
+	 * Get a context's model ready to be opened — seeding a first one from what
+	 * the map knows. The link itself opens the tab. See `DddMapper`.
+	 */
+	onOpenModel: (id: string) => void;
 	/** True for a node created a moment ago, whose name is a placeholder. */
 	focusName: boolean;
 	removeNode: (node: Node) => void;
@@ -63,6 +69,7 @@ export default function Inspector({
 	setField,
 	setList,
 	setEdgeField,
+	onOpenModel,
 	removeNode,
 	removeServes,
 	focusName,
@@ -205,6 +212,35 @@ export default function Inspector({
 								</Field>
 
 								<Field label="Model status">{node.status}</Field>
+
+								{/*
+								 * The way in.
+								 *
+								 * Under the aggregates and the status on purpose: those two are
+								 * the map's account of the inside of this context — three names
+								 * and a word about how far it has been taken — and this is the
+								 * document that account is a summary of. A reader who has just
+								 * been told there are three aggregates and that the thing is
+								 * "drafted" is exactly the reader who wants to look.
+								 */}
+								<a
+									href={modelHref(node.name)}
+									target="_blank"
+									rel="noopener"
+									// The browser opens the tab from the href; this only gets the
+									// store ready first, which is synchronous. So ⌘-click, middle
+									// click and a plain click all behave the way they do on any
+									// other link, and none of them can race the seeding.
+									onClick={() => onOpenModel(node.id)}
+									className="mt-4 flex w-full items-center justify-between gap-2 rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-200 dark:hover:bg-violet-900"
+								>
+									<span>Open the domain model of “{node.name}”</span>
+									<span aria-hidden="true">→</span>
+								</a>
+								<p className="mt-1 text-[11px] text-ink-muted dark:text-slate-500">
+									One zoom level in: what the aggregates hold, protect and may name.
+									Opens in a new tab, as does double-clicking the box on the map.
+								</p>
 							</>
 						)}
 

@@ -38,3 +38,15 @@ export function archPortalUrl(): string {
     'http://arch-portal.localhost'
   );
 }
+
+/**
+ * The model page, for one bounded context.
+ *
+ * Internal rather than a neighbouring component, and here anyway because this
+ * is where the addresses live. The context travels in the query string because
+ * it is the *name* — the identity in both formats — and not an id: a link that
+ * survives being pasted into a message is worth more than a shorter one.
+ */
+export function modelHref(context: string): string {
+  return `/model?context=${encodeURIComponent(context)}`;
+}

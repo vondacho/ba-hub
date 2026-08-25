@@ -56,6 +56,8 @@ import {
 	VIEW_ACCEPT,
 	viewFilenameFor,
 } from '../../lib/files';
+import { seedModel } from '../../lib/ddm/seed';
+import { modelHref } from '../../lib/links';
 import { parseView, serializeView } from '../../lib/view-file';
 import { useFullscreen } from '../../lib/fullscreen';
 import Icon, { type IconName } from './Icon';
@@ -69,7 +71,9 @@ import {
 	loadText,
 	loadTheme,
 	mapKeys,
+	modelKeys,
 	rememberMap,
+	rememberModel,
 	saveMapView,
 	savePanes,
 	saveSplit,
@@ -122,10 +126,10 @@ const NEW_RELATIONSHIP = { pattern: 'customer-supplier' as const };
 /**
  * How far apart the exported files are handed to the browser.
  *
- * Three downloads from one click, and browsers that treat several anchor clicks
- * in the same task as one gesture drop everything after the first. Spacing them
- * is the only reliable answer; a quarter of a second is under notice and well
- * clear of the coalescing window.
+ * Two downloads from one click, and browsers that treat two anchor clicks in
+ * the same task as one gesture drop the second. Spacing them is the only
+ * reliable answer; a quarter of a second is under notice and well clear of the
+ * coalescing window.
  */
 const DOWNLOAD_GAP_MS = 250;
 
@@ -200,10 +204,6 @@ export default function DddMapper() {
 	 * Nothing in the resulting title distinguishes the two, so the gesture says.
 	 */
 	const renamed = useRef(false);
-	/** Bumped to ask the canvas for the picture. See `exportMap`. */
-	const [svgRequest, setSvgRequest] = useState(0);
-	/** True while the SVG on its way back belongs to a three-file export. */
-	const bundling = useRef(false);
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
@@ -667,39 +667,25 @@ export default function DddMapper() {
 	 */
 	const exportSvg = useCallback(
 		(svg: string) => {
-			const write = () =>
-				downloadText(svgFilenameFor(document_.title), svg, 'image/svg+xml;charset=utf-8');
-			// The canvas answers within a frame, which would put this on top of the
-			// .dddview. As part of an export it takes the third slot; on its own,
-			// from the canvas bar, it is the only file and goes now.
-			if (bundling.current) {
-				bundling.current = false;
-				window.setTimeout(write, DOWNLOAD_GAP_MS * 2);
-			} else {
-				write();
-			}
+			downloadText(svgFilenameFor(document_.title), svg, 'image/svg+xml;charset=utf-8');
 		},
 		[document_.title],
 	);
 
 	/**
-	 * Export: the whole map, in one gesture — three files on one stem.
+	 * Export: the map and its sidecar, in one gesture.
 	 *
-	 *   `insurance.ddd`      the map. The source of truth.
-	 *   `insurance.dddview`  the arrangement. Optional, and losing it costs
-	 *                        nothing but the arrangement.
-	 *   `insurance.svg`      the picture as the canvas draws it.
+	 * Two files because the map *is* two files — `insurance.ddd` and
+	 * `insurance.dddview`, the same pair the store keeps and the same stem — and
+	 * an export that wrote only the first would hand somebody a map that redraws
+	 * to the computed layout, silently dropping an arrangement they had worked
+	 * out. The sidecar goes out even when nothing has been dragged: an empty one
+	 * costs nothing and means an export is always the same two files rather than
+	 * one or two depending on history.
 	 *
-	 * Three rather than the model page's four: there is no `.puml` here, because
-	 * PlantUML draws UML and a context map is not UML. The `.ddm` has classes,
-	 * aggregations and multiplicities that PlantUML was built to render; a map
-	 * has subdomains, straddles and nine strategic patterns that it would have
-	 * to be talked into, and the picture that came back would be a worse map
-	 * than the one the canvas already draws.
-	 *
-	 * The sidecar and the picture go out even when nothing has been dragged and
-	 * even when the canvas has never been opened, so an export is always the
-	 * same three files rather than however many the session happens to justify.
+	 * The picture is not here. It belongs to the canvas — it is a copy of the
+	 * live tree rather than a second renderer — and it stays where the thing it
+	 * copies is, on the canvas's own toolbar.
 	 */
 	const exportMap = useCallback(() => {
 		downloadText(filenameFor(document_.title), source);
@@ -710,15 +696,7 @@ export default function DddMapper() {
 			map: document_.title,
 		});
 		window.setTimeout(() => downloadText(viewFilenameFor(document_.title), sidecar), DOWNLOAD_GAP_MS);
-
-		// The picture has to come from the canvas, which is the only thing that
-		// knows what the map looks like — and which is not mounted at all when
-		// the text is showing alone. So the panes open first: somebody exporting
-		// a map is asking for the map.
-		if (panes === 'source') setPanes('both');
-		bundling.current = true;
-		setSvgRequest((request) => request + 1);
-	}, [document_.title, source, positions, curves, panes]);
+	}, [document_.title, source, positions, curves]);
 
 	const saveLayout = useCallback(() => {
 		downloadText(
@@ -726,6 +704,65 @@ export default function DddMapper() {
 			serializeView({ positions: { ...positions }, curves: { ...curves }, map: document_.title }),
 		);
 	}, [document_.title, positions, curves]);
+
+	/**
+	 * Everything that has to be true before the model page opens.
+	 *
+	 * The two pages are two documents with different lifetimes — a map covers
+	 * many contexts, a model is the inside of exactly one — and this is the seam
+	 * between them. It carries the *name*, because the name is the identity in
+	 * both formats and is what lets one document be checked against the other
+	 * without either holding a pointer into it.
+	 *
+	 * A model already written for this context is left exactly as it is: the
+	 * store is keyed by name, so the other tab opening `risk-appetite.ddm` finds
+	 * its arrangement too. Only when there is nothing there is a stub written —
+	 * from the map's own knowledge of the context, which is the one moment that
+	 * knowledge is to hand, and the reason the seeding lives on this side.
+	 *
+	 * Returns the address, so the caller that has to open a tab itself can.
+	 */
+	const prepareModel = useCallback(
+		(id: string): string | null => {
+			const node = document_.nodes.find((candidate) => candidate.id === id);
+			// A domain and a subdomain have no inside to open. Nothing happens, and
+			// nothing needs to be said about it: the gesture does not apply.
+			if (node?.kind !== 'context') return null;
+
+			// The map is written out before the other tab exists, not because this
+			// one is going anywhere — it is not — but because both tabs now share
+			// one store, and the model page reads the map's keys on the way in.
+			// A line typed a moment ago should be there when it looks.
+			saveText(keys.doc, source);
+			saveMapView(keys.view, mapName, { positions, curves });
+			rememberMap(mapName);
+
+			const model = modelKeys(node.name);
+			if (loadText(model.doc) === null) {
+				saveText(model.doc, seedModel(node.name, node.aggregates));
+			}
+			rememberModel(node.name);
+			return modelHref(node.name);
+		},
+		[document_, keys, mapName, source, positions, curves],
+	);
+
+	/**
+	 * The double click's way in.
+	 *
+	 * A new tab rather than this one, and the same tab the inspector's link
+	 * opens: the map is where you were, and going one level in to look at a
+	 * context is not usually leaving. `noopener` because the other tab has no
+	 * business reaching back into this one — they talk through the store, which
+	 * is the only channel either of them should have.
+	 */
+	const openModel = useCallback(
+		(id: string) => {
+			const href = prepareModel(id);
+			if (href) window.open(href, '_blank', 'noopener');
+		},
+		[prepareModel],
+	);
 
 	const loadLayout = async (file: File | undefined) => {
 		if (!file) return;
@@ -804,7 +841,7 @@ export default function DddMapper() {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this map: .ddd, .dddview and .svg"
+						label="Export this map: a .ddd file and its .dddview sidecar"
 						onClick={exportMap}
 					>
 						<Icon name="export" />
@@ -944,7 +981,7 @@ export default function DddMapper() {
 							canAdd={canAdd}
 							onConnect={connect}
 							onExportSvg={exportSvg}
-							exportRequest={svgRequest}
+							onOpenNode={openModel}
 						/>
 						<Inspector
 							document={document_}
@@ -961,6 +998,7 @@ export default function DddMapper() {
 							setEdgeField={setEdgeField}
 							removeNode={removeNode}
 							removeServes={removeServes}
+							onOpenModel={prepareModel}
 							focusName={fresh !== null && fresh === selected}
 						/>
 					</section>

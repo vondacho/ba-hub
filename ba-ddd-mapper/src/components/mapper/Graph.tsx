@@ -55,14 +55,14 @@ interface Props {
 	onConnect: (fromId: string, toId: string) => void;
 	onExportSvg: (svg: string) => void;
 	/**
-	 * Bumped by the page when its Export button wants the picture too.
+	 * Open a node's own document — a double click on a context.
 	 *
-	 * The canvas is the only thing that can produce the SVG — it is a copy of
-	 * the live tree, not a second renderer — so an export that includes it has
-	 * to ask rather than compute. A counter rather than a boolean: two exports
-	 * in a row are two requests, and a flag would swallow the second.
+	 * On the node rather than only in the inspector because the gesture already
+	 * means this everywhere else: a double click is how you go *into* the thing
+	 * under the pointer. The page decides what a given node opens, and for
+	 * everything that is not a context the answer is nothing.
 	 */
-	exportRequest: number;
+	onOpenNode: (id: string) => void;
 }
 
 /**
@@ -110,7 +110,7 @@ export default function Graph({
 	canAdd,
 	onConnect,
 	onExportSvg,
-	exportRequest,
+	onOpenNode,
 }: Props) {
 	const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
 	const [size, setSize] = useState({ width: 800, height: 600 });
@@ -281,10 +281,6 @@ export default function Graph({
 		setOrigin(null);
 		setTip(null);
 	}, [connecting, origin, placed]);
-
-	useEffect(() => {
-		if (exportRequest > 0) setExporting(true);
-	}, [exportRequest]);
 
 	useLayoutEffect(() => {
 		if (!exporting) return;
@@ -770,6 +766,7 @@ export default function Graph({
 							classificationOf={classificationOf}
 							onSelect={onSelect}
 							onConnect={connectTo}
+							onOpen={onOpenNode}
 							didDrag={() => draggedLast.current}
 							onGrab={(event) => {
 								const point = toGraph(event.clientX, event.clientY);
@@ -846,6 +843,7 @@ function NodeBox({
 	classificationOf,
 	onSelect,
 	onConnect,
+	onOpen,
 	onGrab,
 	didDrag,
 }: {
@@ -858,6 +856,7 @@ function NodeBox({
 	classificationOf: (id: string) => Classification | null;
 	onSelect: (id: string | null) => void;
 	onConnect: (id: string) => void;
+	onOpen: (id: string) => void;
 	onGrab: (event: React.PointerEvent) => void;
 	/** Did the press this click is ending actually move the box? */
 	didDrag: () => boolean;
@@ -889,6 +888,11 @@ function NodeBox({
 				// every move opens the inspector.
 				if (didDrag()) return;
 				onSelect(selected ? null : node.id);
+			}}
+			onDoubleClick={(event) => {
+				event.stopPropagation();
+				if (connecting) return;
+				onOpen(node.id);
 			}}
 			className={connecting ? 'cursor-crosshair' : 'cursor-move'}
 		>
