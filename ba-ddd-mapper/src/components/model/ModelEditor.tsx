@@ -56,6 +56,7 @@ import {
 import { seedModel } from '../../lib/ddm/seed';
 import { serializeModelView } from '../../lib/view-file';
 import Editor from '../mapper/Editor';
+import Inspector from './Inspector';
 import Icon, { type IconName } from '../mapper/Icon';
 import ProblemList from '../mapper/ProblemList';
 import IconButton from '../ui/IconButton';
@@ -436,6 +437,12 @@ export default function ModelEditor() {
 									'image/svg+xml;charset=utf-8',
 								)
 							}
+						/>
+						<Inspector
+							document={document_}
+							selected={selected}
+							onReveal={reveal}
+							onClose={() => setSelected(null)}
 						/>
 					</section>
 				)}
