@@ -268,6 +268,15 @@ export default function Diagram({
 				aria-label={`Domain model of ${document.context}: ${document.aggregates.length} aggregates, ${document.members.length} classes`}
 			>
 				<defs>
+					{/*
+						The dot grid, the map's exactly. In graph coordinates rather than
+						screen ones, so it pans and zooms with the content — which is what
+						makes the canvas read as a surface things sit on rather than as a
+						texture painted on the window.
+					*/}
+					<pattern id="dots" width={28} height={28} patternUnits="userSpaceOnUse">
+						<circle cx={1.5} cy={1.5} r={1.1} className="fill-slate-300 dark:fill-slate-700" />
+					</pattern>
 					<marker id="open-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
 						<path d="M0 1 L9 5 L0 9" fill="none" className="stroke-slate-500 dark:stroke-slate-400" strokeWidth={1.4} />
 					</marker>
@@ -277,6 +286,26 @@ export default function Diagram({
 					transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}
 					{...{ [VIEWPORT_MARK]: '' }}
 				>
+					{/*
+					   Decorative, and explicitly not a click target: a filled rect over
+					   the canvas is the top hit for every click on empty space, and
+					   clicking the background is how a selection is dropped.
+
+					   Absent from the exported frame. The dots say "this is a surface
+					   you can move things on", which is true of the canvas and not of a
+					   picture in somebody's slide deck.
+					*/}
+					{!exporting && (
+						<rect
+							x={extent.x - 2000}
+							y={extent.y - 2000}
+							width={extent.width + 4000}
+							height={extent.height + 4000}
+							fill="url(#dots)"
+							className="pointer-events-none"
+						/>
+					)}
+
 					{aggregates.map((box) => (
 						<AggregateBox
 							key={box.id}
