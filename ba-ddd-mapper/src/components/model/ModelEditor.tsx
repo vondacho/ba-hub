@@ -57,6 +57,7 @@ import { seedModel } from '../../lib/ddm/seed';
 import { serializeModelView } from '../../lib/view-file';
 import Editor from '../mapper/Editor';
 import Inspector from './Inspector';
+import { Legend } from './Legend';
 import Icon, { type IconName } from '../mapper/Icon';
 import ProblemList from '../mapper/ProblemList';
 import IconButton from '../ui/IconButton';
@@ -376,6 +377,10 @@ export default function ModelEditor() {
 					className="hidden"
 				/>
 			</div>
+
+			{/* The legend explains the diagram's shapes, so it goes when the diagram
+			    does — the map's rule, in the map's place. */}
+			{panes !== 'source' && <Legend theme={theme} />}
 
 			<div className="flex min-h-0 flex-1 flex-col lg:flex-row">
 				{panes !== 'graph' && (

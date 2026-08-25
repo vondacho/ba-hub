@@ -30,6 +30,7 @@ import {
 } from '../../lib/ddm/layout';
 import { multiplicityMark, type AggregateNode, type DomainModel, type Member } from '../../lib/ddm/model';
 import { routeLinks, type RoutedLink } from '../../lib/ddm/route';
+import { paint } from '../../lib/ddm/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar from '../mapper/CanvasBar';
 
@@ -412,11 +413,13 @@ function AggregateBox({
 				rx={16}
 				strokeWidth={selected ? 3 : 1.5}
 				strokeDasharray="7 5"
+				// The boundary's violet is the map's core violet, one tint lighter in
+				// the fill so the root box sitting on it stays the darker of the two.
 				className={`fill-violet-50/70 dark:fill-violet-950/40 ${
-					selected ? 'stroke-violet-600 dark:stroke-violet-300' : 'stroke-violet-400 dark:stroke-violet-700'
+					selected ? 'stroke-violet-600 dark:stroke-violet-300' : 'stroke-violet-600 dark:stroke-violet-700'
 				}`}
 			/>
-			<text x={16} y={35} className="pointer-events-none fill-violet-900 text-[15px] font-semibold dark:fill-violet-200">
+			<text x={16} y={35} className="pointer-events-none fill-violet-950 text-[15px] font-semibold dark:fill-violet-200">
 				{aggregate.name}
 			</text>
 			<text x={16} y={52} className="pointer-events-none fill-violet-700 text-[11px] dark:fill-violet-400">
@@ -521,25 +524,6 @@ function MemberBox({
 			)}
 		</g>
 	);
-}
-
-/**
- * The palette says what a thing is, and it is the map's palette one zoom level
- * down: violet for the part that carries the modelling weight, grey for the
- * part that should not. An aggregate root is the violet one here, for the same
- * reason a core subdomain is violet there.
- */
-function paint(member: Member): string {
-	if (member.kind === 'entity' && member.root) {
-		return 'fill-violet-100 stroke-violet-500 dark:fill-violet-950 dark:stroke-violet-400';
-	}
-	if (member.kind === 'entity') {
-		return 'fill-sky-50 stroke-sky-400 dark:fill-sky-950 dark:stroke-sky-600';
-	}
-	if (member.kind === 'enum') {
-		return 'fill-slate-50 stroke-slate-400 dark:fill-slate-900 dark:stroke-slate-600';
-	}
-	return 'fill-white stroke-slate-400 dark:fill-slate-900 dark:stroke-slate-600';
 }
 
 /**
