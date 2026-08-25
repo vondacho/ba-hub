@@ -479,14 +479,11 @@ export default function ModelEditor() {
 				</span>
 
 				<span className="ml-auto flex flex-wrap items-center gap-2">
-					{saveFailed && (
-						<span className="text-xs text-amber-700 dark:text-amber-400">
-							Not saving in this browser
-						</span>
-					)}
-					{/* The map's toolbar, button for button: the two editors are one
-					    tool, and a control that means the same thing should look the
-					    same and sit in the same place in both. */}
+					{/* The map's toolbar, button for button and in its order: the two
+					    editors are one tool, and a control that means the same thing
+					    should look the same and sit in the same place in both. The
+					    layout picker leads, because it decides what the rest are even
+					    acting on. */}
 					<span role="group" aria-label="Panels" className="flex items-center gap-1">
 						{PANE_CHOICES.map((choice) => (
 							<IconButton
@@ -503,14 +500,13 @@ export default function ModelEditor() {
 						))}
 					</span>
 
+					{saveFailed && (
+						<span className="text-xs text-amber-700 dark:text-amber-400">
+							Not saving in this browser
+						</span>
+					)}
 					<IconButton label="Open a .ddm model" onClick={() => fileInput.current?.click()}>
 						<Icon name="open" />
-					</IconButton>
-					<IconButton
-						label="What this browser is holding"
-						onClick={() => setShowStore(true)}
-					>
-						<Icon name="store" />
 					</IconButton>
 					<IconButton
 						label="Export this model: a .ddm file and its .ddmview sidecar"
@@ -518,14 +514,14 @@ export default function ModelEditor() {
 					>
 						<Icon name="export" />
 					</IconButton>
-					<IconButton
-						label="Replace with the sample model"
-						onClick={() => {
-							setSource(SAMPLE);
-							setSelected(null);
-							setPositions({});
-						}}
-					>
+					<IconButton label="What this browser is holding" onClick={() => setShowStore(true)}>
+						<Icon name="store" />
+					</IconButton>
+					{/* The same path the empty state's button takes. Setting the source
+					    here directly used to skip the load flag, which made replacing
+					    this model with the example look like a rename of it — and a
+					    rename moves the entries of whatever was open. */}
+					<IconButton label="Replace with the sample model" onClick={loadExample}>
 						<Icon name="sample" />
 					</IconButton>
 					<IconButton
