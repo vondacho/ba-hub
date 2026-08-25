@@ -1,5 +1,5 @@
 /**
- * The view file: `.dddview`.
+ * The view files: `.dddview` for the map, `.ddmview` for the model.
  *
  * Positions and edge curvature, as a file you can keep.
  *
@@ -107,4 +107,88 @@ export function parseView(text: string, currentMap: string): ViewParse {
 
 function asObject(value: unknown): Record<string, unknown> {
 	return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+}
+
+// ---------------------------------------------------------------------------
+// The model's sidecar: `.ddmview`
+// ---------------------------------------------------------------------------
+
+/**
+ * The same idea one zoom level down, and it lives here rather than in a file of
+ * its own so that "a coordinate from outside is checked before it reaches a
+ * transform" stays one rule in one place.
+ *
+ *   `risk-appetite.ddm`      the model. Reviewed, diffed, argued about.
+ *   `risk-appetite.ddmview`  how one person likes to look at it. Optional.
+ *
+ * Positions only: a class diagram's links are routed, not dragged, so there is
+ * no `curves` to keep. If they ever become draggable this grows the field and
+ * the version.
+ *
+ * The context name is carried for the reason the map's title is — so that a
+ * view built for another model can say so rather than scattering one model's
+ * boxes across coordinates computed for another.
+ */
+export interface ModelViewFile {
+	positions: Record<string, { x: number; y: number }>;
+	/** The bounded context this arrangement was made for. */
+	model: string;
+}
+
+const MODEL_FORMAT = 'ba-ddd-mapper-model-view';
+
+export function serializeModelView(view: ModelViewFile): string {
+	return `${JSON.stringify(
+		{ format: MODEL_FORMAT, version: VERSION, model: view.model, positions: view.positions },
+		null,
+		2,
+	)}\n`;
+}
+
+export type ModelViewParse =
+	| { ok: true; view: ModelViewFile; warning?: string }
+	| { ok: false; error: string };
+
+export function parseModelView(text: string, currentModel: string): ModelViewParse {
+	let raw: unknown;
+	try {
+		raw = JSON.parse(text);
+	} catch {
+		return { ok: false, error: 'Not valid JSON — a .ddmview file is JSON, not a .ddm model.' };
+	}
+
+	if (!raw || typeof raw !== 'object') {
+		return { ok: false, error: 'Not a view file.' };
+	}
+
+	const record = raw as Record<string, unknown>;
+	if (record.format !== MODEL_FORMAT) {
+		return {
+			ok: false,
+			error: 'Not a model view file — it has no `"format": "ba-ddd-mapper-model-view"`. A .ddm model goes in Open, not here.',
+		};
+	}
+	if (typeof record.version !== 'number' || record.version > VERSION) {
+		return { ok: false, error: `View format version ${String(record.version)} is newer than this build understands.` };
+	}
+
+	const positions: Record<string, { x: number; y: number }> = {};
+	for (const [id, value] of Object.entries(asObject(record.positions))) {
+		const point = value as { x?: unknown; y?: unknown };
+		if (Number.isFinite(point?.x) && Number.isFinite(point?.y)) {
+			positions[id] = { x: Number(point.x), y: Number(point.y) };
+		}
+	}
+
+	const model = typeof record.model === 'string' ? record.model : '';
+
+	// A mismatch is a warning rather than a refusal, as it is for the map: ids
+	// are derived from names, so a view from a renamed or forked model still
+	// lands correctly on everything the two have in common.
+	const warning =
+		model && model !== currentModel
+			? `This view was made for “${model}”, and the open model is “${currentModel}”. Boxes whose names match have moved; the rest are where they were.`
+			: undefined;
+
+	return { ok: true, view: { positions, model }, ...(warning ? { warning } : {}) };
 }

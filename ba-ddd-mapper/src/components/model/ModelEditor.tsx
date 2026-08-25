@@ -53,6 +53,8 @@ import {
 	type GraphTheme,
 	type Panes,
 } from '../../lib/storage';
+import { toPuml } from '../../lib/ddm/puml';
+import { serializeModelView } from '../../lib/view-file';
 import Editor from '../mapper/Editor';
 import Icon, { type IconName } from '../mapper/Icon';
 import ProblemList from '../mapper/ProblemList';
@@ -63,6 +65,19 @@ import Diagram from './Diagram';
 const DEBOUNCE_MS = 250;
 const MODEL_EXTENSION = '.ddm';
 const MODEL_ACCEPT = '.ddm,text/plain';
+/** The layout sidecar. See src/lib/view-file.ts for why it is a separate file. */
+const MODEL_VIEW_EXTENSION = '.ddmview';
+const PUML_EXTENSION = '.puml';
+
+/**
+ * How far apart the exported files are handed to the browser.
+ *
+ * Four downloads from one click, and browsers that treat several anchor clicks
+ * in the same task as one gesture drop everything after the first. Spacing them
+ * is the only reliable answer; a quarter of a second is under notice and well
+ * clear of the coalescing window.
+ */
+const DOWNLOAD_GAP_MS = 250;
 
 /** Parsed once, so the initial model and the initial key agree. */
 const SEED = parse(SAMPLE).document;
@@ -97,6 +112,10 @@ export default function ModelEditor() {
 	const keysRef = useRef<DocumentKeys | null>(null);
 	/** Set by Open alone, and read once by the effect that moves the entries. */
 	const opened = useRef(false);
+	/** Bumped to ask the canvas for the picture. See `exportModel`. */
+	const [svgRequest, setSvgRequest] = useState(0);
+	/** True while the SVG on its way back belongs to a four-file export. */
+	const bundling = useRef(false);
 
 	useEffect(() => {
 		restore();
@@ -160,9 +179,9 @@ export default function ModelEditor() {
 	}, [source, keys.doc, modelName]);
 
 	useEffect(() => {
-		const timer = window.setTimeout(() => saveModelView(keys.view, { ...positions }), 400);
+		const timer = window.setTimeout(() => saveModelView(keys.view, modelName, { ...positions }), 400);
 		return () => window.clearTimeout(timer);
-	}, [positions, keys.view]);
+	}, [positions, keys.view, modelName]);
 
 	/**
 	 * Renaming the context moves the entries; opening another model leaves them.
@@ -180,9 +199,9 @@ export default function ModelEditor() {
 
 		const carried = loadText(previous.doc);
 		if (carried !== null) saveText(keys.doc, carried);
-		saveModelView(keys.view, loadModelView(previous.view));
+		saveModelView(keys.view, modelName, loadModelView(previous.view));
 		forget(previous);
-	}, [keys]);
+	}, [keys, modelName]);
 
 	/*
 	 * ELK is asynchronous and a stale answer must not win.
@@ -210,6 +229,46 @@ export default function ModelEditor() {
 		},
 		[panes],
 	);
+
+	/**
+	 * Export: the whole context, in one gesture — four files on one stem.
+	 *
+	 *   `risk-appetite.ddm`       the model. The source of truth.
+	 *   `risk-appetite.ddmview`   the arrangement. Optional, and losing it costs
+	 *                             nothing but the arrangement.
+	 *   `risk-appetite.puml`      for whoever renders diagrams in a wiki.
+	 *   `risk-appetite.svg`       the picture as the canvas draws it.
+	 *
+	 * One button rather than four, because they are one thing: a bounded context
+	 * handed to somebody else. The three derived files go out even when nothing
+	 * has been dragged and even when the visitor has never opened the canvas, so
+	 * an export is always the same four files rather than however many the
+	 * session happens to justify.
+	 *
+	 * Only the `.ddm` is authoritative. The other three are renders, and the
+	 * `.puml` says so in its own first line.
+	 */
+	const exportModel = useCallback(() => {
+		const stem = slug(document_.context, 'model');
+		downloadText(`${stem}${MODEL_EXTENSION}`, source);
+
+		const sidecar = serializeModelView({ positions: { ...positions }, model: document_.context });
+		window.setTimeout(() => downloadText(`${stem}${MODEL_VIEW_EXTENSION}`, sidecar), DOWNLOAD_GAP_MS);
+
+		const puml = toPuml(document_);
+		window.setTimeout(
+			() => downloadText(`${stem}${PUML_EXTENSION}`, puml, 'text/plain;charset=utf-8'),
+			DOWNLOAD_GAP_MS * 2,
+		);
+
+		// The picture has to come from the canvas, which is the only thing that
+		// knows what the diagram looks like — and which is not mounted at all
+		// when the text is showing alone. So the panes open first: somebody
+		// exporting a diagram is asking for the diagram.
+		if (panes === 'source') setPanes('both');
+		bundling.current = true;
+		setSvgRequest((request) => request + 1);
+	}, [document_, source, positions, panes]);
 
 	const onOpen = async (file: File | undefined) => {
 		if (!file) return;
@@ -275,10 +334,8 @@ export default function ModelEditor() {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this model as a .ddm file"
-						onClick={() =>
-							downloadText(`${slug(document_.context, 'model')}${MODEL_EXTENSION}`, source)
-						}
+						label="Export this context: .ddm, .ddmview, .puml and .svg"
+						onClick={exportModel}
 					>
 						<Icon name="export" />
 					</IconButton>
@@ -372,12 +429,20 @@ export default function ModelEditor() {
 							onPositions={setPositions}
 							onFullscreen={toggleFullscreen}
 							fullscreen={fullscreen}
-							onExportSvg={(svg) =>
-								downloadText(
-									`${slug(document_.context, 'model')}${SVG_EXTENSION}`,
-									svg,
-									'image/svg+xml;charset=utf-8',
-								)
+							exportRequest={svgRequest}
+							onExportSvg={(svg) => {
+								const name = `${slug(document_.context, 'model')}${SVG_EXTENSION}`;
+								const write = () => downloadText(name, svg, 'image/svg+xml;charset=utf-8');
+								// The canvas answers within a frame, which would put this on top
+								// of the .ddm. As part of an export it takes the fourth slot; on
+								// its own, from the canvas bar, it is the only file and goes now.
+								if (bundling.current) {
+									bundling.current = false;
+									window.setTimeout(write, DOWNLOAD_GAP_MS * 3);
+								} else {
+									write();
+								}
+							}
 							}
 						/>
 					</section>

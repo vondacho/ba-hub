@@ -54,6 +54,15 @@ interface Props {
 	/** Draw an edge between two nodes. The parent decides what that means. */
 	onConnect: (fromId: string, toId: string) => void;
 	onExportSvg: (svg: string) => void;
+	/**
+	 * Bumped by the page when its Export button wants the picture too.
+	 *
+	 * The canvas is the only thing that can produce the SVG — it is a copy of
+	 * the live tree, not a second renderer — so an export that includes it has
+	 * to ask rather than compute. A counter rather than a boolean: two exports
+	 * in a row are two requests, and a flag would swallow the second.
+	 */
+	exportRequest: number;
 }
 
 /**
@@ -101,6 +110,7 @@ export default function Graph({
 	canAdd,
 	onConnect,
 	onExportSvg,
+	exportRequest,
 }: Props) {
 	const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
 	const [size, setSize] = useState({ width: 800, height: 600 });
@@ -271,6 +281,10 @@ export default function Graph({
 		setOrigin(null);
 		setTip(null);
 	}, [connecting, origin, placed]);
+
+	useEffect(() => {
+		if (exportRequest > 0) setExporting(true);
+	}, [exportRequest]);
 
 	useLayoutEffect(() => {
 		if (!exporting) return;

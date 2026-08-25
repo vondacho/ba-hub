@@ -119,6 +119,16 @@ const NEW_RELATIONSHIP = { pattern: 'customer-supplier' as const };
  * button. One panel is for the two moments when the other half is in the way:
  * writing a long map on a laptop, and showing the finished one to a room.
  */
+/**
+ * How far apart the exported files are handed to the browser.
+ *
+ * Three downloads from one click, and browsers that treat several anchor clicks
+ * in the same task as one gesture drop everything after the first. Spacing them
+ * is the only reliable answer; a quarter of a second is under notice and well
+ * clear of the coalescing window.
+ */
+const DOWNLOAD_GAP_MS = 250;
+
 const PANE_CHOICES: readonly { panes: Panes; icon: IconName; label: string }[] = [
 	{ panes: 'source', icon: 'panes-source', label: 'Show the source only' },
 	{ panes: 'both', icon: 'panes-both', label: 'Show the source and the map' },
@@ -190,6 +200,10 @@ export default function DddMapper() {
 	 * Nothing in the resulting title distinguishes the two, so the gesture says.
 	 */
 	const renamed = useRef(false);
+	/** Bumped to ask the canvas for the picture. See `exportMap`. */
+	const [svgRequest, setSvgRequest] = useState(0);
+	/** True while the SVG on its way back belongs to a three-file export. */
+	const bundling = useRef(false);
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
@@ -653,35 +667,58 @@ export default function DddMapper() {
 	 */
 	const exportSvg = useCallback(
 		(svg: string) => {
-			downloadText(svgFilenameFor(document_.title), svg, 'image/svg+xml;charset=utf-8');
+			const write = () =>
+				downloadText(svgFilenameFor(document_.title), svg, 'image/svg+xml;charset=utf-8');
+			// The canvas answers within a frame, which would put this on top of the
+			// .dddview. As part of an export it takes the third slot; on its own,
+			// from the canvas bar, it is the only file and goes now.
+			if (bundling.current) {
+				bundling.current = false;
+				window.setTimeout(write, DOWNLOAD_GAP_MS * 2);
+			} else {
+				write();
+			}
 		},
 		[document_.title],
 	);
 
 	/**
-	 * Export: the map and its sidecar, in one gesture.
+	 * Export: the whole map, in one gesture — three files on one stem.
 	 *
-	 * Two files because the map *is* two files — `insurance.ddd` and
-	 * `insurance.dddview`, the same pair the store keeps and the same stem — and
-	 * an export that wrote only the first would hand somebody a map that redraws
-	 * to the computed layout, silently dropping an arrangement they had worked
-	 * out. The sidecar is written even when nothing has been dragged: an empty
-	 * one costs nothing and means the export always produces the same two files
-	 * rather than one or two depending on history.
+	 *   `insurance.ddd`      the map. The source of truth.
+	 *   `insurance.dddview`  the arrangement. Optional, and losing it costs
+	 *                        nothing but the arrangement.
+	 *   `insurance.svg`      the picture as the canvas draws it.
 	 *
-	 * The second download is deferred a beat. Two anchor clicks in the same task
-	 * are treated as one gesture by some browsers, and the one that gets dropped
-	 * is the second.
+	 * Three rather than the model page's four: there is no `.puml` here, because
+	 * PlantUML draws UML and a context map is not UML. The `.ddm` has classes,
+	 * aggregations and multiplicities that PlantUML was built to render; a map
+	 * has subdomains, straddles and nine strategic patterns that it would have
+	 * to be talked into, and the picture that came back would be a worse map
+	 * than the one the canvas already draws.
+	 *
+	 * The sidecar and the picture go out even when nothing has been dragged and
+	 * even when the canvas has never been opened, so an export is always the
+	 * same three files rather than however many the session happens to justify.
 	 */
 	const exportMap = useCallback(() => {
 		downloadText(filenameFor(document_.title), source);
+
 		const sidecar = serializeView({
 			positions: { ...positions },
 			curves: { ...curves },
 			map: document_.title,
 		});
-		window.setTimeout(() => downloadText(viewFilenameFor(document_.title), sidecar), 150);
-	}, [document_.title, source, positions, curves]);
+		window.setTimeout(() => downloadText(viewFilenameFor(document_.title), sidecar), DOWNLOAD_GAP_MS);
+
+		// The picture has to come from the canvas, which is the only thing that
+		// knows what the map looks like — and which is not mounted at all when
+		// the text is showing alone. So the panes open first: somebody exporting
+		// a map is asking for the map.
+		if (panes === 'source') setPanes('both');
+		bundling.current = true;
+		setSvgRequest((request) => request + 1);
+	}, [document_.title, source, positions, curves, panes]);
 
 	const saveLayout = useCallback(() => {
 		downloadText(
@@ -767,7 +804,7 @@ export default function DddMapper() {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this map: a .ddd file and its .dddview sidecar"
+						label="Export this map: .ddd, .dddview and .svg"
 						onClick={exportMap}
 					>
 						<Icon name="export" />
@@ -907,6 +944,7 @@ export default function DddMapper() {
 							canAdd={canAdd}
 							onConnect={connect}
 							onExportSvg={exportSvg}
+							exportRequest={svgRequest}
 						/>
 						<Inspector
 							document={document_}

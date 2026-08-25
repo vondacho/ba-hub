@@ -33,7 +33,7 @@
  */
 
 import { slug } from './files';
-import { parseView, serializeView } from './view-file';
+import { parseModelView, parseView, serializeModelView, serializeView } from './view-file';
 
 const THEME = 'ba-ddd-mapper-mapper:graph-theme';
 const SPLIT = 'ba-ddd-mapper-mapper:split';
@@ -256,22 +256,30 @@ export function loadMapView(key: string): MapView {
 }
 
 /**
- * The domain model's arrangement.
- *
- * Plain JSON rather than a sidecar, because `.ddm` has no view file to be
- * identical to yet. When it grows one this becomes `saveMapView`'s twin.
+ * The domain model's arrangement, `saveMapView`'s twin: the sidecar itself, so
+ * that `risk-appetite.ddmview` in the store and `risk-appetite.ddmview` in the
+ * downloads folder are the same file.
  */
-export function saveModelView(key: string, positions: Record<string, { x: number; y: number }>): void {
+export function saveModelView(
+	key: string,
+	context: string,
+	positions: Record<string, { x: number; y: number }>,
+): void {
 	try {
 		if (Object.keys(positions).length === 0) store()?.removeItem(key);
-		else store()?.setItem(key, JSON.stringify(positions));
+		else store()?.setItem(key, serializeModelView({ positions, model: context }));
 	} catch {
 		// As everywhere here: a nudge that does not persist beats a crash.
 	}
 }
 
 export function loadModelView(key: string): Record<string, { x: number; y: number }> {
-	return readPoints(loadText(key));
+	const raw = loadText(key);
+	if (raw === null) return {};
+	// The context is passed as its own: this entry was written under a key
+	// derived from that name, so the mismatch warning cannot fire.
+	const result = parseModelView(raw, '');
+	return result.ok ? result.view.positions : {};
 }
 
 /**
