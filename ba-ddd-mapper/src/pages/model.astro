@@ -1,10 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import ModelEditor from '../components/model/ModelEditor.tsx';
+import { archPortalUrl, baPortalUrl, eventStormerUrl } from '../lib/links';
 
-// Server-rendered like `/`, for symmetry with it rather than out of need: this
-// page asks the environment for nothing yet, and will once it links back to a
-// context on the map.
+// Server-rendered like `/`, and now for the same reason rather than for
+// symmetry: the footer resolves the neighbouring components' addresses from the
+// environment, which is configuration read per request rather than baked into
+// the image at build time.
+const portal = baPortalUrl();
+const stormer = eventStormerUrl();
+const arch = archPortalUrl();
 ---
 
 <Layout
@@ -17,11 +22,17 @@ import ModelEditor from '../components/model/ModelEditor.tsx';
 				ba-hub · ddd mapper
 			</p>
 			<h1 class="mt-2 text-3xl font-bold sm:text-4xl">The inside of one context</h1>
-			<p class="mt-3 max-w-prose text-ink-muted dark:text-slate-400">
+			{/*
+				Full width, like the map page's, and rewritten for it: the old line
+				was set to `max-w-prose` and wrapped after a third of the screen,
+				which put a ragged column above an editor that runs edge to edge.
+			*/}
+			<p class="mt-3 text-ink-muted dark:text-slate-400">
 				The <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/">map</a>
-				says a context has an aggregate called <code>Submission</code>. This says what
-				<code>Submission</code> is: what it holds, what it protects, and what it is allowed to
-				know about the rest of the world.
+				says a bounded context has an aggregate called <code>Submission</code>; this says what
+				<code>Submission</code> is — the entities and values it holds, the invariants it keeps
+				true across a transaction, and the identities it is allowed to hold across its own
+				boundary.
 			</p>
 		</header>
 
@@ -33,10 +44,28 @@ import ModelEditor from '../components/model/ModelEditor.tsx';
 				<p class="mt-2 max-w-prose text-ink-muted dark:text-slate-400">
 					A diagram is direct manipulation, which is not something a page can do without
 					scripting. The <code>.ddm</code> format is plain text, though, so any editor will do
-					— and the <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/dsl">format page</a>
-					describes the one next door.
+					— and the <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/dsl#ddm">format page</a>
+					documents its grammar.
 				</p>
 			</div>
 		</noscript>
+
+		<footer
+			class="mt-10 border-t border-slate-200 pt-6 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400"
+		>
+			<p>
+				Nothing here is stored on the server — the editor keeps a copy in this browser, and that
+				copy goes no further. The <code>.ddm</code> file you export is the model, and it belongs
+				beside the <a class="font-semibold text-brand underline" href="/" target="_blank" rel="noopener">map</a> that names the
+				context it is the inside of. The practice is written up in the
+				<a class="font-semibold text-brand underline" href={portal} target="_blank" rel="noopener">business analysis hub</a>;
+				the contexts a model goes one level inside are usually found first on a wall in
+				the <a class="font-semibold text-brand underline" href={stormer} target="_blank" rel="noopener">Event Stormer</a>, and
+				what they get realised as lives in
+				the <a class="font-semibold text-brand underline" href={arch} target="_blank" rel="noopener">architecture hub</a>.
+				The <a class="font-semibold text-brand underline" href="/dsl#ddm" target="_blank" rel="noopener">
+					<code>.ddm</code> format is documented</a>.
+			</p>
+		</footer>
 	</main>
 </Layout>

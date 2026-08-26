@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import { PATTERNS, patternAdmits, patternLabel, symmetric } from '../lib/model-reexport';
 import { SAMPLE } from '../lib/ddd/sample';
+import { SAMPLE as MODEL_SAMPLE } from '../lib/ddm/sample';
 
 // Prerendered: the format is prose and asks the server for nothing. It is also
 // the page a reader without scripting is sent to, so it must not depend on an
@@ -16,8 +17,8 @@ const shape: Record<string, string> = {
 ---
 
 <Layout
-	title="The .ddd format — DDD mapper"
-	description="The grammar of a .ddd file: domains, subdomains, bounded contexts, and the nine strategic patterns that tag the relationships between them."
+	title="The .ddd and .ddm formats — DDD mapper"
+	description="The grammar of a .ddd file: domains, subdomains, bounded contexts, and the nine strategic patterns that tag the relationships between them — and of a .ddm file, which is the inside of one of those contexts."
 >
 	<main id="main" class="mx-auto w-full max-w-3xl px-6 py-12">
 		<p class="text-xs font-semibold tracking-[0.16em] text-ink-muted uppercase dark:text-slate-400">
@@ -133,8 +134,79 @@ Because      = 'because'  , String ;`}</code></pre>
 		</p>
 		<pre class="mt-3 max-h-[36rem] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{SAMPLE}</code></pre>
 
+		<h2 id="ddm" class="mt-16 scroll-mt-6 border-t border-slate-200 pt-10 text-2xl font-bold dark:border-slate-700">
+			The <code>.ddm</code> format
+		</h2>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			One zoom level down: a <code>.ddm</code> file is the inside of a single bounded context
+			named on a map. Same discipline — braces, <code>//</code> comments, quoted strings, and
+			the text as the source of truth — and the same claim about names, except that here they
+			are unique within one model rather than one map.
+		</p>
+
+		<h3 class="mt-8 text-lg font-semibold">Grammar</h3>
+		<pre class="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{`File         = Model , EOF ;
+Model        = 'model' , String , '{' , { Aggregate | Value | Enum } , '}' ;
+
+Aggregate    = 'aggregate' , String ,
+               '{' , { Intent | Invariant | Entity | Value | Enum } , '}' ;
+Entity       = [ 'root' ] , 'entity' , String ,
+               [ '{' , { Id | Attribute | Link } , '}' ] ;
+Value        = 'value' , String , [ '{' , { Attribute | Link } , '}' ] ;
+Enum         = 'enum'  , String , '{' , String , { String } , '}' ;
+
+Intent       = 'intent'    , String ;        (* at most one *)
+Invariant    = 'invariant' , String ;        (* repeatable *)
+Id           = 'id'        , String ;        (* the identity type; entities only *)
+Attribute    = 'attribute' , String , ':' , String ;
+
+Link         = ( 'contains' | 'embeds' | 'references' ) , String ,
+               [ Multiplicity ] ;
+Multiplicity = 'one' | 'optional' | 'many' | 'at-least-one' ;  (* default: one *)`}</code></pre>
+
+		<h3 class="mt-8 text-lg font-semibold">The three links</h3>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			<code>contains</code> is composition inside one boundary: the part is created, saved and
+			deleted with the root, and has no life of its own. <code>embeds</code> is a value object
+			or an enumeration, which has no identity and is therefore copied rather than shared.
+			<code>references</code> crosses a boundary <strong>by identity</strong> — it names another
+			aggregate, never something inside one, and holds its id rather than the thing itself. That
+			last rule is what makes an aggregate a consistency boundary rather than a diagram, and the
+			parser enforces it.
+		</p>
+
+		<h3 class="mt-8 text-lg font-semibold">What the parser refuses</h3>
+		<ul class="mt-2 list-disc space-y-1 pl-5 text-ink-muted dark:text-slate-400">
+			<li>
+				A value object with an <code>id</code>. Identity is the whole difference between a value
+				and an entity: two values with the same fields are the same value.
+			</li>
+			<li>
+				A link naming something that is not declared, and a <code>references</code> naming a
+				member instead of the aggregate that owns it.
+			</li>
+			<li>
+				Two declarations sharing a name. Two things called <code>Line</code> in one context is
+				precisely the ubiquitous-language failure this tool exists to surface.
+			</li>
+		</ul>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			It warns, rather than refuses, about the ones that are usually a smell and occasionally the
+			truth: an aggregate with no <code>root</code> or no <code>invariant</code>, a root with no
+			<code>id</code>, and a member nothing inside the aggregate reaches.
+		</p>
+
+		<h3 class="mt-8 text-lg font-semibold">A complete file</h3>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			The example the model editor loads: the inside of <code>Risk appetite</code>, whose
+			aggregates are the ones the map above declares for it.
+		</p>
+		<pre class="mt-3 max-h-[36rem] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{MODEL_SAMPLE}</code></pre>
+
 		<p class="mt-10 text-sm">
 			<a class="font-semibold text-brand underline" href="/">Back to the mapper</a>
+			<span class="mx-2 text-ink-muted dark:text-slate-500">·</span>
+			<a class="font-semibold text-brand underline" href="/model">the model editor</a>
 		</p>
 	</main>
 </Layout>

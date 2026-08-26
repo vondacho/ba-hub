@@ -17,6 +17,18 @@
  */
 
 import { tokenize, type Token } from '../ddd/lexer';
+import {
+	blockEnd,
+	indentBefore,
+	indentInside,
+	lineRegion,
+	openBraceAfter,
+	quote,
+	spaces,
+	splice,
+	spliceAll,
+	step,
+} from '../source';
 import type {
 	ContainmentEdge,
 	DddDocument,
@@ -26,28 +38,6 @@ import type {
 	RelationshipEdge,
 	Span,
 } from '../ddd/model';
-
-/** Replace one span. The single primitive; everything below is built on it. */
-export function splice(source: string, span: Span, replacement: string): string {
-	return source.slice(0, span.start) + replacement + source.slice(span.end);
-}
-
-/**
- * Replace several spans in one pass.
- *
- * Applied right to left so that an earlier edit does not shift the offsets of a
- * later one. Renaming a context needs this — the declaration and every
- * relationship that names it move together, and doing them one at a time
- * against stale spans would corrupt the file.
- */
-export function spliceAll(
-	source: string,
-	edits: readonly { span: Span; replacement: string }[],
-): string {
-	return [...edits]
-		.sort((a, b) => b.span.start - a.span.start)
-		.reduce((text, edit) => splice(text, edit.span, edit.replacement), source);
-}
 
 /**
  * Change the pattern on a relationship.
@@ -243,52 +233,6 @@ function insertIntoBlock(
 	const insertion = blockInsertion(source, node, fragment, options?.asBlock ?? false);
 	if (!insertion) return source;
 	return source.slice(0, insertion.at) + insertion.text + source.slice(insertion.at);
-}
-
-/**
- * Where the block opened at `open` closes, counting nested braces.
- *
- * Strings and comments are skipped rather than counted. A brace inside an
- * `intent` — `"the {invoice} aggregate"` — is text, and a counter that took it
- * for structure would put the end of the block in the wrong place. That is
- * harmless when the answer is only used to bound a search, and it deletes the
- * wrong half of somebody's file when it is used to remove a node.
- */
-function blockEnd(source: string, open: number): number {
-	let depth = 0;
-	let index = open;
-
-	while (index < source.length) {
-		const ch = source[index]!;
-
-		if (ch === '"') {
-			index += 1;
-			while (index < source.length && source[index] !== '"') {
-				index += source[index] === '\\' ? 2 : 1;
-			}
-			index += 1;
-			continue;
-		}
-
-		if (ch === '/' && source[index + 1] === '/') {
-			const newline = source.indexOf('\n', index);
-			if (newline < 0) return source.length;
-			index = newline + 1;
-			continue;
-		}
-
-		if (ch === '{') depth += 1;
-		else if (ch === '}') {
-			depth -= 1;
-			if (depth === 0) return index + 1;
-		}
-		index += 1;
-	}
-	return source.length;
-}
-
-function quote(text: string): string {
-	return `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 // ---------------------------------------------------------------------------
@@ -499,67 +443,6 @@ function declarationSpan(source: string, node: Node): Span {
 	const open = openBraceAfter(source, node.nameSpan.end);
 	const end = open < 0 ? node.nameSpan.end : blockEnd(source, open);
 	return { ...node.span, end };
-}
-
-/** The `{` that opens this declaration's block, or -1 if it has none. */
-function openBraceAfter(source: string, from: number): number {
-	let index = from;
-	while (index < source.length) {
-		const ch = source[index]!;
-		if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') {
-			index += 1;
-			continue;
-		}
-		if (ch === '/' && source[index + 1] === '/') {
-			const newline = source.indexOf('\n', index);
-			if (newline < 0) return -1;
-			index = newline + 1;
-			continue;
-		}
-		return ch === '{' ? index : -1;
-	}
-	return -1;
-}
-
-/**
- * A span grown to the whole lines it sits on, with one blank line above it.
- *
- * Removing a declaration and leaving its indentation, its newline, or the gap
- * that separated it from its neighbour makes an add-then-remove fail to return
- * the file to where it started — every gesture slightly lossy, and the loss
- * accumulating in the diff. This is the rule `removeRelationship` was written
- * with, lifted out so the three deletions share it.
- */
-function lineRegion(source: string, span: Span): Span {
-	let end = span.end;
-	while (end < source.length && (source[end] === ' ' || source[end] === '\t')) end += 1;
-	if (source[end] === '\n') end += 1;
-
-	let start = span.start;
-	while (start > 0 && (source[start - 1] === ' ' || source[start - 1] === '\t')) start -= 1;
-	if (source[start - 1] === '\n' && source[start - 2] === '\n') start -= 1;
-
-	return { ...span, start, end };
-}
-
-/** The indentation used by the lines inside the block opened at `open`. */
-function indentInside(source: string, open: number): string {
-	if (open < 0) return '  ';
-
-	const nextLine = source.indexOf('\n', open);
-	const indent = nextLine < 0 ? '' : (/^[ \t]*/.exec(source.slice(nextLine + 1))?.[0] ?? '');
-
-	// An empty block's next line is its own `}`, whose indentation is the
-	// parent's. One step in from there is where a child belongs.
-	const closes = /^[ \t]*\}/.test(source.slice(nextLine + 1));
-	return closes ? `${indent}  ` : indent;
-}
-
-/** The whitespace between the start of `at`'s line and `at` itself. */
-function indentBefore(source: string, at: number): string {
-	let start = at;
-	while (start > 0 && (source[start - 1] === ' ' || source[start - 1] === '\t')) start -= 1;
-	return source.slice(start, at);
 }
 
 /**
@@ -863,8 +746,10 @@ function insertField(source: string, head: Head, line: string): string {
 	}
 
 	// No block at all — the grammar allows that for both a node and an arrow —
-	// so the field brings one with it.
-	const indent = indentBefore(source, head.start);
+	// so the field brings one with it. In spaces: `indentBefore` is verbatim
+	// because its other caller matches it against existing text, and this one is
+	// writing new lines.
+	const indent = spaces(indentBefore(source, head.start));
 	const at = head.end;
-	return `${source.slice(0, at)} {\n${indent}  ${line}\n${indent}}${source.slice(at)}`;
+	return `${source.slice(0, at)} {\n${indent}${step()}${line}\n${indent}}${source.slice(at)}`;
 }

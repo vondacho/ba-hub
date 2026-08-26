@@ -21,9 +21,18 @@ interface Props {
 	problems: readonly Problem[];
 	/** Set when a problem is clicked, to move the caret there. */
 	revealLine: number | null;
+	/**
+	 * What the textarea is called.
+	 *
+	 * Both editors use this component, and both write into it from their own
+	 * panels — `applyEdit` finds the box by this name so that a gesture lands on
+	 * the textarea's undo stack. Two islands answering to "Map source" would be
+	 * one of them writing into the other's document if they ever shared a page.
+	 */
+	label?: string;
 }
 
-export default function Editor({ value, onChange, problems, revealLine }: Props) {
+export default function Editor({ value, onChange, problems, revealLine, label = 'Map source' }: Props) {
 	const area = useRef<HTMLTextAreaElement>(null);
 	const gutter = useRef<HTMLDivElement>(null);
 
@@ -94,7 +103,7 @@ export default function Editor({ value, onChange, problems, revealLine }: Props)
 				autoComplete="off"
 				autoCapitalize="off"
 				autoCorrect="off"
-				aria-label="Map source"
+				aria-label={label}
 				className="min-h-0 flex-1 resize-none bg-white px-3 py-3 text-ink outline-none dark:bg-slate-950 dark:text-slate-100"
 			/>
 		</div>

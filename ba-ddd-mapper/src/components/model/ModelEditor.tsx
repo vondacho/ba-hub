@@ -22,9 +22,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parse } from '../../lib/ddm/parser';
+import { setIntent as spliceIntent, setInvariant as spliceInvariant } from '../../lib/ddm/edit';
 import { SAMPLE } from '../../lib/ddm/sample';
 import { layout as computePlacement, type Placement, type Positions } from '../../lib/ddm/layout';
-import type { DomainModel } from '../../lib/ddm/model';
+import type { AggregateNode, DomainModel } from '../../lib/ddm/model';
 import type { Problem } from '../../lib/ddd/problems';
 import {
 	clearFileInput,
@@ -67,6 +68,14 @@ import { useFullscreen } from '../../lib/fullscreen';
 import Diagram from './Diagram';
 
 const DEBOUNCE_MS = 250;
+
+/** Said whenever a gesture is refused because the text has not parsed. */
+const STALE =
+	'The source has not parsed since the last change, so the spans a gesture would edit are the previous document’s. Fix the errors and the tools come back.';
+
+/** The textarea this island writes into. See `Editor`'s `label`. */
+const SOURCE_LABEL = 'Model source';
+
 const MODEL_EXTENSION = '.ddm';
 const MODEL_ACCEPT = '.ddm,text/plain';
 /** The layout sidecar. See src/lib/view-file.ts for why it is a separate file. */
@@ -190,6 +199,7 @@ export default function ModelEditor() {
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	const [positions, setPositions] = useState<Positions>(start.positions);
 	const [saveFailed, setSaveFailed] = useState(false);
+	const [note, setNote] = useState<{ kind: 'warn' | 'error'; text: string } | null>(null);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
 	/**
@@ -355,6 +365,91 @@ export default function ModelEditor() {
 			if (run.current === token) setPlacement(next);
 		});
 	}, [document_]);
+
+	/**
+	 * Apply a panel gesture.
+	 *
+	 * `DddMapper`'s, and for its reason: the edit goes through the textarea
+	 * rather than through `setSource`, so the browser records it on the
+	 * textarea's own undo stack and ⌘Z takes back an invariant exactly as it
+	 * takes back a keystroke. `execCommand` is deprecated and is still the only
+	 * way to write into a textarea undoably; the fallback keeps the edit and
+	 * loses only the undo entry.
+	 */
+	const applyEdit = useCallback((next: string) => {
+		const area = window.document.querySelector<HTMLTextAreaElement>(
+			`textarea[aria-label="${SOURCE_LABEL}"]`,
+		);
+		if (area) {
+			area.focus();
+			area.setSelectionRange(0, area.value.length);
+			const wrote = window.document.execCommand?.('insertText', false, next);
+			if (wrote) {
+				setSource(area.value);
+				return;
+			}
+		}
+		setSource(next);
+	}, []);
+
+	/**
+	 * Splice one of an aggregate's fields.
+	 *
+	 * Refused when the text does not parse, like every gesture that edits a
+	 * span: a span is an offset into a document, and there is no document. The
+	 * panel says so rather than doing nothing, because a control that silently
+	 * declines is a control people stop believing in.
+	 *
+	 * The parse happens **here**, on the text as it stands, rather than reusing
+	 * the debounced `document_`. A quarter of a second is a long time in a panel
+	 * where one human gesture makes two edits — committing a box by clicking the
+	 * ✕ on the invariant below it is a blur and then a click, no pause between
+	 * them — and the second edit would otherwise be splicing the first edit's
+	 * output at offsets taken from the document before it. Re-parsing costs a
+	 * millisecond on a file this size, and it is the only way the offsets are
+	 * about the string being spliced.
+	 */
+	const onAggregate = useCallback(
+		(
+			aggregate: AggregateNode,
+			edit: (source: string, document: DomainModel, current: AggregateNode) => string,
+		) => {
+			const parsed = parse(source);
+			// The aggregate is found again by id rather than trusted from the
+			// panel's props, for the same reason: its spans came from a render that
+			// may be one edit behind. The id is made of the name, so this is the
+			// same aggregate or it is gone.
+			const current = parsed.ok
+				? parsed.document.aggregates.find((candidate) => candidate.id === aggregate.id)
+				: undefined;
+
+			if (!current) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+
+			applyEdit(edit(source, parsed.document, current));
+		},
+		[applyEdit, source],
+	);
+
+	const setIntent = useCallback(
+		(aggregate: AggregateNode, text: string) => {
+			onAggregate(aggregate, (source_, document, current) =>
+				spliceIntent(source_, document, current, text),
+			);
+		},
+		[onAggregate],
+	);
+
+	const setInvariant = useCallback(
+		(aggregate: AggregateNode, index: number, text: string) => {
+			onAggregate(aggregate, (source_, document, current) =>
+				spliceInvariant(source_, document, current, index, text),
+			);
+		},
+		[onAggregate],
+	);
 
 	const reveal = useCallback(
 		(line: number) => {
@@ -572,6 +667,26 @@ export default function ModelEditor() {
 
 			{panes !== 'source' && <Legend theme={theme} />}
 
+			{note && (
+				<p
+					className={
+						note.kind === 'error'
+							? 'flex items-start gap-2 border-b border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-200'
+							: 'flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200'
+					}
+				>
+					<span className="grow">{note.text}</span>
+					<button
+						type="button"
+						onClick={() => setNote(null)}
+						aria-label="Dismiss"
+						className="shrink-0 font-semibold"
+					>
+						✕
+					</button>
+				</p>
+			)}
+
 			<div className="flex min-h-0 flex-1 flex-col lg:flex-row">
 				{panes !== 'graph' && (
 					<section
@@ -589,6 +704,7 @@ export default function ModelEditor() {
 								onChange={setSource}
 								problems={problems}
 								revealLine={revealLine}
+								label={SOURCE_LABEL}
 							/>
 						</div>
 						<ProblemList
@@ -653,6 +769,8 @@ export default function ModelEditor() {
 							selected={selected}
 							onReveal={reveal}
 							onClose={() => setSelected(null)}
+							setIntent={setIntent}
+							setInvariant={setInvariant}
 						/>
 					</section>
 				)}
