@@ -33,13 +33,17 @@ export type IconName =
 	| 'connect'
 	| 'remove'
 	| 'picture'
-	| 'store';
+	| 'store'
+	| 'format';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A tray with an arrow coming *in* — the file comes to you.
 	open: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 2v7m0 0 2.5-2.5M8 9 5.5 6.5" />,
 	// The same tray, arrow going *out*.
 	export: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 9.5v-7m0 0L5.5 5M8 2.5 10.5 5" />,
+	// Lines stepped in from a margin: the shape of an indented block, which is
+	// the whole of what this button does to the text.
+	format: <path d="M2.5 3.5h11M6 6.5h7.5M6 9.5h7.5M2.5 12.5h11M3.5 6.5v3" />,
 	// A document with a spark: the example map, not your work.
 	sample: <path d="M4 2h5l3 3v9H4V2Zm5 0v3h3M6.5 11.5l.7-1.6 1.6-.7-1.6-.7-.7-1.6-.7 1.6-1.6.7 1.6.7.7 1.6Z" />,
 	// A frame with a downward arrow: the arrangement, saved.

@@ -44,6 +44,7 @@ import {
 	type Layout,
 	type Positions,
 } from '../../lib/graph/layout';
+import { format as formatSource } from '../../lib/format';
 import * as edits from '../../lib/graph/edit';
 import type { EdgeField, ListField, ScalarField } from '../../lib/graph/edit';
 import {
@@ -589,6 +590,29 @@ export default function DddMapper() {
 	 * splices a span: the spans belong to the last document that parsed, and the
 	 * text has moved on.
 	 */
+	/**
+	 * Tidy the source: indentation, and nothing that moves a token.
+	 *
+	 * Not refused while the text fails to *parse*, unlike every other gesture
+	 * here, and that is the point of it — a document full of errors is exactly
+	 * when somebody reaches for this, and the brace depth is legible long before
+	 * the grammar is. It is refused only when the text will not lex, because a
+	 * file with an unterminated string in it has no line structure left to trust.
+	 *
+	 * Through `applyEdit`, so ⌘Z takes the whole reformat back in one go.
+	 */
+	const format = useCallback(() => {
+		const tidied = formatSource(source);
+		if (tidied === null) {
+			setNote({
+				kind: 'error',
+				text: 'The source will not tokenise — an unterminated string, most likely — so there is no line structure to indent. The problems panel says where.',
+			});
+			return;
+		}
+		if (tidied !== source) applyEdit(tidied);
+	}, [applyEdit, source]);
+
 	const setField = useCallback(
 		(node: Node, field: ScalarField, value: string) => {
 			if (stale) {
@@ -978,6 +1002,14 @@ export default function DddMapper() {
 							Not saving in this browser
 						</span>
 					)}
+					{/* First of the document buttons, because it acts on what you are
+					    typing rather than on where the file goes. */}
+					<IconButton
+						label="Format the source: indentation only, nothing moves"
+						onClick={format}
+					>
+						<Icon name="format" />
+					</IconButton>
 					<IconButton label="Open a .ddd map" onClick={() => fileInput.current?.click()}>
 						<Icon name="open" />
 					</IconButton>

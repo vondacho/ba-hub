@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parse } from '../../lib/ddm/parser';
 import { setIntent as spliceIntent, setInvariant as spliceInvariant } from '../../lib/ddm/edit';
+import { format as formatSource } from '../../lib/format';
 import { SAMPLE } from '../../lib/ddm/sample';
 import { layout as computePlacement, type Placement, type Positions } from '../../lib/ddm/layout';
 import type { AggregateNode, DomainModel } from '../../lib/ddm/model';
@@ -433,6 +434,26 @@ export default function ModelEditor() {
 		[applyEdit, source],
 	);
 
+	/**
+	 * Tidy the source: indentation, and nothing that moves a token.
+	 *
+	 * The map's, exactly — see `DddMapper`. Not refused while the text fails to
+	 * parse, because a document full of errors is when somebody reaches for it;
+	 * refused only when it will not lex, because then there is no line structure
+	 * left to trust. Through `applyEdit`, so ⌘Z takes the reformat back whole.
+	 */
+	const format = useCallback(() => {
+		const tidied = formatSource(source);
+		if (tidied === null) {
+			setNote({
+				kind: 'error',
+				text: 'The source will not tokenise — an unterminated string, most likely — so there is no line structure to indent. The problems panel says where.',
+			});
+			return;
+		}
+		if (tidied !== source) applyEdit(tidied);
+	}, [applyEdit, source]);
+
 	const setIntent = useCallback(
 		(aggregate: AggregateNode, text: string) => {
 			onAggregate(aggregate, (source_, document, current) =>
@@ -613,6 +634,15 @@ export default function ModelEditor() {
 							Not saving in this browser
 						</span>
 					)}
+					{/* First of the document buttons, because it acts on what you are
+					    typing rather than on where the file goes. The map's toolbar
+					    has it in the same place, for the same reason. */}
+					<IconButton
+						label="Format the source: indentation only, nothing moves"
+						onClick={format}
+					>
+						<Icon name="format" />
+					</IconButton>
 					<IconButton label="Open a .ddm model" onClick={() => fileInput.current?.click()}>
 						<Icon name="open" />
 					</IconButton>
