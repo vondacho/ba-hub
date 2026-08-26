@@ -35,7 +35,11 @@ export type IconName =
 	| 'picture'
 	| 'store'
 	| 'format'
-	| 'legend';
+	| 'legend'
+	| 'add-aggregate'
+	| 'add-entity'
+	| 'add-value'
+	| 'add-enum';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A tray with an arrow coming *in* — the file comes to you.
@@ -121,6 +125,42 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	'add-context': (
 		<>
 			<ellipse cx="6" cy="7.5" rx="4" ry="3.5" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	/*
+	 * The four things the model canvas makes, and the same plus in the corner.
+	 *
+	 * They are drawn as what the diagram draws: a dashed boundary for the
+	 * aggregate, a ruled class box for the entity, a plain one for the value
+	 * object, and a list for the enumeration. Somebody who has looked at the
+	 * canvas for ten seconds can read the row without the tooltips.
+	 */
+	'add-aggregate': (
+		<>
+			<rect x="2" y="4" width="8" height="7" rx="1" strokeDasharray="2 1.5" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	// The dot is the identity, which is the whole difference between the two.
+	'add-entity': (
+		<>
+			<rect x="2" y="4" width="8" height="7" rx="1" />
+			<path d="M2 6.5h8" />
+			<circle cx="3.6" cy="8.6" r="0.7" fill="currentColor" stroke="none" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	'add-value': (
+		<>
+			<rect x="2" y="4" width="8" height="7" rx="1" />
+			<path d="M2 6.5h8" />
+			<path d="M11.5 11.5v4M9.5 13.5h4" />
+		</>
+	),
+	'add-enum': (
+		<>
+			<path d="M2.5 4.5h7M2.5 7.5h7M2.5 10.5h4" />
 			<path d="M11.5 11.5v4M9.5 13.5h4" />
 		</>
 	),

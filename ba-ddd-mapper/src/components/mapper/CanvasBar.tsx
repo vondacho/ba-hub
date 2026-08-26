@@ -1,5 +1,20 @@
-import type { NodeKind } from '../../lib/ddd/model';
-import Icon from './Icon';
+import Icon, { type IconName } from './Icon';
+
+/**
+ * One `Add` button: what it makes, and why it is off.
+ *
+ * A list rather than a fixed three, because the two canvases make different
+ * things — domains, subdomains and contexts on one; aggregates, entities,
+ * value objects and enumerations on the other — and a bar that knew either
+ * language would have to know both. `why` is the reason the button is
+ * disabled, said on the button, or null when it is live.
+ */
+export interface AddChoice {
+	readonly kind: string;
+	readonly icon: IconName;
+	readonly label: string;
+	readonly why: string | null;
+}
 
 /**
  * The canvas widget bar.
@@ -50,13 +65,12 @@ interface Props {
 	 *
 	 * The domain model editor uses this bar for the half it already has — look
 	 * at the picture, reset it, take it full screen, write it out — and has no
-	 * add-a-domain button and no `.dddview` of its own yet. Omitting a group is
-	 * how it says so; the alternative was a second bar that would drift from
-	 * this one in a week.
+	 * `.ddmview` sidecar of its own yet. Omitting a group is how it says so; the
+	 * alternative was a second bar that would drift from this one in a week.
 	 */
-	onAdd?: (kind: NodeKind) => void;
-	/** What the selection allows adding right now. */
-	canAdd?: Record<NodeKind, string | null>;
+	onAdd?: (kind: string) => void;
+	/** What this canvas can make, and what the selection allows right now. */
+	adds?: readonly AddChoice[];
 	connecting?: boolean;
 	onConnecting?: (on: boolean) => void;
 	onSaveLayout?: () => void;
@@ -75,7 +89,7 @@ interface Props {
 
 export default function CanvasBar({
 	onAdd,
-	canAdd,
+	adds,
 	connecting,
 	onConnecting,
 	onZoom,
@@ -91,31 +105,17 @@ export default function CanvasBar({
 }: Props) {
 	return (
 		<div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900/95">
-			{onAdd && canAdd && (
-				<>
+			{onAdd &&
+				adds?.map((add) => (
 					<Button
-						label={canAdd.domain ?? 'Add a domain'}
-						onClick={() => onAdd('domain')}
-						disabled={canAdd.domain !== null}
+						key={add.kind}
+						label={add.why ?? add.label}
+						onClick={() => onAdd(add.kind)}
+						disabled={add.why !== null}
 					>
-						<Icon name="add-domain" />
+						<Icon name={add.icon} />
 					</Button>
-					<Button
-						label={canAdd.subdomain ?? 'Add a subdomain to the selected domain'}
-						onClick={() => onAdd('subdomain')}
-						disabled={canAdd.subdomain !== null}
-					>
-						<Icon name="add-subdomain" />
-					</Button>
-					<Button
-						label={canAdd.context ?? 'Add a bounded context to the selection'}
-						onClick={() => onAdd('context')}
-						disabled={canAdd.context !== null}
-					>
-						<Icon name="add-context" />
-					</Button>
-				</>
-			)}
+				))}
 			{onConnecting && (
 				<Button
 					label={
@@ -127,7 +127,7 @@ export default function CanvasBar({
 					<Icon name="connect" />
 				</Button>
 			)}
-			{(onAdd || onConnecting) && (
+			{(adds || onConnecting) && (
 				<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 			)}
 

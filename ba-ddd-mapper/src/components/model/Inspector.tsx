@@ -15,6 +15,14 @@
  * problem is that nobody wrote its invariants down looks identical on the
  * canvas to one that genuinely has none. Here they do not look identical.
  *
+ * A class selected on the canvas opens a **second, much smaller panel**: its
+ * name, what kind of thing it is, and what deleting it would take with it. A
+ * class box already shows its stereotype, its identity and its attributes, so
+ * repeating them here would be a second way to say the same thing and a second
+ * place for it to be wrong. What the box cannot offer is a place to *type* the
+ * name — which is the whole reason this branch exists, since a class added from
+ * the canvas arrives called "New entity".
+ *
  * **It writes the two fields that have no box: the intent and the invariants.**
  * The text is the source of truth here as everywhere in this component, so
  * writing means splicing a span and re-parsing — `ddm/edit.ts`. The rest of the
@@ -47,6 +55,12 @@ interface Props {
 	 * removes. See `setInvariant` — the three gestures are one splice each.
 	 */
 	setInvariant: (aggregate: AggregateNode, index: number, text: string) => void;
+	/** Rename a boundary or a class, and every link that names it. */
+	rename: (what: AggregateNode | Member, to: string) => void;
+	/** Delete it, and everything that would dangle after it. */
+	remove: (what: AggregateNode | Member) => void;
+	/** True for a declaration created a moment ago, whose name is a placeholder. */
+	focusName: boolean;
 }
 
 export default function Inspector({
@@ -56,13 +70,30 @@ export default function Inspector({
 	onClose,
 	setIntent,
 	setInvariant,
+	rename,
+	remove,
+	focusName,
 }: Props) {
 	if (!selected) return null;
 
 	const aggregate = document.aggregates.find((candidate) => candidate.id === selected);
-	// A member's box says everything a member panel would. Selecting one still
-	// highlights it and still reveals its line; it just does not open this.
-	if (!aggregate) return null;
+	if (!aggregate) {
+		const member = document.members.find((candidate) => candidate.id === selected);
+		// A link is selected by drawing one and is described by its own line in
+		// the class that holds it. Nothing to open.
+		if (!member) return null;
+		return (
+			<MemberPanel
+				document={document}
+				member={member}
+				onReveal={onReveal}
+				onClose={onClose}
+				rename={rename}
+				remove={remove}
+				focusName={focusName}
+			/>
+		);
+	}
 
 	const byId = new Map(document.members.map((member) => [member.id, member] as const));
 	const members = aggregate.members
@@ -89,7 +120,13 @@ export default function Inspector({
 					<p className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase dark:text-slate-400">
 						aggregate
 					</p>
-					<h2 className="truncate text-base font-semibold">{aggregate.name}</h2>
+					<NameField
+						value={aggregate.name}
+						label="aggregate name"
+						title="Rename — every `references` that names it moves too, and the root keeps its own name"
+						focus={focusName}
+						onRename={(to) => rename(aggregate, to)}
+					/>
 				</div>
 				<button
 					type="button"
@@ -221,9 +258,256 @@ export default function Inspector({
 				<p className="mt-1 text-[11px] text-ink-muted dark:text-slate-500">
 					The text is the model. An edit here is a splice into it.
 				</p>
+
+				<Removal
+					what={`the aggregate “${aggregate.name}”`}
+					note={`Takes ${count(members.length, 'class', 'classes')} with it${
+						into.length > 0 ? `, and ${count(into.length, 'reference', 'references')} to it` : ''
+					}.`}
+					onRemove={() => remove(aggregate)}
+				/>
 			</div>
 		</aside>
 	);
+}
+
+/**
+ * A class, and deliberately almost empty.
+ *
+ * Everything a class *is* — its stereotype, its identity, its attributes — is
+ * already drawn on the box, at a size somebody can read without opening
+ * anything. What is not on the box is a place to type the name, and the name is
+ * the identity in this format: every `contains`, `embeds` and `references` that
+ * points here moves with it. So the field is the panel, and the rest is what
+ * you need before pressing Remove.
+ *
+ * The attributes are not editable here, and that is not an omission waiting to
+ * be filled. They are a table with a type column, and a table belongs in the
+ * text where columns line up — the line number at the foot goes there.
+ */
+function MemberPanel({
+	document,
+	member,
+	onReveal,
+	onClose,
+	rename,
+	remove,
+	focusName,
+}: {
+	document: DomainModel;
+	member: Member;
+	onReveal: (line: number) => void;
+	onClose: () => void;
+	rename: (what: Member, to: string) => void;
+	remove: (what: Member) => void;
+	focusName: boolean;
+}) {
+	const owner = document.aggregates.find((candidate) => candidate.id === member.aggregate);
+	const root = owner?.root === member.id;
+	const held = document.links.filter((link) => link.from === member.id);
+	const pointing = document.links.filter((link) => link.to === member.id);
+
+	const nameOf = (id: string) =>
+		document.members.find((candidate) => candidate.id === id)?.name ??
+		document.aggregates.find((candidate) => candidate.id === id)?.name ??
+		id;
+
+	return (
+		<aside className="absolute top-3 right-3 bottom-14 z-20 flex w-80 flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+			<div className="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+				<div className="min-w-0">
+					<p className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase dark:text-slate-400">
+						{memberLabel[member.kind].toLowerCase()}
+						{root ? ' · root' : ''}
+					</p>
+					<NameField
+						value={member.name}
+						label={`${memberLabel[member.kind].toLowerCase()} name`}
+						title="Rename — every link that names it moves too"
+						focus={focusName}
+						onRename={(to) => rename(member, to)}
+					/>
+				</div>
+				<button
+					type="button"
+					onClick={onClose}
+					aria-label="Close inspector"
+					className="shrink-0 rounded p-1 text-ink-muted hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+				>
+					✕
+				</button>
+			</div>
+
+			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm">
+				<Field label="Inside">
+					{owner ? (
+						<p>
+							<strong>{owner.name}</strong>
+							{root && (
+								<span className="text-ink-muted dark:text-slate-400">
+									{' '}
+									— the way in
+								</span>
+							)}
+						</p>
+					) : (
+						<>
+							<p>
+								<em className="text-ink-muted dark:text-slate-400">no boundary — shared</em>
+							</p>
+							<p className="mt-1 text-xs text-ink-muted dark:text-slate-400">
+								Declared at model level, so any aggregate may embed it. That is what a value
+								object used in two places looks like; one owned by an aggregate and embedded
+								from another is the error the parser refuses.
+							</p>
+						</>
+					)}
+				</Field>
+
+				{/*
+				 * Both directions, and kept apart for the aggregate panel's reason:
+				 * what it holds is its own business, and what holds it is the part
+				 * that makes it hard to move.
+				 */}
+				<Field label={`Holds (${held.length})`}>
+					{held.length === 0 ? (
+						<em className="text-ink-muted dark:text-slate-400">nothing</em>
+					) : (
+						<ul className="text-xs">
+							{held.map((link) => (
+								<li key={link.id}>
+									{linkLabel[link.kind]} {nameOf(link.to)} {mark(link.multiplicity)}
+								</li>
+							))}
+						</ul>
+					)}
+				</Field>
+
+				<Field label={`Held by (${pointing.length})`}>
+					{pointing.length === 0 ? (
+						<>
+							<em className="text-ink-muted dark:text-slate-400">nothing</em>
+							{owner && !root && (
+								<p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+									Nothing inside “{owner.name}” reaches it. Everything in an aggregate is
+									loaded and saved through the root, so a class the root cannot reach is
+									either dead or a boundary of its own.
+								</p>
+							)}
+						</>
+					) : (
+						<ul className="text-xs">
+							{pointing.map((link) => (
+								<li key={link.id}>
+									{nameOf(link.from)} {linkLabel[link.kind]} it
+								</li>
+							))}
+						</ul>
+					)}
+				</Field>
+
+				<button
+					type="button"
+					onClick={() => onReveal(member.nameSpan.line)}
+					className="mt-4 text-xs font-semibold text-brand hover:underline dark:text-purple-400"
+				>
+					Show in the source (line {member.nameSpan.line})
+				</button>
+				<p className="mt-1 text-[11px] text-ink-muted dark:text-slate-500">
+					Its attributes are a table, and a table reads better where the columns line up.
+				</p>
+
+				<Removal
+					what={`the ${memberLabel[member.kind].toLowerCase()} “${member.name}”`}
+					note={
+						pointing.length === 0
+							? 'Nothing points at it.'
+							: `Takes ${count(pointing.length, 'link', 'links')} to it with it — a link naming something that is gone does not parse.`
+					}
+					onRemove={() => remove(member)}
+				/>
+			</div>
+		</aside>
+	);
+}
+
+/**
+ * The name, edited in place. The map's `NameField`, and its one rule: a
+ * declaration without a name is not a declaration, it is a document that no
+ * longer parses.
+ */
+function NameField({
+	value,
+	label,
+	title,
+	focus,
+	onRename,
+}: {
+	value: string;
+	label: string;
+	title: string;
+	focus: boolean;
+	onRename: (to: string) => void;
+}) {
+	const draft = useDraft(value, (next) => {
+		const trimmed = next.trim();
+		// Refusing here puts the old one back, because the draft is already gone.
+		if (trimmed !== '' && trimmed !== value) onRename(trimmed);
+	});
+
+	return (
+		<input
+			{...draft}
+			/* A box created a second ago is called "New entity" and is asking to be
+			   named. Selecting the placeholder means the first keystroke replaces
+			   it rather than appending to it. */
+			autoFocus={focus}
+			onFocus={(event) => {
+				if (focus) event.currentTarget.select();
+			}}
+			aria-label={label}
+			title={title}
+			className="mt-0.5 w-full rounded-md border border-transparent bg-transparent px-1 py-0.5 text-base font-semibold hover:border-slate-300 focus:border-brand focus:outline-none dark:hover:border-slate-600"
+		/>
+	);
+}
+
+/**
+ * Delete, with what it takes said *before* it is clicked.
+ *
+ * The map's rule and its reasoning: the references are not optional to remove —
+ * a link naming a class that no longer exists does not parse — so the delete
+ * takes them, and the only honest thing is to say how many first. A number
+ * somebody can read beats a confirmation dialog they will learn to dismiss
+ * without reading.
+ */
+function Removal({
+	what,
+	note,
+	onRemove,
+}: {
+	what: string;
+	note: string;
+	onRemove: () => void;
+}) {
+	return (
+		<div className="mt-5 border-t border-slate-200 pt-3 dark:border-slate-800">
+			<p className="text-xs text-ink-muted dark:text-slate-400">{note}</p>
+			<button
+				type="button"
+				onClick={onRemove}
+				title={`Remove ${what}`}
+				className="mt-1 text-xs font-semibold text-rose-600 hover:underline dark:text-rose-400"
+			>
+				Remove
+			</button>
+		</div>
+	);
+}
+
+/** `1 class` and `2 classes`, without the call site branching every time. */
+function count(n: number, one: string, many: string): string {
+	return `${n} ${n === 1 ? one : many}`;
 }
 
 /**

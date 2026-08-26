@@ -22,11 +22,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parse } from '../../lib/ddm/parser';
-import { setIntent as spliceIntent, setInvariant as spliceInvariant } from '../../lib/ddm/edit';
+import * as edits from '../../lib/ddm/edit';
 import { format as formatSource } from '../../lib/format';
 import { SAMPLE } from '../../lib/ddm/sample';
 import { layout as computePlacement, type Placement, type Positions } from '../../lib/ddm/layout';
-import type { AggregateNode, DomainModel } from '../../lib/ddm/model';
+import type {
+	AggregateNode,
+	DomainModel,
+	Link,
+	LinkKind,
+	Member,
+	MemberKind,
+} from '../../lib/ddm/model';
 import type { Problem } from '../../lib/ddd/problems';
 import {
 	clearFileInput,
@@ -69,6 +76,7 @@ import ProblemList from '../mapper/ProblemList';
 import IconButton from '../ui/IconButton';
 import { useFullscreen } from '../../lib/fullscreen';
 import Diagram from './Diagram';
+import type { AddChoice } from '../mapper/CanvasBar';
 
 const DEBOUNCE_MS = 250;
 
@@ -78,6 +86,18 @@ const STALE =
 
 /** The textarea this island writes into. See `Editor`'s `label`. */
 const SOURCE_LABEL = 'Model source';
+
+/**
+ * What a class is called a second after it exists.
+ *
+ * Placeholders, and obviously so — the inspector opens with the name selected,
+ * and the first keystroke replaces it. The map's `NEW_NAME`, one level down.
+ */
+const NEW_MEMBER: Record<MemberKind, string> = {
+	entity: 'New entity',
+	value: 'New value',
+	enum: 'New enumeration',
+};
 
 const MODEL_EXTENSION = '.ddm';
 const MODEL_ACCEPT = '.ddm,text/plain';
@@ -181,6 +201,58 @@ function documentOf(text: string): DomainModel {
 	return result.ok ? result.document : EMPTY;
 }
 
+/**
+ * What the far end of a drawn link is, and which of the three links it makes.
+ *
+ * `contains` and `embeds` stay inside one boundary; `references` crosses one.
+ * That is the whole table, and each refusal below is a rule of the format
+ * rather than a limitation of the gesture — so each one says the rule.
+ */
+function resolve(
+	document: DomainModel,
+	toId: string,
+	from: Member,
+): { kind: LinkKind; id: string; name: string; note: string | null } | { why: string } {
+	const aggregate = document.aggregates.find((candidate) => candidate.id === toId);
+
+	if (aggregate) {
+		if (aggregate.id === from.aggregate) {
+			return {
+				why: `"${from.name}" already belongs to "${aggregate.name}" — a member does not reference its own aggregate.`,
+			};
+		}
+		return { kind: 'references', id: aggregate.id, name: aggregate.name, note: null };
+	}
+
+	const target = document.members.find((candidate) => candidate.id === toId);
+	if (!target) return { why: 'That is not something a link can point at.' };
+
+	// Inside another boundary: not a target, but its aggregate is. Retargeted
+	// rather than refused, and said out loud — the rule is worth learning and
+	// the gesture meant something.
+	if (target.aggregate !== null && target.aggregate !== from.aggregate) {
+		const owner = document.aggregates.find((candidate) => candidate.id === target.aggregate);
+		if (!owner) return { why: `"${target.name}" is inside an aggregate this model cannot find.` };
+		return {
+			kind: 'references',
+			id: owner.id,
+			name: owner.name,
+			note: `Drawn to "${owner.name}" rather than to "${target.name}": you hold an aggregate's identity, never its parts. Reaching past a root is how a boundary stops being one.`,
+		};
+	}
+
+	// Everything past here is inside the same boundary — the branch above caught
+	// the rest — and an entity is only ever declared inside one, so a shared
+	// class never reaches this point with an entity in front of it.
+	//
+	// An entity has identity, so it is owned. A value or an enumeration has
+	// none, so it is copied rather than shared. That distinction is the reason
+	// there are two keywords instead of one.
+	return target.kind === 'entity'
+		? { kind: 'contains', id: target.id, name: target.name, note: null }
+		: { kind: 'embeds', id: target.id, name: target.name, note: null };
+}
+
 /** Whitespace and comments are not a model. */
 function blank(source: string): boolean {
 	return source.trim() === '';
@@ -211,6 +283,8 @@ export default function ModelEditor() {
 	const [positions, setPositions] = useState<Positions>(start.positions);
 	const [saveFailed, setSaveFailed] = useState(false);
 	const [note, setNote] = useState<{ kind: 'warn' | 'error'; text: string } | null>(null);
+	/** The id of a box created a moment ago, whose name is still a placeholder. */
+	const [fresh, setFresh] = useState<string | null>(null);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
 	/**
@@ -466,10 +540,305 @@ export default function ModelEditor() {
 		if (tidied !== source) applyEdit(tidied);
 	}, [applyEdit, source]);
 
+	// A placeholder name stops being one the moment the selection moves off it.
+	useEffect(() => {
+		if (fresh !== null && fresh !== selected) setFresh(null);
+	}, [fresh, selected]);
+
+	// A selection that no longer exists — renamed or deleted in the text — must
+	// not leave the inspector describing something that is gone.
+	useEffect(() => {
+		if (!selected) return;
+		const exists =
+			document_.aggregates.some((a) => a.id === selected) ||
+			document_.members.some((m) => m.id === selected) ||
+			document_.links.some((l) => l.id === selected);
+		if (!exists) setSelected(null);
+	}, [document_, selected]);
+
+	/**
+	 * The declaration the selection points at, whichever kind it is.
+	 *
+	 * A member box and an aggregate boundary are both selectable and their ids
+	 * are in the same string space, so one lookup answers both — and the two
+	 * answers are what every gesture below branches on.
+	 */
+	const selectedAggregate = useMemo(
+		() => document_.aggregates.find((candidate) => candidate.id === selected) ?? null,
+		[document_, selected],
+	);
+	const selectedMember = useMemo(
+		() => document_.members.find((candidate) => candidate.id === selected) ?? null,
+		[document_, selected],
+	);
+
+	/** The boundary a new class would land in: the selection, or the one it is in. */
+	const host = useMemo((): AggregateNode | null => {
+		if (selectedAggregate) return selectedAggregate;
+		if (!selectedMember?.aggregate) return null;
+		return document_.aggregates.find((a) => a.id === selectedMember.aggregate) ?? null;
+	}, [document_, selectedAggregate, selectedMember]);
+
+	/**
+	 * The four things this canvas makes, and why a button is off.
+	 *
+	 * An **entity** needs a boundary and says so: it belongs to exactly one
+	 * aggregate, which is what makes "this class is inside that consistency
+	 * boundary" structural rather than a rule that can drift.
+	 *
+	 * A **value object** and an **enumeration** do not. With nothing selected
+	 * they are declared at model level — *shared*, which is a real answer and
+	 * not a missing one: a value used in two aggregates belongs to neither, and
+	 * the sample's `Money` is exactly that. So those two buttons stay live with
+	 * an empty selection, and what they make depends on it. The tooltip says
+	 * which, because a button that quietly does two things is one nobody trusts.
+	 */
+	const adds = useMemo(
+		(): readonly AddChoice[] => [
+			{
+				kind: 'aggregate',
+				icon: 'add-aggregate',
+				label: 'Add an aggregate and the root you reach it through',
+				why: stale ? STALE : null,
+			},
+			{
+				kind: 'entity',
+				icon: 'add-entity',
+				label: host ? `Add an entity to "${host.name}"` : 'Add an entity',
+				why: stale
+					? STALE
+					: host
+						? null
+						: 'Select an aggregate first — an entity belongs to exactly one boundary',
+			},
+			{
+				kind: 'value',
+				icon: 'add-value',
+				label: host
+					? `Add a value object to "${host.name}"`
+					: 'Add a value object, shared across the aggregates',
+				why: stale ? STALE : null,
+			},
+			{
+				kind: 'enum',
+				icon: 'add-enum',
+				label: host
+					? `Add an enumeration to "${host.name}"`
+					: 'Add an enumeration, shared across the aggregates',
+				why: stale ? STALE : null,
+			},
+		],
+		[host, stale],
+	);
+
+	/**
+	 * Make something, and select it before it exists.
+	 *
+	 * The id is derived from the name — `entity:Order` — so it can be selected
+	 * on this side of the parse that will produce it, which is the map's trick
+	 * and is what lets the inspector open on the new box with its name ready to
+	 * be typed over.
+	 */
+	const add = useCallback(
+		(chosen: string) => {
+			const parsed = parse(source);
+			if (!parsed.ok) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			const document = parsed.document;
+
+			if (chosen === 'aggregate') {
+				const name = edits.unusedName(document, 'New aggregate');
+				applyEdit(edits.addAggregate(source, document, name));
+				setFresh(`aggregate:${name}`);
+				setSelected(`aggregate:${name}`);
+				return;
+			}
+
+			const kind = chosen as MemberKind;
+			if (kind === 'entity' && !host) return;
+			// Found again in the fresh parse, for `onAggregate`'s reason: the one
+			// in the closure carries spans from a render that may be one edit old.
+			const into = host ? (document.aggregates.find((a) => a.id === host.id) ?? null) : null;
+			const name = edits.unusedName(document, NEW_MEMBER[kind]);
+			applyEdit(edits.addMember(source, document, kind, name, into));
+			setFresh(`${kind}:${name}`);
+			setSelected(`${kind}:${name}`);
+		},
+		[applyEdit, host, source],
+	);
+
+	/**
+	 * What a link drawn from one box to another *means*.
+	 *
+	 * The gesture is one gesture and the format has three links, so the pair of
+	 * ends decides which was drawn — and the three are not decoration, they are
+	 * the argument of the whole format:
+	 *
+	 *   contains    composition inside one boundary. The part has no life of
+	 *               its own and is created, saved and deleted with the root.
+	 *   embeds      a value object or an enumeration, which has no identity and
+	 *               is therefore copied rather than shared.
+	 *   references  across a boundary, by identity.
+	 *
+	 * Two ends need translating before any of that applies. An **aggregate**
+	 * resolves to its root, because a link lives in a class's body and the root
+	 * is the way in — which is exactly what "the aggregate holds it" means. And
+	 * a **class inside another aggregate** resolves to that aggregate, with a
+	 * note saying so: you hold an aggregate's identity, never its parts, and
+	 * reaching past a root is how a boundary stops being one. Refusing would be
+	 * correct and would teach nothing; the map already reads an edge drawn
+	 * backwards as the same claim rather than as a mistake.
+	 */
+	const connect = useCallback(
+		(fromId: string, toId: string) => {
+			const parsed = parse(source);
+			if (!parsed.ok) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			const document = parsed.document;
+			const rootOf = (aggregate: AggregateNode) =>
+				document.members.find((member) => member.id === aggregate.root) ?? null;
+
+			const fromAggregate = document.aggregates.find((a) => a.id === fromId);
+			const from = fromAggregate
+				? rootOf(fromAggregate)
+				: (document.members.find((m) => m.id === fromId) ?? null);
+
+			if (!from) {
+				setNote({
+					kind: 'warn',
+					text: fromAggregate
+						? `"${fromAggregate.name}" has no root yet, and a link is written in the class you reach the aggregate through. Give it one first.`
+						: 'That is not something a link can start from.',
+				});
+				return;
+			}
+
+			// An enumeration is a list of values. It has no body to hold a link.
+			if (from.kind === 'enum') {
+				setNote({
+					kind: 'warn',
+					text: `"${from.name}" is an enumeration — a closed list of values, which holds nothing. Draw the link from the class that embeds it instead.`,
+				});
+				return;
+			}
+
+			const target = resolve(document, toId, from);
+			if ('why' in target) {
+				setNote({ kind: 'warn', text: target.why });
+				return;
+			}
+
+			if (
+				document.links.some(
+					(link) => link.from === from.id && link.kind === target.kind && link.to === target.id,
+				)
+			) {
+				setNote({ kind: 'warn', text: `"${from.name}" already ${target.kind} "${target.name}".` });
+				return;
+			}
+
+			applyEdit(edits.addLink(source, document, from, target.kind, target.name, 'one'));
+			wanted.current = { from: from.id, to: target.id, kind: target.kind };
+			if (target.note) setNote({ kind: 'warn', text: target.note });
+		},
+		[applyEdit, source],
+	);
+
+	/*
+	 * Select a link that does not exist yet.
+	 *
+	 * A link's id carries the offset of the line it was parsed from, which is
+	 * not knowable until the text has been re-parsed — unlike a class's, which
+	 * is its name. So the pair is remembered and claimed on the far side.
+	 */
+	const wanted = useRef<{ from: string; to: string; kind: LinkKind } | null>(null);
+	useEffect(() => {
+		const want = wanted.current;
+		if (!want) return;
+		const found = document_.links.find(
+			(link) => link.from === want.from && link.to === want.to && link.kind === want.kind,
+		);
+		if (!found) return;
+		wanted.current = null;
+		setSelected(found.id);
+	}, [document_]);
+
+	/** Delete whatever is selected, and everything that would dangle after it. */
+	const remove = useCallback(
+		(what: AggregateNode | Member | Link) => {
+			const parsed = parse(source);
+			if (!parsed.ok) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			const document = parsed.document;
+
+			if ('kind' in what && (what.kind === 'contains' || what.kind === 'embeds' || what.kind === 'references')) {
+				const link = document.links.find((candidate) => candidate.id === what.id);
+				if (link) applyEdit(edits.removeLink(source, document, link));
+			} else if ('kind' in what) {
+				const member = document.members.find((candidate) => candidate.id === what.id);
+				if (member) applyEdit(edits.removeMember(source, document, member));
+			} else {
+				const aggregate = document.aggregates.find((candidate) => candidate.id === what.id);
+				if (aggregate) applyEdit(edits.removeAggregate(source, document, aggregate));
+			}
+			setSelected(null);
+		},
+		[applyEdit, source],
+	);
+
+	/** Rename a class or a boundary, and every link that names it. */
+	const rename = useCallback(
+		(what: AggregateNode | Member, to: string) => {
+			const parsed = parse(source);
+			if (!parsed.ok) {
+				setNote({ kind: 'error', text: STALE });
+				return;
+			}
+			const document = parsed.document;
+
+			const taken = [...document.aggregates, ...document.members].some(
+				(candidate) => candidate.id !== what.id && candidate.name === to,
+			);
+			// An aggregate may share its name with its own root and with nothing
+			// else — the parser's rule, restated here so the panel refuses before
+			// the file has to.
+			const twin = 'kind' in what
+				? document.aggregates.find((a) => a.root === what.id)?.name === to
+				: document.members.find((m) => m.id === (what as AggregateNode).root)?.name === to;
+
+			if (taken && !twin) {
+				setNote({
+					kind: 'error',
+					text: `"${to}" is already the name of something else. The name is the identity in this format — two of them inside one bounded context is the ubiquitous language failing.`,
+				});
+				return;
+			}
+
+			if ('kind' in what) {
+				const member = document.members.find((candidate) => candidate.id === what.id);
+				if (!member) return;
+				applyEdit(edits.renameMember(source, document, member, to));
+				setSelected(`${member.kind}:${to}`);
+			} else {
+				const aggregate = document.aggregates.find((candidate) => candidate.id === what.id);
+				if (!aggregate) return;
+				applyEdit(edits.renameAggregate(source, document, aggregate, to));
+				setSelected(`aggregate:${to}`);
+			}
+		},
+		[applyEdit, source],
+	);
+
 	const setIntent = useCallback(
 		(aggregate: AggregateNode, text: string) => {
 			onAggregate(aggregate, (source_, document, current) =>
-				spliceIntent(source_, document, current, text),
+				edits.setIntent(source_, document, current, text),
 			);
 		},
 		[onAggregate],
@@ -478,7 +847,7 @@ export default function ModelEditor() {
 	const setInvariant = useCallback(
 		(aggregate: AggregateNode, index: number, text: string) => {
 			onAggregate(aggregate, (source_, document, current) =>
-				spliceInvariant(source_, document, current, index, text),
+				edits.setInvariant(source_, document, current, index, text),
 			);
 		},
 		[onAggregate],
@@ -804,6 +1173,9 @@ export default function ModelEditor() {
 									'image/svg+xml;charset=utf-8',
 								)
 							}
+							adds={adds}
+							onAdd={add}
+							onConnect={connect}
 						/>
 						{document_.aggregates.length === 0 && document_.members.length === 0 && (
 							<EmptyState
@@ -827,6 +1199,9 @@ export default function ModelEditor() {
 							onClose={() => setSelected(null)}
 							setIntent={setIntent}
 							setInvariant={setInvariant}
+							rename={rename}
+							remove={remove}
+							focusName={fresh !== null && fresh === selected}
 						/>
 					</section>
 				)}

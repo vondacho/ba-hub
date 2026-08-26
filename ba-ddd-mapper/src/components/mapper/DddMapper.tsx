@@ -93,6 +93,7 @@ import EmptyState from '../ui/EmptyState';
 import StoreState from '../ui/StoreState';
 import Editor from './Editor';
 import Graph from './Graph';
+import type { AddChoice } from './CanvasBar';
 import Inspector from './Inspector';
 import { Legend } from './Legend';
 import ProblemList from './ProblemList';
@@ -565,8 +566,38 @@ export default function DddMapper() {
 		[stale, selectedNode],
 	);
 
+	/**
+	 * The three things this canvas makes, in the order the format nests them.
+	 *
+	 * Built here rather than in the bar because the reasons a button is off are
+	 * facts about *this* language, and the bar is shared with a canvas that
+	 * makes different things entirely.
+	 */
+	const adds = useMemo(
+		(): readonly AddChoice[] => [
+			{ kind: 'domain', icon: 'add-domain', label: 'Add a domain', why: canAdd.domain },
+			{
+				kind: 'subdomain',
+				icon: 'add-subdomain',
+				label: 'Add a subdomain to the selected domain',
+				why: canAdd.subdomain,
+			},
+			{
+				kind: 'context',
+				icon: 'add-context',
+				label: 'Add a bounded context to the selection',
+				why: canAdd.context,
+			},
+		],
+		[canAdd],
+	);
+
 	const addNode = useCallback(
-		(kind: NodeKind) => {
+		(chosen: string) => {
+			// The bar is shared with a canvas that makes other things, so the kind
+			// arrives as a string and is narrowed here — where the list it came
+			// from was written.
+			const kind = chosen as NodeKind;
 			if (canAdd[kind] !== null) return;
 			const name = edits.unusedName(document_, NEW_NAME[kind]);
 			applyEdit(edits.addNode(source, kind, name, kind === 'domain' ? null : selectedNode));
@@ -1180,7 +1211,7 @@ export default function DddMapper() {
 							onSaveLayout={saveLayout}
 							onLoadLayout={() => viewInput.current?.click()}
 							onAdd={addNode}
-							canAdd={canAdd}
+							adds={adds}
 							onConnect={connect}
 							onExportSvg={exportSvg}
 							onOpenNode={openModel}

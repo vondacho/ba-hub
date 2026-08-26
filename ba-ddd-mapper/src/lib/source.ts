@@ -198,6 +198,27 @@ export function spaces(indent: string): string {
 }
 
 /**
+ * Shift every line of a block from one indentation to another.
+ *
+ * The first line is exempt when it carries none: a declaration span starts at
+ * its keyword, past the indentation, so line one is already bare. Called with
+ * `from` empty it therefore indents a whole fragment while keeping the relative
+ * shape its inner lines were written with.
+ */
+export function reindent(block: string, from: string, to: string): string {
+	return block
+		.split('\n')
+		.map((line) => {
+			// A blank line stays blank. Prefixing it would leave trailing
+			// whitespace on a line that has nothing on it, which every linter and
+			// half the reviewers in the world will flag.
+			if (line.trim() === '') return line;
+			return line.startsWith(from) ? to + line.slice(from.length) : line;
+		})
+		.join('\n');
+}
+
+/**
  * The leading whitespace of the line `at` sits on, in spaces.
  *
  * Not `indentBefore`, which is the whitespace immediately before `at` — for a

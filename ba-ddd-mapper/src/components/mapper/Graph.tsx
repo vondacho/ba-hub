@@ -18,7 +18,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Classification, DddDocument, Node, NodeKind } from '../../lib/ddd/model';
+import type { Classification, DddDocument, Node } from '../../lib/ddd/model';
 import {
 	applyPositions,
 	borderTowards,
@@ -31,7 +31,7 @@ import {
 } from '../../lib/graph/layout';
 import { classificationLabel, statusNote, styleFor } from '../../lib/graph/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
-import CanvasBar from './CanvasBar';
+import CanvasBar, { type AddChoice } from './CanvasBar';
 import Minimap from './Minimap';
 
 interface Props {
@@ -49,8 +49,8 @@ interface Props {
 	fullscreen: boolean;
 	onSaveLayout: () => void;
 	onLoadLayout: () => void;
-	onAdd: (kind: NodeKind) => void;
-	canAdd: Record<NodeKind, string | null>;
+	onAdd: (kind: string) => void;
+	adds: readonly AddChoice[];
 	/** Draw an edge between two nodes. The parent decides what that means. */
 	onConnect: (fromId: string, toId: string) => void;
 	onExportSvg: (svg: string) => void;
@@ -107,7 +107,7 @@ export default function Graph({
 	onSaveLayout,
 	onLoadLayout,
 	onAdd,
-	canAdd,
+	adds,
 	onConnect,
 	onExportSvg,
 	onOpenNode,
@@ -410,7 +410,7 @@ export default function Graph({
 
 			<CanvasBar
 				onAdd={onAdd}
-				canAdd={canAdd}
+				adds={adds}
 				connecting={connecting}
 				onConnecting={setConnecting}
 				onZoom={zoomBy}

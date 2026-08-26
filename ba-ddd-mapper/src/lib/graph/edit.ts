@@ -24,6 +24,7 @@ import {
 	lineRegion,
 	openBraceAfter,
 	quote,
+	reindent,
 	spaces,
 	splice,
 	spliceAll,
@@ -443,25 +444,6 @@ function declarationSpan(source: string, node: Node): Span {
 	const open = openBraceAfter(source, node.nameSpan.end);
 	const end = open < 0 ? node.nameSpan.end : blockEnd(source, open);
 	return { ...node.span, end };
-}
-
-/**
- * Shift every line of a block from one indentation to another.
- *
- * The first line is exempt when it carries none: a declaration span starts at
- * its keyword, past the indentation, so line one is already bare.
- */
-function reindent(block: string, from: string, to: string): string {
-	return block
-		.split('\n')
-		.map((line) => {
-			// A blank line stays blank. Prefixing it would leave trailing
-			// whitespace on a line that has nothing on it, which every linter and
-			// half the reviewers in the world will flag.
-			if (line.trim() === '') return line;
-			return line.startsWith(from) ? to + line.slice(from.length) : line;
-		})
-		.join('\n');
 }
 
 /** Append a declaration at the end of the map block. */

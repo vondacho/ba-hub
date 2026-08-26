@@ -32,7 +32,7 @@ import { multiplicityMark, type AggregateNode, type DomainModel, type Member } f
 import { routeLinks, type RoutedLink } from '../../lib/ddm/route';
 import { paint } from '../../lib/ddm/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
-import CanvasBar from '../mapper/CanvasBar';
+import CanvasBar, { type AddChoice } from '../mapper/CanvasBar';
 
 interface Props {
 	document: DomainModel;
@@ -45,6 +45,11 @@ interface Props {
 	onFullscreen: () => void;
 	fullscreen: boolean;
 	onExportSvg: (svg: string) => void;
+	/** What this canvas can make, and why each button is off. */
+	adds: readonly AddChoice[];
+	onAdd: (kind: string) => void;
+	/** Two boxes, in the order they were clicked. See `ModelEditor`'s table. */
+	onConnect: (fromId: string, toId: string) => void;
 }
 
 interface View {
@@ -85,6 +90,9 @@ export default function Diagram({
 	onFullscreen,
 	fullscreen,
 	onExportSvg,
+	adds,
+	onAdd,
+	onConnect,
 }: Props) {
 	const [view, setView] = useState<View>({ x: 0, y: 0, scale: ZOOM_UNIT });
 	/*
@@ -94,6 +102,18 @@ export default function Diagram({
 	 */
 	const [exporting, setExporting] = useState(false);
 	const [size, setSize] = useState({ width: 800, height: 600 });
+	/*
+	 * Drawing a link, in two pieces: the mode, and the half-drawn line.
+	 *
+	 * The map's `Graph`, and the map's reason for the split — `connecting` is
+	 * the tool being held and `origin` is the box clicked first, so a completed
+	 * stroke leaves the tool in hand and six links can be drawn without going
+	 * back to the bar. A drag from a box already means "move it", which is why
+	 * this is a mode and not a drag.
+	 */
+	const [connecting, setConnecting] = useState(false);
+	const [origin, setOrigin] = useState<string | null>(null);
+	const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
 	const surface = useRef<SVGSVGElement>(null);
 	const pan = useRef<{ x: number; y: number; originX: number; originY: number; pointerId: number; live: boolean } | null>(null);
 	const dragging = useRef<{ id: string; offsetX: number; offsetY: number; startX: number; startY: number; pointerId: number; moved: boolean } | null>(null);
@@ -137,6 +157,34 @@ export default function Diagram({
 		return () => observer.disconnect();
 	}, []);
 
+	/*
+	 * Escape abandons the candidate, and a second Escape puts the tool down.
+	 * Two steps because losing the tool on the same key that fixes a misclick
+	 * would mean going back to the bar after every slip.
+	 */
+	useEffect(() => {
+		if (!connecting) return;
+		const onKey = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			setOrigin((current) => {
+				if (current === null) setConnecting(false);
+				return null;
+			});
+			setTip(null);
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [connecting]);
+
+	// Putting the tool down drops whatever was half-drawn with it — and so does
+	// the origin going away, which happens when the box it started from is
+	// deleted, or renamed out from under it, while the candidate is out.
+	useEffect(() => {
+		if (connecting && (origin === null || boxes.some((box) => box.id === origin))) return;
+		setOrigin(null);
+		setTip(null);
+	}, [connecting, origin, boxes]);
+
 	useLayoutEffect(() => {
 		if (!exporting) return;
 		const svg = surface.current;
@@ -173,6 +221,27 @@ export default function Diagram({
 		};
 	};
 
+	/**
+	 * A click on a box while the connect tool is held.
+	 *
+	 * First click sets the origin, second commits — unless it landed back on the
+	 * origin, which is a cancel rather than a link to nowhere. A class that
+	 * contains itself is not a thing this format can say, and refusing it with a
+	 * message would be pedantry about an obvious slip.
+	 */
+	const connectTo = (id: string) => {
+		if (origin === null) {
+			setOrigin(id);
+			return;
+		}
+		const from = origin;
+		setOrigin(null);
+		setTip(null);
+		if (from !== id) onConnect(from, id);
+	};
+
+	const originBox = origin === null ? null : (boxes.find((box) => box.id === origin) ?? null);
+
 	const zoomBy = (factor: number) => {
 		setView((current) => {
 			const scale = clampZoom(current.scale * factor, MAX_ZOOM);
@@ -199,6 +268,10 @@ export default function Diagram({
 			)}
 
 			<CanvasBar
+				adds={adds}
+				onAdd={onAdd}
+				connecting={connecting}
+				onConnecting={setConnecting}
 				onZoom={zoomBy}
 				onFit={fit}
 				onReset={() => onPositions({})}
@@ -211,7 +284,9 @@ export default function Diagram({
 
 			<svg
 				ref={surface}
-				className={`h-full w-full touch-none ${stale ? 'opacity-40' : ''} cursor-grab`}
+				className={`h-full w-full touch-none ${stale ? 'opacity-40' : ''} ${
+					connecting ? 'cursor-crosshair' : 'cursor-grab'
+				}`}
 				onWheel={(event) => {
 					if (!event.ctrlKey && !event.metaKey) return;
 					event.preventDefault();
@@ -219,6 +294,9 @@ export default function Diagram({
 				}}
 				onPointerDown={(event) => {
 					if (event.button !== 0 || dragging.current) return;
+					// With the tool in hand the canvas is not a thing to pan: a drag
+					// here would move the model out from under a half-drawn link.
+					if (connecting) return;
 					pan.current = {
 						x: event.clientX,
 						y: event.clientY,
@@ -229,6 +307,11 @@ export default function Diagram({
 					};
 				}}
 				onPointerMove={(event) => {
+					if (connecting) {
+						if (origin !== null) setTip(toGraph(event.clientX, event.clientY));
+						return;
+					}
+
 					const drag = dragging.current;
 					if (drag) {
 						if (!drag.moved) {
@@ -263,7 +346,15 @@ export default function Diagram({
 					dragging.current = null;
 				}}
 				onClick={(event) => {
-					if (event.target === event.currentTarget) onSelect(null);
+					if (event.target !== event.currentTarget) return;
+					// Clicking the canvas with a candidate out loses it, which is what
+					// the hint line promises.
+					if (connecting) {
+						setOrigin(null);
+						setTip(null);
+						return;
+					}
+					onSelect(null);
 				}}
 				role="img"
 				aria-label={`Domain model of ${document.context}: ${document.aggregates.length} aggregates, ${document.members.length} classes`}
@@ -313,7 +404,10 @@ export default function Diagram({
 							box={box}
 							aggregate={box.node as AggregateNode}
 							selected={!exporting && selected === box.id}
+							pending={!exporting && origin === box.id}
+							connecting={connecting}
 							onSelect={onSelect}
+							onConnect={connectTo}
 							didDrag={() => draggedLast.current}
 							onGrab={(event) => grab(event, box)}
 						/>
@@ -334,17 +428,41 @@ export default function Diagram({
 							box={box}
 							member={box.node as Member}
 							selected={!exporting && selected === box.id}
+							pending={!exporting && origin === box.id}
+							connecting={connecting}
 							onSelect={onSelect}
+							onConnect={connectTo}
 							didDrag={() => draggedLast.current}
 							onGrab={(event) => grab(event, box)}
 						/>
 					))}
+
+					{/*
+					 * The half-drawn link, from the middle of the origin to the
+					 * pointer. Dashed and unrouted: it is a gesture in progress rather
+					 * than a link, and drawing it the way a real one is drawn would
+					 * claim it already exists.
+					 */}
+					{originBox && tip && (
+						<line
+							x1={originBox.x + originBox.width / 2}
+							y1={originBox.y + originBox.height / 2}
+							x2={tip.x}
+							y2={tip.y}
+							strokeWidth={2}
+							strokeDasharray="6 4"
+							className="pointer-events-none stroke-brand dark:stroke-purple-400"
+						/>
+					)}
 				</g>
 			</svg>
 
 			<p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-white/85 px-2 py-1 text-[11px] text-ink-muted dark:bg-slate-900/85 dark:text-slate-400">
-				drag a class to move it · drag an aggregate to move it with its members · drag the canvas
-				to pan · ⌘/ctrl + scroll to zoom
+				{connecting
+					? origin === null
+						? 'click the class the link starts from · esc to put the tool down'
+						: 'click what it points at · click anywhere else to lose it · esc to cancel'
+					: 'drag a class to move it · drag an aggregate to move it with its members · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
 			</p>
 		</div>
 	);
@@ -381,28 +499,40 @@ function AggregateBox({
 	box,
 	aggregate,
 	selected,
+	pending,
+	connecting,
 	onSelect,
+	onConnect,
 	didDrag,
 	onGrab,
 }: {
 	box: PlacedBox;
 	aggregate: AggregateNode;
 	selected: boolean;
+	/** The origin of a half-drawn link. */
+	pending: boolean;
+	connecting: boolean;
 	onSelect: (id: string | null) => void;
+	onConnect: (id: string) => void;
 	didDrag: () => boolean;
 	onGrab: (event: React.PointerEvent) => void;
 }) {
 	return (
 		<g
 			transform={`translate(${box.x} ${box.y})`}
-			className="cursor-move"
+			className={connecting ? 'cursor-crosshair' : 'cursor-move'}
 			onPointerDown={(event) => {
 				if (event.button !== 0) return;
 				event.stopPropagation();
-				onGrab(event);
+				// With the tool in hand a box is a target, not a handle.
+				if (!connecting) onGrab(event);
 			}}
 			onClick={(event) => {
 				event.stopPropagation();
+				if (connecting) {
+					onConnect(box.id);
+					return;
+				}
 				if (didDrag()) return;
 				onSelect(selected ? null : box.id);
 			}}
@@ -411,12 +541,18 @@ function AggregateBox({
 				width={box.width}
 				height={box.height}
 				rx={16}
-				strokeWidth={selected ? 3 : 1.5}
+				strokeWidth={selected || pending ? 3 : 1.5}
 				strokeDasharray="7 5"
 				// The boundary's violet is the map's core violet, one tint lighter in
 				// the fill so the root box sitting on it stays the darker of the two.
+				// A pending origin borrows the brand colour instead, so the box a link
+				// is coming *from* is never mistaken for the current selection.
 				className={`fill-violet-50/70 dark:fill-violet-950/40 ${
-					selected ? 'stroke-violet-600 dark:stroke-violet-300' : 'stroke-violet-600 dark:stroke-violet-700'
+					pending
+						? 'stroke-brand dark:stroke-purple-400'
+						: selected
+							? 'stroke-violet-600 dark:stroke-violet-300'
+							: 'stroke-violet-600 dark:stroke-violet-700'
 				}`}
 			/>
 			<text x={16} y={35} className="pointer-events-none fill-violet-950 text-[15px] font-semibold dark:fill-violet-200">
@@ -443,14 +579,21 @@ function MemberBox({
 	box,
 	member,
 	selected,
+	pending,
+	connecting,
 	onSelect,
+	onConnect,
 	didDrag,
 	onGrab,
 }: {
 	box: PlacedBox;
 	member: Member;
 	selected: boolean;
+	/** The origin of a half-drawn link. */
+	pending: boolean;
+	connecting: boolean;
 	onSelect: (id: string | null) => void;
+	onConnect: (id: string) => void;
 	didDrag: () => boolean;
 	onGrab: (event: React.PointerEvent) => void;
 }) {
@@ -460,14 +603,19 @@ function MemberBox({
 	return (
 		<g
 			transform={`translate(${box.x} ${box.y})`}
-			className="cursor-move"
+			className={connecting ? 'cursor-crosshair' : 'cursor-move'}
 			onPointerDown={(event) => {
 				if (event.button !== 0) return;
 				event.stopPropagation();
-				onGrab(event);
+				// With the tool in hand a box is a target, not a handle.
+				if (!connecting) onGrab(event);
 			}}
 			onClick={(event) => {
 				event.stopPropagation();
+				if (connecting) {
+					onConnect(box.id);
+					return;
+				}
 				if (didDrag()) return;
 				onSelect(selected ? null : box.id);
 			}}
@@ -476,8 +624,14 @@ function MemberBox({
 				width={box.width}
 				height={box.height}
 				rx={6}
-				strokeWidth={selected ? 3 : 1.5}
-				className={`${paint(member)} ${selected ? 'stroke-violet-600 dark:stroke-violet-300' : ''}`}
+				strokeWidth={selected || pending ? 3 : 1.5}
+				className={`${paint(member)} ${
+					pending
+						? 'stroke-brand dark:stroke-purple-400'
+						: selected
+							? 'stroke-violet-600 dark:stroke-violet-300'
+							: ''
+				}`}
 			/>
 			{/* Every coordinate here comes from BOX, which is also what sized the
 			    box. Two sets of numbers that have to agree is a bug with a date on
