@@ -5,9 +5,6 @@
 export const DDD_EXTENSION = '.ddd';
 export const DDD_ACCEPT = '.ddd,text/plain';
 
-/** The layout sidecar. See src/lib/view-file.ts for why it is a separate file. */
-export const VIEW_EXTENSION = '.dddview';
-export const VIEW_ACCEPT = '.dddview,application/json';
 
 export async function readTextFile(file: File): Promise<string> {
 	return file.text();
@@ -33,7 +30,16 @@ export function downloadText(
 	text: string,
 	type = 'text/plain;charset=utf-8',
 ): void {
-	const blob = new Blob([text], { type });
+	downloadBlob(filename, new Blob([text], { type }));
+}
+
+/**
+ * The same, for something that is already bytes — an archive.
+ *
+ * `downloadText` is this with an encoding step in front of it, which is why
+ * there is one anchor dance in this file rather than two.
+ */
+export function downloadBlob(filename: string, blob: Blob): void {
 	const url = URL.createObjectURL(blob);
 	const anchor = document.createElement('a');
 	anchor.href = url;
@@ -46,16 +52,15 @@ export function downloadText(
 	setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-export function filenameFor(title: string): string {
-	return `${slug(title, 'map')}${DDD_EXTENSION}`;
-}
-
-/** The sidecar takes the map's stem, so the pair sorts together in a folder. */
-export function viewFilenameFor(title: string): string {
-	return `${slug(title, 'map')}${VIEW_EXTENSION}`;
-}
-
-/** And so does the picture. */
+/**
+ * The picture's filename.
+ *
+ * The last of a family of three. The other two — the `.ddd` and its `.dddview`
+ * — went when the board's export became one archive of the whole thing:
+ * `bundle.ts` builds those names from the storage keys, which are the same
+ * slug, so having a second way to spell them was a second thing to keep in
+ * step.
+ */
 export function svgFilenameFor(title: string): string {
 	return `${slug(title, 'map')}${SVG_EXTENSION}`;
 }

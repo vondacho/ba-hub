@@ -50,17 +50,14 @@ import type { EdgeField, ListField, ScalarField } from '../../lib/graph/edit';
 import {
 	clearFileInput,
 	DDD_ACCEPT,
+	downloadBlob,
 	downloadText,
-	filenameFor,
 	readTextFile,
 	svgFilenameFor,
-	VIEW_ACCEPT,
-	viewFilenameFor,
 } from '../../lib/files';
 import { freshMap } from '../../lib/ddd/seed';
 import { seedModel } from '../../lib/ddm/seed';
 import { modelHref } from '../../lib/links';
-import { parseView, serializeView } from '../../lib/view-file';
 import { useFullscreen } from '../../lib/fullscreen';
 import Icon, { type IconName } from './Icon';
 import IconButton from '../ui/IconButton';
@@ -79,6 +76,7 @@ import {
 	modelKeys,
 	saveModelView,
 	rememberMap,
+	unusedTitle,
 	rememberModel,
 	saveMapView,
 	saveAgent,
@@ -97,6 +95,9 @@ import EmptyState from '../ui/EmptyState';
 import StoreState from '../ui/StoreState';
 import Editor from './Editor';
 import Graph from './Graph';
+import ImportBundle from '../ui/ImportBundle';
+import { incoming, mapIn, outgoing, receive, type Incoming } from '../../lib/bundle';
+import { unzip, zip, ZipError } from '../../lib/zip';
 import AgentPanel from '../agent/AgentPanel';
 import type { AddChoice } from './CanvasBar';
 import Inspector from './Inspector';
@@ -136,15 +137,6 @@ const NEW_RELATIONSHIP = { pattern: 'customer-supplier' as const };
  * button. One panel is for the two moments when the other half is in the way:
  * writing a long map on a laptop, and showing the finished one to a room.
  */
-/**
- * How far apart the exported files are handed to the browser.
- *
- * Two downloads from one click, and browsers that treat two anchor clicks in
- * the same task as one gesture drop the second. Spacing them is the only
- * reliable answer; a quarter of a second is under notice and well clear of the
- * coalescing window.
- */
-const DOWNLOAD_GAP_MS = 250;
 
 const PANE_CHOICES: readonly { panes: Panes; icon: IconName; label: string }[] = [
 	{ panes: 'source', icon: 'panes-source', label: 'Show the source only' },
@@ -273,7 +265,9 @@ export default function DddMapper() {
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
-	const viewInput = useRef<HTMLInputElement>(null);
+	const bundleInput = useRef<HTMLInputElement>(null);
+	/** An archive read but not yet written. See `ImportBundle`. */
+	const [arriving, setArriving] = useState<{ name: string; incoming: Incoming } | null>(null);
 	/*
 	 * The one-line banner under the bar.
 	 *
@@ -555,7 +549,6 @@ export default function DddMapper() {
 	}, [positions, curves, keys.view, mapName, source]);
 
 	// ---- creating, deleting, connecting -------------------------------------
-
 
 	useEffect(() => {
 		if (fresh !== null && fresh !== selected) setFresh(null);
@@ -863,37 +856,54 @@ export default function DddMapper() {
 	);
 
 	/**
-	 * Export: the map and its sidecar, in one gesture.
+	 * Export: this map, its arrangement, and the inside of every context it
+	 * names — one archive, one gesture.
 	 *
-	 * Two files because the map *is* two files — `insurance.ddd` and
-	 * `insurance.dddview`, the same pair the store keeps and the same stem — and
-	 * an export that wrote only the first would hand somebody a map that redraws
-	 * to the computed layout, silently dropping an arrangement they had worked
-	 * out. The sidecar goes out even when nothing has been dragged: an empty one
-	 * costs nothing and means an export is always the same two files rather than
-	 * one or two depending on history.
+	 *     insurance/
+	 *       insurance.ddd
+	 *       insurance.dddview
+	 *       risk-appetite/
+	 *         risk-appetite.ddm
+	 *         risk-appetite.ddmview
+	 *
+	 * **The only export at this level, and deliberately.** There used to be one
+	 * that wrote the `.ddd` and its sidecar alone and another that wrote the
+	 * arrangement by itself, and both are contained in this. A toolbar with
+	 * three exports makes somebody choose between them every time, having first
+	 * worked out what the difference is — and the difference was scope, which is
+	 * the one thing a person exporting their work does not want to think about.
+	 *
+	 * The sidecar goes out even when nothing has been dragged: an empty one
+	 * costs nothing and means an export is always the same shape rather than one
+	 * that varies with history.
+	 *
+	 * Contexts the map names that have no model in this browser are counted
+	 * rather than written — an empty folder is a claim that something is there —
+	 * and the note says how many, because "three of these are still unmodelled"
+	 * is exactly what somebody wants to hear while packing up.
 	 *
 	 * The picture is not here. It belongs to the canvas — it is a copy of the
 	 * live tree rather than a second renderer — and it stays where the thing it
 	 * copies is, on the canvas's own toolbar.
 	 */
-	const exportMap = useCallback(() => {
-		downloadText(filenameFor(document_.title), source);
+	const exportBundle = useCallback(async () => {
+		const contexts = document_.nodes
+			.filter((node) => node.kind === 'context')
+			.map((node) => node.name);
+		const bundle = outgoing(document_.title, source, contexts);
 
-		const sidecar = serializeView({
-			positions: { ...positions },
-			curves: { ...curves },
-			map: document_.title,
+		downloadBlob(`${bundle.root}.zip`, await zip(bundle.entries));
+
+		const models = bundle.entries.filter((entry) => entry.path.endsWith('.ddm')).length;
+		setNote({
+			kind: 'warn',
+			text:
+				`Exported ${bundle.root}.zip — the map and ${models === 1 ? 'one model' : `${models} models`}.` +
+				(bundle.missing.length > 0
+					? ` ${bundle.missing.length === 1 ? 'One context has' : `${bundle.missing.length} contexts have`} no model in this browser yet, so nothing was written for ${bundle.missing.length === 1 ? 'it' : 'them'}.`
+					: ''),
 		});
-		window.setTimeout(() => downloadText(viewFilenameFor(document_.title), sidecar), DOWNLOAD_GAP_MS);
-	}, [document_.title, source, positions, curves]);
-
-	const saveLayout = useCallback(() => {
-		downloadText(
-			viewFilenameFor(document_.title),
-			serializeView({ positions: { ...positions }, curves: { ...curves }, map: document_.title }),
-		);
-	}, [document_.title, positions, curves]);
+	}, [document_, source]);
 
 	/**
 	 * Everything that has to be true before the model page opens.
@@ -938,7 +948,29 @@ export default function DddMapper() {
 	}, []);
 
 	const loadExample = useCallback(() => open_(SAMPLE), [open_]);
-	const startFresh = useCallback(() => open_(freshMap()), [open_]);
+
+	/**
+	 * A map that did not exist a second ago.
+	 *
+	 * **Nothing is lost by pressing it.** The map on screen keeps its own
+	 * entries — `open_` flags this as a load rather than a rename, so the store
+	 * is not moved — and the new one takes a name nothing is using, so pressing
+	 * it twice leaves two drafts rather than one overwritten. Both are in the
+	 * store panel, which is the sentence the note says out loud: somebody whose
+	 * work has just vanished from the screen should not have to take that on
+	 * trust.
+	 */
+	const startFresh = useCallback(() => {
+		const title = unusedTitle('New map', 'map');
+		const had = !blank(source) && document_.title !== '';
+		open_(freshMap(title));
+		if (had) {
+			setNote({
+				kind: 'warn',
+				text: `Started “${title}”. “${document_.title}” is still in this browser — the store panel opens it again.`,
+			});
+		}
+	}, [document_.title, open_, source]);
 
 	/**
 	 * Write this map out now, rather than at the end of the debounce.
@@ -997,18 +1029,59 @@ export default function DddMapper() {
 		[prepareModel],
 	);
 
-	const loadLayout = async (file: File | undefined) => {
+	/**
+	 * Read an archive, and stop.
+	 *
+	 * Nothing is written here. The panel lists what would land and what it would
+	 * replace, and the writing waits for somebody to say yes: an import can
+	 * overwrite the only copy of a map, and ⌘Z does not reach the store.
+	 */
+	const openBundle = async (file: File | undefined) => {
+		clearFileInput(bundleInput.current);
 		if (!file) return;
-		const result = parseView(await readTextFile(file), document_.title);
-		clearFileInput(viewInput.current);
 
-		if (!result.ok) {
-			setNote({ kind: 'error', text: result.error });
+		try {
+			setArriving({ name: file.name, incoming: incoming(await unzip(await file.arrayBuffer())) });
+		} catch (error) {
+			setNote({
+				kind: 'error',
+				text: error instanceof ZipError ? error.message : 'That file could not be read as an archive.',
+			});
+		}
+	};
+
+	/** Yes, having read the list. */
+	const takeBundle = () => {
+		if (!arriving) return;
+		const result = receive(arriving.incoming.files);
+		const opening = mapIn(arriving.incoming.files);
+		setArriving(null);
+
+		if (result.failed.length > 0) {
+			setNote({
+				kind: 'error',
+				text: `Wrote ${result.written}, then ran out of room before ${result.failed.join(', ')}. The store panel says what is taking the space.`,
+			});
 			return;
 		}
-		setPositions(result.view.positions);
-		setCurves(result.view.curves);
-		setNote(result.warning ? { kind: 'warn', text: result.warning } : null);
+
+		// The map it brought becomes the map on screen. Anything else leaves
+		// somebody looking at their old document wondering whether it worked.
+		const text = opening ? loadText(opening.doc) : null;
+		if (opening && text !== null) {
+			// Not a rename: the map that was here keeps its own entries.
+			renamed.current = false;
+			setSource(text);
+			setSelected(null);
+			const view = loadMapView(opening.view);
+			setPositions(view.positions);
+			setCurves(view.curves);
+		}
+
+		setNote({
+			kind: 'warn',
+			text: `Imported ${result.written} ${result.written === 1 ? 'document' : 'documents'}.`,
+		});
 	};
 
 	const onOpen = async (file: File | undefined) => {
@@ -1117,14 +1190,30 @@ export default function DddMapper() {
 					>
 						<Icon name="format" />
 					</IconButton>
+					{/* Before Open, because it is the other way in and the one somebody
+					    with nothing yet needs. It used to be reachable only by emptying
+					    the editor until the canvas offered it, which is a gesture you
+					    find by accident and only once. */}
+					<IconButton
+						label="Start a new map. Nothing is lost — this one stays in the store."
+						onClick={startFresh}
+					>
+						<Icon name="new" />
+					</IconButton>
 					<IconButton label="Open a .ddd map" onClick={() => fileInput.current?.click()}>
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this map: a .ddd file and its .dddview sidecar"
-						onClick={exportMap}
+						label="Export this map and the models of the contexts it names, as a .zip"
+						onClick={() => void exportBundle()}
 					>
-						<Icon name="export" />
+						<Icon name="folder-export" />
+					</IconButton>
+					<IconButton
+						label="Import a .zip: a map and its models"
+						onClick={() => bundleInput.current?.click()}
+					>
+						<Icon name="folder-import" />
 					</IconButton>
 					<IconButton
 						label="What this browser is holding"
@@ -1162,10 +1251,10 @@ export default function DddMapper() {
 					className="hidden"
 				/>
 				<input
-					ref={viewInput}
+					ref={bundleInput}
 					type="file"
-					accept={VIEW_ACCEPT}
-					onChange={(event) => void loadLayout(event.target.files?.[0])}
+					accept=".zip,application/zip"
+					onChange={(event) => void openBundle(event.target.files?.[0])}
 					className="hidden"
 				/>
 			</div>
@@ -1173,6 +1262,15 @@ export default function DddMapper() {
 			{/* The legend explains the map's colours, so it goes when the map does —
 			    and when it is turned off, which is a different question with the
 			    same answer on screen. */}
+			{arriving && (
+				<ImportBundle
+					name={arriving.name}
+					incoming={arriving.incoming}
+					onImport={takeBundle}
+					onClose={() => setArriving(null)}
+				/>
+			)}
+
 			{showStore && (
 				<StoreState current={keys.doc} onLeaving={flush} onClose={() => setShowStore(false)} />
 			)}
@@ -1259,8 +1357,6 @@ export default function DddMapper() {
 							onCurves={setCurves}
 							onFullscreen={toggleFullscreen}
 							fullscreen={fullscreen}
-							onSaveLayout={saveLayout}
-							onLoadLayout={() => viewInput.current?.click()}
 							onAdd={addNode}
 							adds={adds}
 							onConnect={connect}

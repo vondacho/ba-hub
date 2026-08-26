@@ -12,13 +12,13 @@
  * problems panel exists to say out loud, and a first map that says nothing
  * teaches nothing.
  */
-export function freshMap(): string {
+export function freshMap(title = 'New map'): string {
 	return `// A new context map.
 //
 // Rename the domain, then add the subdomains it divides into and the bounded
 // contexts that serve them. The panel below says what is still missing.
 
-map "New map" {
+map "${title}" {
 
   domain "New domain" {
   }

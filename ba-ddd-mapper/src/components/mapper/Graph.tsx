@@ -48,8 +48,6 @@ interface Props {
 	onCurves: (next: Curves) => void;
 	onFullscreen: () => void;
 	fullscreen: boolean;
-	onSaveLayout: () => void;
-	onLoadLayout: () => void;
 	onAdd: (kind: string) => void;
 	adds: readonly AddChoice[];
 	/** Draw an edge between two nodes. The parent decides what that means. */
@@ -105,8 +103,6 @@ export default function Graph({
 	onCurves,
 	onFullscreen,
 	fullscreen,
-	onSaveLayout,
-	onLoadLayout,
 	onAdd,
 	adds,
 	onConnect,
@@ -432,8 +428,6 @@ export default function Graph({
 					onPositions({});
 					onCurves({});
 				}}
-				onSaveLayout={onSaveLayout}
-				onLoadLayout={onLoadLayout}
 				onExportSvg={() => setExporting(true)}
 				onFullscreen={onFullscreen}
 				fullscreen={fullscreen}

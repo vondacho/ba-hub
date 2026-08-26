@@ -55,6 +55,7 @@ import {
 	loadTheme,
 	modelKeys,
 	rememberModel,
+	unusedTitle,
 	saveModelView,
 	saveAgent,
 	saveInspector,
@@ -949,6 +950,29 @@ export default function ModelEditor() {
 	}, [document_.context]);
 
 	/**
+	 * A model that did not exist a second ago — and this one is **not**
+	 * `startFresh`.
+	 *
+	 * That one keeps the context's name on purpose: it is what the empty state
+	 * offers when you arrive from the map on a context nobody has modelled, and
+	 * pressing it means "yes, model *this*". From the toolbar the same
+	 * behaviour would be a trap — pressing New while looking at Risk appetite
+	 * would write a blank model called Risk appetite over the real one. So this
+	 * takes a name nothing is using, which also makes it safe to press twice.
+	 */
+	const newModel = useCallback(() => {
+		const name = unusedTitle('New model', 'model');
+		const had = !blank(source) && document_.context !== '';
+		open_(freshModel(name), name);
+		if (had) {
+			setNote({
+				kind: 'warn',
+				text: `Started “${name}”. “${document_.context}” is still in this browser — the store panel opens it again.`,
+			});
+		}
+	}, [document_.context, source]);
+
+	/**
 	 * Put a document in the editor, by request, and show both halves of it.
 	 *
 	 * Flagged as a load rather than left to look like one: the text carries its
@@ -1087,6 +1111,13 @@ export default function ModelEditor() {
 						onClick={format}
 					>
 						<Icon name="format" />
+					</IconButton>
+					{/* The map's, in the map's place, and for the map's reason. */}
+					<IconButton
+						label="Start a new model. Nothing is lost — this one stays in the store."
+						onClick={newModel}
+					>
+						<Icon name="new" />
 					</IconButton>
 					<IconButton label="Open a .ddm model" onClick={() => fileInput.current?.click()}>
 						<Icon name="open" />

@@ -13,8 +13,6 @@ export type IconName =
 	| 'open'
 	| 'export'
 	| 'sample'
-	| 'layout-save'
-	| 'layout-open'
 	| 'zoom-in'
 	| 'zoom-out'
 	| 'fit'
@@ -38,12 +36,39 @@ export type IconName =
 	| 'legend'
 	| 'inspector'
 	| 'agent'
+	| 'new'
+	| 'folder-export'
+	| 'folder-import'
 	| 'add-aggregate'
 	| 'add-entity'
 	| 'add-value'
 	| 'add-enum';
 
 const PATHS: Record<IconName, React.ReactNode> = {
+	// A blank sheet with a plus: a document that does not exist yet.
+	new: (
+		<>
+			<path d="M4 2h5l3 3v9H4V2Zm5 0v3h3" />
+			<path d="M8 8v4M6 10h4" />
+		</>
+	),
+	/*
+	 * The folder pair: the same two arrows as `open` and `export`, on a folder
+	 * instead of a tray. A map and its models go out and come back together, and
+	 * the icon should say "more than one file" before the tooltip does.
+	 */
+	'folder-export': (
+		<>
+			<path d="M2 12.5v-9h4l1.5 2h6.5v7H2Z" />
+			<path d="M8 11V6.5m0 0L6.4 8.1M8 6.5l1.6 1.6" />
+		</>
+	),
+	'folder-import': (
+		<>
+			<path d="M2 12.5v-9h4l1.5 2h6.5v7H2Z" />
+			<path d="M8 6.5V11m0 0 1.6-1.6M8 11 6.4 9.4" />
+		</>
+	),
 	// A tray with an arrow coming *in* — the file comes to you.
 	open: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 2v7m0 0 2.5-2.5M8 9 5.5 6.5" />,
 	// The same tray, arrow going *out*.
@@ -76,10 +101,6 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	format: <path d="M2.5 3.5h11M6 6.5h7.5M6 9.5h7.5M2.5 12.5h11M3.5 6.5v3" />,
 	// A document with a spark: the example map, not your work.
 	sample: <path d="M4 2h5l3 3v9H4V2Zm5 0v3h3M6.5 11.5l.7-1.6 1.6-.7-1.6-.7-.7-1.6-.7 1.6-1.6.7 1.6.7.7 1.6Z" />,
-	// A frame with a downward arrow: the arrangement, saved.
-	'layout-save': <path d="M2.5 3.5h11v9h-11v-9Zm5.5 2v4m0 0 1.75-1.75M8 9.5 6.25 7.75" />,
-	// The same frame, arrow up out of it.
-	'layout-open': <path d="M2.5 3.5h11v9h-11v-9Zm5.5 6v-4m0 0L6.25 7.25M8 5.5l1.75 1.75" />,
 	'zoom-in': <path d="M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm3.4 7.9L14 14M7 5v4M5 7h4" />,
 	'zoom-out': <path d="M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm3.4 7.9L14 14M5 7h4" />,
 	// A framed target: fit the content, as distinct from filling the screen.

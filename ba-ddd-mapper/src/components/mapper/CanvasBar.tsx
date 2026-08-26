@@ -73,8 +73,6 @@ interface Props {
 	adds?: readonly AddChoice[];
 	connecting?: boolean;
 	onConnecting?: (on: boolean) => void;
-	onSaveLayout?: () => void;
-	onLoadLayout?: () => void;
 	onZoom: (factor: number) => void;
 	onFit: () => void;
 	onReset: () => void;
@@ -95,8 +93,6 @@ export default function CanvasBar({
 	onZoom,
 	onFit,
 	onReset,
-	onSaveLayout,
-	onLoadLayout,
 	onExportSvg,
 	onFullscreen,
 	fullscreen,
@@ -161,22 +157,13 @@ export default function CanvasBar({
 
 			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
-			{onSaveLayout && (
-				<Button
-					label={
-						moved === 0 ? 'Save this layout (nothing moved yet)' : 'Save this layout to a .dddview file'
-					}
-					onClick={onSaveLayout}
-					disabled={moved === 0}
-				>
-					<Icon name="layout-save" />
-				</Button>
-			)}
-			{onLoadLayout && (
-				<Button label="Load a layout from a .dddview file" onClick={onLoadLayout}>
-					<Icon name="layout-open" />
-				</Button>
-			)}
+			{/*
+			 * The one export at this level, and it is the picture — the artefact
+			 * that belongs to the canvas rather than to the document. The
+			 * arrangement used to have its own save and load here, writing the
+			 * `.dddview` by itself; the board's export carries that file now, and
+			 * two buttons for one artefact is a choice nobody should have to make.
+			 */}
 			<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
 				<Icon name="picture" />
 			</Button>

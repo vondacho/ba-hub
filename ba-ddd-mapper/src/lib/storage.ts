@@ -76,6 +76,27 @@ export function modelKeys(context: string): DocumentKeys {
 	return { doc: `${stem}.ddm`, view: `${stem}.ddmview` };
 }
 
+/**
+ * `base`, or the first numbered variant of it this browser is not already
+ * using.
+ *
+ * What makes a New button safe to press twice. Both fresh documents are called
+ * the same thing — "New map", "New model" — so the second would land on the
+ * first's key and take a draft somebody had started with it. The name is the
+ * filename is the key here, so asking whether a name is free is one lookup.
+ *
+ * `unusedName` in `graph/edit.ts` is the same idea one level down, for names
+ * inside a document; this one is about names *of* documents.
+ */
+export function unusedTitle(base: string, kind: 'map' | 'model'): string {
+	const keysFor = kind === 'map' ? mapKeys : modelKeys;
+	if (loadText(keysFor(base).doc) === null) return base;
+	for (let n = 2; ; n += 1) {
+		const candidate = `${base} ${n}`;
+		if (loadText(keysFor(candidate).doc) === null) return candidate;
+	}
+}
+
 function store(): Storage | null {
 	try {
 		return window.localStorage;
