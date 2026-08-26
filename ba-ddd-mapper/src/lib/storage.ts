@@ -28,9 +28,9 @@
  * the title rather than the key so that both of a document's entries can be
  * derived from one string.
  *
- * The desk keys — theme, split, panes, legend, inspector — stay global and
- * stay outside this scheme. They are properties of the person, not of any
- * document.
+ * The desk keys — theme, split, panes, legend, inspector, and the agent's
+ * configuration — stay global and stay outside this scheme. They are properties
+ * of the person, not of any document.
  */
 
 import { slug } from './files';
@@ -41,6 +41,10 @@ const SPLIT = 'ba-ddd-mapper-mapper:split';
 const PANES = 'ba-ddd-mapper-mapper:panes';
 const LEGEND = 'ba-ddd-mapper-mapper:legend';
 const INSPECTOR = 'ba-ddd-mapper-mapper:inspector';
+const AGENT = 'ba-ddd-mapper-mapper:agent';
+const AGENT_CONFIG = 'ba-ddd-mapper-mapper:agent-config';
+/** Apart from the rest of the configuration, and deliberately. See `loadKey`. */
+const AGENT_KEY = 'ba-ddd-mapper-mapper:agent-key';
 const LAST_MAP = 'ba-ddd-mapper:last-map';
 const LAST_MODEL = 'ba-ddd-mapper:last-model';
 
@@ -253,6 +257,104 @@ export function saveInspector(show: boolean): void {
 		store()?.setItem(INSPECTOR, show ? 'on' : 'off');
 	} catch {
 		// As with the theme: a preference that does not persist is survivable.
+	}
+}
+
+/** Whether the agent panel is open. The legend's key, one along. */
+export function loadAgent(): boolean | null {
+	try {
+		const value = store()?.getItem(AGENT);
+		return value === 'on' ? true : value === 'off' ? false : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveAgent(show: boolean): void {
+	try {
+		store()?.setItem(AGENT, show ? 'on' : 'off');
+	} catch {
+		// As with the theme: a preference that does not persist is survivable.
+	}
+}
+
+/**
+ * How the agent is configured — everything except the key.
+ *
+ * `remember` is about the key and lives here rather than with it, because it is
+ * a decision the visitor made and the key is a secret they typed. Keeping the
+ * two apart is what lets the key be dropped without forgetting the choice.
+ */
+export interface AgentConfig {
+	readonly model: string;
+	readonly effort: string;
+	/** Standing instructions, appended to the guide. */
+	readonly guidance: string;
+	readonly remember: boolean;
+}
+
+export const AGENT_DEFAULTS: AgentConfig = {
+	model: 'claude-opus-5',
+	effort: 'high',
+	guidance: '',
+	remember: false,
+};
+
+export function loadAgentConfig(): AgentConfig {
+	try {
+		const raw = store()?.getItem(AGENT_CONFIG);
+		if (!raw) return AGENT_DEFAULTS;
+		const parsed = JSON.parse(raw) as Partial<AgentConfig>;
+		return {
+			model: typeof parsed.model === 'string' && parsed.model !== '' ? parsed.model : AGENT_DEFAULTS.model,
+			effort: typeof parsed.effort === 'string' ? parsed.effort : AGENT_DEFAULTS.effort,
+			guidance: typeof parsed.guidance === 'string' ? parsed.guidance : '',
+			remember: parsed.remember === true,
+		};
+	} catch {
+		// A corrupt entry is not worth a broken panel.
+		return AGENT_DEFAULTS;
+	}
+}
+
+export function saveAgentConfig(config: AgentConfig): void {
+	try {
+		store()?.setItem(AGENT_CONFIG, JSON.stringify(config));
+	} catch {
+		// Same.
+	}
+}
+
+/**
+ * The API key, in whichever store the visitor chose.
+ *
+ * **Two stores, one key, and the difference is the point.** `sessionStorage` is
+ * this tab and goes when it closes; `localStorage` survives, and survives for
+ * anything else that can run script on this origin. Neither is a secret vault
+ * and the panel says so — a browser is where a local-first tool can keep a key,
+ * and being told that plainly is the least this can do about it.
+ *
+ * Read from both regardless of the current preference, because the preference
+ * can change after a key was stored and a key nobody can find is worse than
+ * either choice.
+ */
+export function loadKey(): string {
+	try {
+		return window.sessionStorage.getItem(AGENT_KEY) ?? store()?.getItem(AGENT_KEY) ?? '';
+	} catch {
+		return '';
+	}
+}
+
+export function saveKey(key: string, remember: boolean): void {
+	try {
+		window.sessionStorage.removeItem(AGENT_KEY);
+		store()?.removeItem(AGENT_KEY);
+		if (key === '') return;
+		(remember ? store() : window.sessionStorage)?.setItem(AGENT_KEY, key);
+	} catch {
+		// A key that does not persist still works for this page's lifetime; the
+		// panel holds it in memory too.
 	}
 }
 

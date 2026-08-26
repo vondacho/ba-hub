@@ -37,6 +37,7 @@ export type IconName =
 	| 'format'
 	| 'legend'
 	| 'inspector'
+	| 'agent'
 	| 'add-aggregate'
 	| 'add-entity'
 	| 'add-value'
@@ -47,6 +48,14 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	open: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 2v7m0 0 2.5-2.5M8 9 5.5 6.5" />,
 	// The same tray, arrow going *out*.
 	export: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 9.5v-7m0 0L5.5 5M8 2.5 10.5 5" />,
+	// A speech mark with a spark in it: something that answers, and is not a
+	// person. The same spark as `sample`, which is the house mark for generated.
+	agent: (
+		<>
+			<path d="M13.5 3.5h-11v8h3v2.5l3-2.5h5v-8Z" />
+			<path d="M8 5.6l.55 1.35L9.9 7.5l-1.35.55L8 9.4l-.55-1.35L6.1 7.5l1.35-.55L8 5.6Z" />
+		</>
+	),
 	// A panel docked to the right of the frame, which is where it opens.
 	inspector: (
 		<>

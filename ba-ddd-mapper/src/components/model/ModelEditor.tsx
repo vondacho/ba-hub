@@ -46,6 +46,7 @@ import {
 	forget,
 	lastModel,
 	loadModelView,
+	loadAgent,
 	loadInspector,
 	loadLegend,
 	loadPanes,
@@ -55,6 +56,7 @@ import {
 	modelKeys,
 	rememberModel,
 	saveModelView,
+	saveAgent,
 	saveInspector,
 	saveLegend,
 	savePanes,
@@ -78,6 +80,7 @@ import ProblemList from '../mapper/ProblemList';
 import IconButton from '../ui/IconButton';
 import { useFullscreen } from '../../lib/fullscreen';
 import Diagram from './Diagram';
+import AgentPanel from '../agent/AgentPanel';
 import type { AddChoice } from '../mapper/CanvasBar';
 
 const DEBOUNCE_MS = 250;
@@ -289,6 +292,14 @@ export default function ModelEditor() {
 	 * strange preference that quietly disabled half the bar. Only the panel goes.
 	 */
 	const [inspector, setInspector] = useState(true);
+	/**
+	 * The assistant panel. Closed until asked for — unlike the legend and the
+	 * inspector, which describe what is already on screen.
+	 *
+	 * This one costs money and sends the document somewhere, so it opens because
+	 * somebody wanted it and not because nobody has said otherwise yet.
+	 */
+	const [agent, setAgent] = useState(false);
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	const [positions, setPositions] = useState<Positions>(start.positions);
 	const [saveFailed, setSaveFailed] = useState(false);
@@ -338,6 +349,8 @@ export default function ModelEditor() {
 		if (storedLegend !== null) setLegend(storedLegend);
 		const storedInspector = loadInspector();
 		if (storedInspector !== null) setInspector(storedInspector);
+		const storedAgent = loadAgent();
+		if (storedAgent !== null) setAgent(storedAgent);
 	}, []);
 
 	/**
@@ -1048,6 +1061,19 @@ export default function ModelEditor() {
 						<Icon name="inspector" />
 					</IconButton>
 
+					{/* Beside the other two, and the same question again: which of the
+					    editor's own furniture is showing. */}
+					<IconButton
+						label={agent ? 'Hide the assistant' : 'Ask about this document'}
+						pressed={agent}
+						onClick={() => {
+							setAgent(!agent);
+							saveAgent(!agent);
+						}}
+					>
+						<Icon name="agent" />
+					</IconButton>
+
 					{saveFailed && (
 						<span className="text-xs text-amber-700 dark:text-amber-400">
 							Not saving in this browser
@@ -1231,6 +1257,21 @@ export default function ModelEditor() {
 							focusName={fresh !== null && fresh === selected}
 						/>
 					</section>
+				)}
+				{/* A third column, after the picture rather than over it: an answer
+				    about a document is read *beside* the document, and a panel that
+				    covered the thing it is discussing would be the wrong shape. */}
+				{agent && (
+					<AgentPanel
+						language="ddm"
+						source={source}
+						check={(text) => parse(text).problems}
+						onApply={applyEdit}
+						onClose={() => {
+							setAgent(false);
+							saveAgent(false);
+						}}
+					/>
 				)}
 			</div>
 		</div>
