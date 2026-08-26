@@ -28,8 +28,8 @@
  * the title rather than the key so that both of a document's entries can be
  * derived from one string.
  *
- * The desk keys — theme, split, panes — stay global and stay outside this
- * scheme. They are properties of the person, not of any document.
+ * The desk keys — theme, split, panes, legend — stay global and stay outside
+ * this scheme. They are properties of the person, not of any document.
  */
 
 import { slug } from './files';
@@ -38,6 +38,7 @@ import { parseModelView, parseView, serializeModelView, serializeView } from './
 const THEME = 'ba-ddd-mapper-mapper:graph-theme';
 const SPLIT = 'ba-ddd-mapper-mapper:split';
 const PANES = 'ba-ddd-mapper-mapper:panes';
+const LEGEND = 'ba-ddd-mapper-mapper:legend';
 const LAST_MAP = 'ba-ddd-mapper:last-map';
 const LAST_MODEL = 'ba-ddd-mapper:last-model';
 
@@ -188,6 +189,36 @@ export function loadPanes(): Panes | null {
 export function savePanes(panes: Panes): void {
 	try {
 		store()?.setItem(PANES, panes);
+	} catch {
+		// As with the theme: a preference that does not persist is survivable.
+	}
+}
+
+/**
+ * Whether the legend is showing, in its own key alongside the panes.
+ *
+ * A property of the reader rather than of the document, like everything else on
+ * this shelf: somebody meeting the notation wants the row and somebody who has
+ * been writing these all week wants the two centimetres of canvas back. It is
+ * remembered rather than defaulted for that reason — the second group would
+ * otherwise dismiss it once per visit.
+ *
+ * Null is "never said", which the editors read as showing it. A legend that
+ * hid itself until asked for would be a legend nobody meeting the notation ever
+ * discovers, which is the one audience it exists for.
+ */
+export function loadLegend(): boolean | null {
+	try {
+		const value = store()?.getItem(LEGEND);
+		return value === 'on' ? true : value === 'off' ? false : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveLegend(show: boolean): void {
+	try {
+		store()?.setItem(LEGEND, show ? 'on' : 'off');
 	} catch {
 		// As with the theme: a preference that does not persist is survivable.
 	}

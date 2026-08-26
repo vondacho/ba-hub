@@ -68,6 +68,7 @@ import {
 	forget,
 	lastMap,
 	loadMapView,
+	loadLegend,
 	loadPanes,
 	loadSplit,
 	loadText,
@@ -78,6 +79,7 @@ import {
 	rememberMap,
 	rememberModel,
 	saveMapView,
+	saveLegend,
 	savePanes,
 	saveSplit,
 	saveText,
@@ -233,6 +235,14 @@ export default function DddMapper() {
 	const [collapsed, setCollapsed] = useState(false);
 	const [split, setSplit] = useState(42);
 	const [panes, setPanes] = useState<Panes>('both');
+	/**
+	 * The notation row. Shown until somebody says otherwise — see `loadLegend`.
+	 *
+	 * It has no bearing on the source pane, so the button stays live even with
+	 * the graph hidden: the answer is about what the panel shows when it is
+	 * showing, exactly as the split percentage survives a single pane.
+	 */
+	const [legend, setLegend] = useState(true);
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	// Where the visitor has dragged boxes to. View state: it goes to
 	// localStorage and never into `source`.
@@ -295,6 +305,8 @@ export default function DddMapper() {
 		if (storedSplit !== null) setSplit(storedSplit);
 		const storedPanes = loadPanes();
 		if (storedPanes !== null) setPanes(storedPanes);
+		const storedLegend = loadLegend();
+		if (storedLegend !== null) setLegend(storedLegend);
 	}, []);
 
 	/**
@@ -997,6 +1009,19 @@ export default function DddMapper() {
 						))}
 					</span>
 
+					{/* Next to the picker that decides which panels show, because it
+					    is the same question one row down: what the panel shows. */}
+					<IconButton
+						label={legend ? 'Hide the legend' : 'Show the legend'}
+						pressed={legend}
+						onClick={() => {
+							setLegend(!legend);
+							saveLegend(!legend);
+						}}
+					>
+						<Icon name="legend" />
+					</IconButton>
+
 					{saveFailed && (
 						<span className="text-xs text-amber-700 dark:text-amber-400">
 							Not saving in this browser
@@ -1063,12 +1088,14 @@ export default function DddMapper() {
 				/>
 			</div>
 
-			{/* The legend explains the map's colours, so it goes when the map does. */}
+			{/* The legend explains the map's colours, so it goes when the map does —
+			    and when it is turned off, which is a different question with the
+			    same answer on screen. */}
 			{showStore && (
 				<StoreState current={keys.doc} onLeaving={flush} onClose={() => setShowStore(false)} />
 			)}
 
-			{panes !== 'source' && <Legend theme={theme} />}
+			{panes !== 'source' && legend && <Legend theme={theme} />}
 
 			{note && (
 				<p
