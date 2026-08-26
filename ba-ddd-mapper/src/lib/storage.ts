@@ -28,8 +28,9 @@
  * the title rather than the key so that both of a document's entries can be
  * derived from one string.
  *
- * The desk keys — theme, split, panes, legend — stay global and stay outside
- * this scheme. They are properties of the person, not of any document.
+ * The desk keys — theme, split, panes, legend, inspector — stay global and
+ * stay outside this scheme. They are properties of the person, not of any
+ * document.
  */
 
 import { slug } from './files';
@@ -39,6 +40,7 @@ const THEME = 'ba-ddd-mapper-mapper:graph-theme';
 const SPLIT = 'ba-ddd-mapper-mapper:split';
 const PANES = 'ba-ddd-mapper-mapper:panes';
 const LEGEND = 'ba-ddd-mapper-mapper:legend';
+const INSPECTOR = 'ba-ddd-mapper-mapper:inspector';
 const LAST_MAP = 'ba-ddd-mapper:last-map';
 const LAST_MODEL = 'ba-ddd-mapper:last-model';
 
@@ -219,6 +221,36 @@ export function loadLegend(): boolean | null {
 export function saveLegend(show: boolean): void {
 	try {
 		store()?.setItem(LEGEND, show ? 'on' : 'off');
+	} catch {
+		// As with the theme: a preference that does not persist is survivable.
+	}
+}
+
+/**
+ * Whether the inspector opens on a selection, in its own key beside the legend.
+ *
+ * The legend's reasoning exactly, and the same answer: it is a property of the
+ * reader. Somebody editing wants the panel on every click; somebody reading a
+ * map on a projector wants the whole canvas and none of it, and closing it once
+ * per selection is not a preference, it is a chore.
+ *
+ * Null is "never said", which the editors read as showing it — for the legend's
+ * reason too. The inspector is where a pattern is chosen, a rationale typed and
+ * an invariant written, so a tool that hid it until asked would hide most of
+ * what it does.
+ */
+export function loadInspector(): boolean | null {
+	try {
+		const value = store()?.getItem(INSPECTOR);
+		return value === 'on' ? true : value === 'off' ? false : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveInspector(show: boolean): void {
+	try {
+		store()?.setItem(INSPECTOR, show ? 'on' : 'off');
 	} catch {
 		// As with the theme: a preference that does not persist is survivable.
 	}

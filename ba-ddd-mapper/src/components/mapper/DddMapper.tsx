@@ -68,6 +68,7 @@ import {
 	forget,
 	lastMap,
 	loadMapView,
+	loadInspector,
 	loadLegend,
 	loadPanes,
 	loadSplit,
@@ -79,6 +80,7 @@ import {
 	rememberMap,
 	rememberModel,
 	saveMapView,
+	saveInspector,
 	saveLegend,
 	savePanes,
 	saveSplit,
@@ -244,6 +246,14 @@ export default function DddMapper() {
 	 * showing, exactly as the split percentage survives a single pane.
 	 */
 	const [legend, setLegend] = useState(true);
+	/**
+	 * The inspector panel. Shown until somebody says otherwise — `loadInspector`.
+	 *
+	 * Turning it off does not stop things being selected: the selection is what
+	 * the Add buttons act on and what the canvas highlights, and it would be a
+	 * strange preference that quietly disabled half the bar. Only the panel goes.
+	 */
+	const [inspector, setInspector] = useState(true);
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	// Where the visitor has dragged boxes to. View state: it goes to
 	// localStorage and never into `source`.
@@ -308,6 +318,8 @@ export default function DddMapper() {
 		if (storedPanes !== null) setPanes(storedPanes);
 		const storedLegend = loadLegend();
 		if (storedLegend !== null) setLegend(storedLegend);
+		const storedInspector = loadInspector();
+		if (storedInspector !== null) setInspector(storedInspector);
 	}, []);
 
 	/**
@@ -1053,6 +1065,19 @@ export default function DddMapper() {
 						<Icon name="legend" />
 					</IconButton>
 
+					{/* Beside the legend, and the same kind of answer: which of the
+					    canvas's own furniture is showing. */}
+					<IconButton
+						label={inspector ? 'Hide the inspector' : 'Show the inspector on a selection'}
+						pressed={inspector}
+						onClick={() => {
+							setInspector(!inspector);
+							saveInspector(!inspector);
+						}}
+					>
+						<Icon name="inspector" />
+					</IconButton>
+
 					{saveFailed && (
 						<span className="text-xs text-amber-700 dark:text-amber-400">
 							Not saving in this browser
@@ -1225,9 +1250,11 @@ export default function DddMapper() {
 								onStart={startFresh}
 							/>
 						)}
+						{/* Selection survives the panel being off — see the state's note
+						    — so this gates the render and nothing else. */}
 						<Inspector
 							document={document_}
-							selected={selected}
+							selected={inspector ? selected : null}
 							onSource={applyEdit}
 							onReveal={reveal}
 							onClose={() => setSelected(null)}

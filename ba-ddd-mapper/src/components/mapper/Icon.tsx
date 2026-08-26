@@ -36,6 +36,7 @@ export type IconName =
 	| 'store'
 	| 'format'
 	| 'legend'
+	| 'inspector'
 	| 'add-aggregate'
 	| 'add-entity'
 	| 'add-value'
@@ -46,6 +47,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	open: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 2v7m0 0 2.5-2.5M8 9 5.5 6.5" />,
 	// The same tray, arrow going *out*.
 	export: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 9.5v-7m0 0L5.5 5M8 2.5 10.5 5" />,
+	// A panel docked to the right of the frame, which is where it opens.
+	inspector: (
+		<>
+			<rect x="2" y="3.5" width="12" height="9" rx="1" />
+			<path d="M9.5 3.5v9" />
+		</>
+	),
 	// Two swatches with their captions: a key, which is what a legend is.
 	legend: (
 		<>
