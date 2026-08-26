@@ -32,6 +32,7 @@ import {
 import { classificationLabel, statusNote, styleFor } from '../../lib/graph/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar, { type AddChoice } from './CanvasBar';
+import { useNudge } from '../../lib/nudge';
 import Minimap from './Minimap';
 
 interface Props {
@@ -185,6 +186,18 @@ export default function Graph({
 		pointerId: number;
 		live: boolean;
 	} | null>(null);
+
+	/*
+	 * Nudging reads `layout.nodes` rather than `placed`, which is the same
+	 * distinction `useNudge` documents: an override is written in the layout's
+	 * coordinates, and `placed` is what those coordinates come out as.
+	 */
+	useNudge({
+		selected,
+		positions,
+		onPositions,
+		originOf: (id) => layout?.nodes.find((node) => node.id === id) ?? null,
+	});
 
 	const placed = useMemo(
 		() => (layout ? applyPositions(layout.nodes, positions) : []),
@@ -828,7 +841,7 @@ export default function Graph({
 					? origin === null
 						? 'click the box the edge starts from · esc to put the tool down'
 						: 'click the box it ends at · click anywhere else to lose it · esc to cancel'
-					: 'drag a box to move it · click an edge then drag its handle to bend it · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
+					: 'drag a box to move it, or nudge it with the arrow keys · click an edge then drag its handle to bend it · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
 			</p>
 		</div>
 	);

@@ -33,6 +33,7 @@ import { routeLinks, type RoutedLink } from '../../lib/ddm/route';
 import { paint } from '../../lib/ddm/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar, { type AddChoice } from '../mapper/CanvasBar';
+import { useNudge } from '../../lib/nudge';
 
 interface Props {
 	document: DomainModel;
@@ -118,6 +119,19 @@ export default function Diagram({
 	const pan = useRef<{ x: number; y: number; originX: number; originY: number; pointerId: number; live: boolean } | null>(null);
 	const dragging = useRef<{ id: string; offsetX: number; offsetY: number; startX: number; startY: number; pointerId: number; moved: boolean } | null>(null);
 	const draggedLast = useRef(false);
+
+	/*
+	 * Nudging reads `placement.boxes` rather than `boxes`, and that is load
+	 * bearing here: `applyPositions` adds a member's own shift to its
+	 * aggregate's, so a member drawn inside a boundary that has moved is not
+	 * where its override says it is. See `useNudge`.
+	 */
+	useNudge({
+		selected,
+		positions,
+		onPositions,
+		originOf: (id) => placement?.boxes.find((box) => box.id === id) ?? null,
+	});
 
 	const boxes = useMemo(
 		() => (placement ? applyPositions(placement.boxes, positions) : []),
@@ -462,7 +476,7 @@ export default function Diagram({
 					? origin === null
 						? 'click the class the link starts from · esc to put the tool down'
 						: 'click what it points at · click anywhere else to lose it · esc to cancel'
-					: 'drag a class to move it · drag an aggregate to move it with its members · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
+					: 'drag a class to move it, or nudge it with the arrow keys · drag an aggregate to move it with its members · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
 			</p>
 		</div>
 	);
