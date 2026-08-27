@@ -2,11 +2,22 @@
  * The icon set.
  *
  * One file, one viewBox, one stroke weight — so a row of them reads as a row
- * rather than as a collection. Every icon is stroked at 1.6 on a 16-unit grid,
- * which is what keeps them the same visual weight at 14px.
+ * rather than as a collection.
  *
  * Icons carry no accessible name of their own: they are always inside a button
  * that has one, and a `<title>` here would be read out twice.
+ *
+ * ## Why the stroke is not a round number
+ *
+ * These are drawn on a 16-unit grid and the boards' are drawn on a 24-unit one,
+ * which is a difference nobody should have to see. Weight on screen is the
+ * stroke as a *fraction of the grid*, so the boards' 1.6-on-24 — doc-portal's
+ * weight, and the estate's — is this grid's 1.6 x 16/24. Written as the
+ * arithmetic rather than as 1.07, because the next person to touch it needs to
+ * know which number is the one that must not drift.
+ *
+ * Redrawing 34 glyphs onto a 24 grid would be the other way to do this, and it
+ * would be the same picture for a great deal more work.
  */
 
 export type IconName =
@@ -241,10 +252,10 @@ export default function Icon({ name, className }: { name: IconName; className?: 
 	return (
 		<svg
 			viewBox="0 0 16 16"
-			className={className ?? 'h-3.5 w-3.5'}
+			className={className ?? 'h-[1.3125rem] w-[1.3125rem]'}
 			fill="none"
 			stroke="currentColor"
-			strokeWidth={1.6}
+			strokeWidth={(1.6 * 16) / 24}
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			aria-hidden="true"

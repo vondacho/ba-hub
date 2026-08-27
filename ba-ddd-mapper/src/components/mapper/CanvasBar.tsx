@@ -29,6 +29,12 @@ export interface AddChoice {
  * group at the left, ahead of the divider, so the split is still legible: draw
  * on the left, look on the right.
  *
+ * The controls here are the estate's 28px overlay size rather than the 36px a
+ * toolbar uses, which is the size the boards' band and delivery rails take for
+ * the same reason: this bar sits *on* the picture and takes space away from it.
+ * The tooltip stays a native `title` for the same reason it does there — an
+ * element tooltip is clipped at the edge of whatever scrolls.
+ *
  * Four controls are worth explaining.
  *
  * **Connect** is a mode rather than a drag, and that is deliberate. A drag
@@ -109,7 +115,7 @@ export default function CanvasBar({
 						onClick={() => onAdd(add.kind)}
 						disabled={add.why !== null}
 					>
-						<Icon name={add.icon} />
+						<Icon name={add.icon} className="h-4 w-4" />
 					</Button>
 				))}
 			{onConnecting && (
@@ -120,31 +126,31 @@ export default function CanvasBar({
 					onClick={() => onConnecting(!connecting)}
 					pressed={connecting}
 				>
-					<Icon name="connect" />
+					<Icon name="connect" className="h-4 w-4" />
 				</Button>
 			)}
 			{(adds || onConnecting) && (
-				<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+				<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 			)}
 
-			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
 			<Button label="Zoom out" onClick={() => onZoom(0.8)}>
-				<Icon name="zoom-out" />
+				<Icon name="zoom-out" className="h-4 w-4" />
 			</Button>
 			<span className="w-11 text-center text-[11px] tabular-nums text-ink-muted dark:text-slate-400">
 				{Math.round(scale * 100)}%
 			</span>
 			<Button label="Zoom in" onClick={() => onZoom(1.25)}>
-				<Icon name="zoom-in" />
+				<Icon name="zoom-in" className="h-4 w-4" />
 			</Button>
 
-			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
 			{/* A target rather than corner brackets: brackets read as "full screen",
 			    and full screen is a button on this same bar. */}
 			<Button label="Fit the whole map in view" onClick={onFit}>
-				<Icon name="fit" />
+				<Icon name="fit" className="h-4 w-4" />
 			</Button>
 
 			<Button
@@ -152,10 +158,10 @@ export default function CanvasBar({
 				onClick={onReset}
 				disabled={moved === 0}
 			>
-				<Icon name="reset" />
+				<Icon name="reset" className="h-4 w-4" />
 			</Button>
 
-			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
 			{/*
 			 * The one export at this level, and it is the picture — the artefact
@@ -165,16 +171,16 @@ export default function CanvasBar({
 			 * two buttons for one artefact is a choice nobody should have to make.
 			 */}
 			<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
-				<Icon name="picture" />
+				<Icon name="picture" className="h-4 w-4" />
 			</Button>
 
-			<span className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 
 			<Button
 				label={fullscreen ? 'Leave full screen' : 'Full screen'}
 				onClick={onFullscreen}
 			>
-				<Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} />
+				<Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} className="h-4 w-4" />
 			</Button>
 		</div>
 	);
@@ -202,7 +208,7 @@ function Button({
 			title={label}
 			aria-label={label}
 			aria-pressed={pressed}
-			className={`flex h-7 w-7 items-center justify-center rounded text-sm disabled:opacity-35 disabled:hover:bg-transparent ${
+			className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent motion-reduce:transition-none ${
 				pressed
 					? 'bg-brand text-white hover:bg-brand-strong'
 					: 'hover:bg-slate-100 dark:hover:bg-slate-800'

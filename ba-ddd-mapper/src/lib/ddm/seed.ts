@@ -28,7 +28,7 @@ export function seedModel(context: string, aggregates: readonly string[]): strin
 
 	return `// The inside of "${context}", opened from the map.
 ${known}
-model "${context}" {
+context "${context}" {
 
 }
 `;
@@ -47,13 +47,13 @@ model "${context}" {
  * can write for you, and the empty warning that follows says so better than a
  * placeholder would.
  */
-export function freshModel(context = 'New model'): string {
+export function freshModel(context = 'New context'): string {
 	return `// The inside of one bounded context.
 //
 // Rename the aggregate, say what it keeps true, and give it the entities and
 // values it owns. The panel below says what is still missing.
 
-model "${context}" {
+context "${context}" {
 
   aggregate "New aggregate" {
 

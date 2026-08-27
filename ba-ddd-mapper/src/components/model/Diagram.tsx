@@ -221,7 +221,7 @@ export default function Diagram({
 		return (
 			<div className="flex h-full items-center justify-center p-8 text-center text-sm text-ink-muted dark:text-slate-400">
 				{document.aggregates.length === 0
-					? 'Nothing to draw yet. A file starts with `model "…" {`.'
+					? 'Nothing to draw yet. A file starts with `context "…" {`.'
 					: 'Laying out…'}
 			</div>
 		);

@@ -78,6 +78,35 @@ const WIDTH = 78;
  * reason: the missing-invariant warning is the most useful thing the panel
  * says, and a blank string would silence it while answering nothing.
  */
+/**
+ * The header keyword, brought up to date.
+ *
+ * `context "Rating" {` is the statement; `model "Rating" {` is what the same
+ * statement was called before, and the parser still reads it — see the note
+ * there. This rewrites it on the way *in*, so a document somebody opens is
+ * written back under the current spelling rather than being kept alive by the
+ * alias indefinitely.
+ *
+ * Only the first token, and only when it is that word. A `model` inside a
+ * string, a comment or a name is somebody's prose and none of this function's
+ * business, which is why it goes through the lexer instead of a regular
+ * expression: the token's span is the one place the keyword can be.
+ *
+ * Unlexable text is handed back untouched. Somebody is mid-edit with a string
+ * open, and a migration is not worth a guess about where their file ends.
+ */
+export function modernize(source: string): string {
+	let first: Token;
+	try {
+		first = tokenize(source)[0];
+	} catch {
+		return source;
+	}
+
+	if (first === undefined || first.type !== 'word' || first.value !== 'model') return source;
+	return splice(source, first.span, 'context');
+}
+
 export function setInvariant(
 	source: string,
 	document: DomainModel,
@@ -466,7 +495,7 @@ function insertDeclaration(
 	// A blank line above, unless the file already has one there. The opening
 	// brace is *not* an exception, which is where this differs from a field: a
 	// field goes directly under the `{` and a declaration is given air. Both
-	// samples do it — `model "…" {` and `map "…" {` are each followed by a blank
+	// samples do it — `context "…" {` and `map "…" {` are each followed by a blank
 	// line and then the first declaration.
 	const lead = /\n[ \t]*\n$/.test(before) ? '' : '\n';
 	const trail = /^[ \t]*(\n|\})/.test(rest) ? '' : '\n';

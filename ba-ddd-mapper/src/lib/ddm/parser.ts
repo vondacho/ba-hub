@@ -115,9 +115,20 @@ export function parse(source: string): ParseResult {
 
 	// ---- the file ----------------------------------------------------------
 
+	/*
+	 * The file names the bounded context it is the inside of, and the keyword
+	 * says so: `context "Rating" {`.
+	 *
+	 * `model` is the old spelling of the same statement and is still accepted,
+	 * silently, because it is sitting in browsers and in repositories and a
+	 * format that stops reading its own older files is a format nobody trusts.
+	 * Nothing *writes* it any more — the seeds, the sample and `modernize` all
+	 * emit `context` — so a document that opens in the editor leaves it under
+	 * the new spelling and the alias fades on its own.
+	 */
 	const mapWord = peek();
-	if (!check('word', 'model')) {
-		fail(mapWord, `A domain model starts with \`model\`, found ${describe(mapWord)}.`);
+	if (!check('word', 'context') && !check('word', 'model')) {
+		fail(mapWord, `A domain model starts with \`context\`, found ${describe(mapWord)}.`);
 		return { document: blank(source), problems, ok: false };
 	}
 	next();
@@ -554,7 +565,7 @@ export function parse(source: string): ParseResult {
 
 // ---------------------------------------------------------------------------
 
-const STARTERS = new Set(['aggregate', 'entity', 'value', 'enum', 'root', 'model']);
+const STARTERS = new Set(['aggregate', 'entity', 'value', 'enum', 'root', 'context', 'model']);
 const LINKS = new Set(['contains', 'embeds', 'references']);
 
 /**

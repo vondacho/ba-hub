@@ -18,7 +18,7 @@ export const SAMPLE = `// The inside of one bounded context from the map next do
 // the identity in both formats, and it is what lets one document be checked
 // against the other.
 
-model "Risk appetite" {
+context "Risk appetite" {
 
   // Shared across the aggregates below, so declared at the top rather than
   // inside one of them.

@@ -187,7 +187,11 @@ function arrival(): Arrival {
 		// thing a half-finished write can leave behind — so it falls through to
 		// the stub rather than opening as a blank editor.
 		if (stored) {
-			return { name, source: stored, document: documentOf(stored), positions: loadModelView(keys.view), keys, fresh: false };
+			// Brought up to date on the way in — see `modernize`. A document that was
+			// written when the header keyword was `model` opens under the current
+			// spelling, and autosave writes it back that way.
+			const text = edits.modernize(stored);
+			return { name, source: text, document: documentOf(text), positions: loadModelView(keys.view), keys, fresh: false };
 		}
 		if (asked !== null) {
 			// Asked for by name with nothing stored: a context whose model has not
@@ -372,9 +376,10 @@ export default function ModelEditor() {
 		// Parsed now rather than waited for: the name is what the key is made of,
 		// and the effect that moves entries has to be told where this load is
 		// going before the debounced parse could tell it.
-		const parsed = parse(legacy.source);
+		const text = edits.modernize(legacy.source);
+		const parsed = parse(text);
 		loading.current = parsed.ok ? modelKeys(parsed.document.context).doc : null;
-		setSource(legacy.source);
+		setSource(text);
 		setPositions(legacy.positions);
 	}
 
@@ -942,10 +947,10 @@ export default function ModelEditor() {
 	 *
 	 * Keeps the context name when there is one — arriving from the map on an
 	 * unmodelled context and pressing this means "yes, model *this*", not "give
-	 * me something called New model".
+	 * me something called New context".
 	 */
 	const startFresh = useCallback(() => {
-		const name = document_.context || 'New model';
+		const name = document_.context || 'New context';
 		open_(freshModel(name), name);
 	}, [document_.context]);
 
@@ -961,7 +966,7 @@ export default function ModelEditor() {
 	 * takes a name nothing is using, which also makes it safe to press twice.
 	 */
 	const newModel = useCallback(() => {
-		const name = unusedTitle('New model', 'model');
+		const name = unusedTitle('New context', 'model');
 		const had = !blank(source) && document_.context !== '';
 		open_(freshModel(name), name);
 		if (had) {
@@ -1000,7 +1005,7 @@ export default function ModelEditor() {
 		// under its own name rather than being moved onto this one's. Parsed now
 		// to learn where this load is going — the debounced parse would answer a
 		// quarter of a second after the question stops mattering.
-		const text = await readTextFile(file);
+		const text = edits.modernize(await readTextFile(file));
 		const parsed = parse(text);
 		loading.current = parsed.ok ? modelKeys(parsed.document.context).doc : keys.doc;
 		setSource(text);

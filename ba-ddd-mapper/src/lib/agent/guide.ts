@@ -83,7 +83,7 @@ continuation line is joined to the one above with a single space.`;
 const DDM_GRAMMAR = `## The notation: \`.ddm\`, the inside of one bounded context
 
 \`\`\`
-model "Bounded context name" {
+context "Bounded context name" {
 
   value "Money" {                    // declared at model level: shared
     attribute "amount"   : "Decimal"

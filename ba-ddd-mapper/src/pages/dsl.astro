@@ -143,10 +143,19 @@ Because      = 'because'  , String ;`}</code></pre>
 			the text as the source of truth — and the same claim about names, except that here they
 			are unique within one model rather than one map.
 		</p>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			The file opens by naming that context — <code>context "Rating" &#123;</code> — and the name is
+			the identity in both formats: it is what lets a model be checked against the map without
+			either document holding a pointer into the other. Files written before this statement was
+			called <code>context</code> open with <code>model</code> instead; they are still read, and the
+			editor writes them back under the current spelling the first time you open one.
+		</p>
 
 		<h3 class="mt-8 text-lg font-semibold">Grammar</h3>
 		<pre class="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{`File         = Model , EOF ;
-Model        = 'model' , String , '{' , { Aggregate | Value | Enum } , '}' ;
+Model        = 'context' , String , '{' , { Aggregate | Value | Enum } , '}' ;
+                                             (* 'model' is the old spelling,
+                                                still read, never written *)
 
 Aggregate    = 'aggregate' , String ,
                '{' , { Intent | Invariant | Entity | Value | Enum } , '}' ;
