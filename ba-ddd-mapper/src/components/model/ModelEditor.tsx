@@ -603,6 +603,26 @@ export default function ModelEditor() {
 		[document_, selected],
 	);
 
+	/**
+	 * Where the selection is written, for the source pane to emphasise.
+	 *
+	 * An aggregate, a class, or a link between two — all three carry a span, and
+	 * all three are things you can click on the canvas. The whole declaration
+	 * rather than just the name: what is selected is the thing, and the thing is
+	 * its invariants and its attributes as much as its title.
+	 *
+	 * Null while the text is stale, for the map's reason — the spans belong to
+	 * the last parse and the text has moved on.
+	 */
+	const highlight = useMemo(() => {
+		if (selected === null || stale) return null;
+		// The whole declaration, not just the keyword and the name — `regionOf` is
+		// the same reach the delete uses.
+		if (selectedAggregate) return edits.regionOf(source, selectedAggregate);
+		if (selectedMember) return edits.regionOf(source, selectedMember);
+		return document_.links.find((link) => link.id === selected)?.span ?? null;
+	}, [document_, selected, selectedAggregate, selectedMember, source, stale]);
+
 	/** The boundary a new class would land in: the selection, or the one it is in. */
 	const host = useMemo((): AggregateNode | null => {
 		if (selectedAggregate) return selectedAggregate;
@@ -1217,6 +1237,7 @@ export default function ModelEditor() {
 								problems={problems}
 								revealLine={revealLine}
 								label={SOURCE_LABEL}
+								highlight={highlight}
 							/>
 						</div>
 						<ProblemList

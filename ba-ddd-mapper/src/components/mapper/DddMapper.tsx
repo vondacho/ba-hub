@@ -560,6 +560,27 @@ export default function DddMapper() {
 	);
 
 	/**
+	 * Where the selection is written, for the source pane to emphasise.
+	 *
+	 * A node or a relationship — both carry a span, and both are things you can
+	 * click on the canvas. The whole declaration rather than just the name,
+	 * because what is selected is the thing, and the thing is all of it: its
+	 * fields, its pattern, its rationale.
+	 *
+	 * Null while the text is stale. The spans belong to the last parse, and the
+	 * text has moved on since; pointing at bytes that have shifted underneath
+	 * would put the emphasis on whatever now sits at that offset.
+	 */
+	const highlight = useMemo(() => {
+		if (selected === null || stale) return null;
+		const node = document_.nodes.find((candidate) => candidate.id === selected);
+		// The whole declaration, not just the keyword and the name: `node.span` is
+		// where a declaration starts, and `declarationSpan` is all of it.
+		if (node) return edits.declarationSpan(source, node);
+		return document_.edges.find((edge) => edge.id === selected)?.span ?? null;
+	}, [document_, selected, source, stale]);
+
+	/**
 	 * Why each `Add` button is off, or null when it is on.
 	 *
 	 * A subdomain divides a domain and a context sits in one of them, so both
@@ -1319,6 +1340,7 @@ export default function DddMapper() {
 								onChange={setSource}
 								problems={problems}
 								revealLine={revealLine}
+								highlight={highlight}
 							/>
 						</div>
 						<ProblemList

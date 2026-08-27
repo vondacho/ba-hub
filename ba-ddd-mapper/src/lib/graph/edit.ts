@@ -440,7 +440,20 @@ export function reparent(
  * for a `{` before the next declaration keyword and stops at the name when
  * there is none.
  */
-function declarationSpan(source: string, node: Node): Span {
+/**
+ * A node's whole declaration: its keyword through its closing brace.
+ *
+ * `node.span` is the keyword and its name — enough to know where a declaration
+ * *starts*, which is all a rename or a field edit needs. The block is found
+ * rather than stored, so this is the one place that knows how to ask for all of
+ * it.
+ *
+ * Exported for the source pane, which emphasises the selection: what is
+ * selected is the node, and the node is its fields and its nested contexts as
+ * much as its name. The same analysis the delete uses, so the highlight and the
+ * removal cannot disagree about what a node *is*.
+ */
+export function declarationSpan(source: string, node: Node): Span {
 	const open = openBraceAfter(source, node.nameSpan.end);
 	const end = open < 0 ? node.nameSpan.end : blockEnd(source, open);
 	return { ...node.span, end };

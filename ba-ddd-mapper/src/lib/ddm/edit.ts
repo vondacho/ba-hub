@@ -443,8 +443,15 @@ function blockOf(source: string, declaration: Declaration): number {
 	return openBraceAfter(source, declaration.nameSpan.end);
 }
 
-/** The whole of a declaration, braces and all — enough to delete. */
-function regionOf(source: string, declaration: Declaration): Span {
+/**
+ * The whole of a declaration, braces and all — enough to delete.
+ *
+ * Exported for the source pane, which emphasises the selection: what is
+ * selected is the aggregate or the class, and that is its invariants and its
+ * attributes as much as its name. The same analysis the delete uses, so the
+ * highlight and the removal cannot disagree about what a declaration *is*.
+ */
+export function regionOf(source: string, declaration: Declaration): Span {
 	return { ...declaration.span, end: declarationEnd(source, declaration) };
 }
 
