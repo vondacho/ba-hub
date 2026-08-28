@@ -184,7 +184,7 @@ function Group({
 			{documents.length === 0 ? (
 				<p className="mt-1 text-xs text-ink-muted dark:text-slate-400">{empty}</p>
 			) : (
-				<ul className="mt-1 space-y-1">
+				<ul className="mt-1 flex flex-col gap-1">
 					{documents.map((document) => {
 						const id = `${document.kind}:${document.stem}`;
 						const open = document.doc?.key === current;
@@ -244,7 +244,7 @@ function Group({
 										</span>
 									)}
 									{open && (
-										<span className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+										<span className="text-xs font-semibold text-brand dark:text-violet-300">
 											open here
 										</span>
 									)}
@@ -281,6 +281,11 @@ function Group({
  * than a link that is disabled, which looks like something that ought to work.
  * The row that is already open is the second case: the way to look at it is to
  * close this panel.
+ *
+ * The shell is doc-es/sm/em's: a rounded bordered card per row, where the border
+ * is what shows the open state and what appears under the pointer. The tint used
+ * to sit on the link inside a borderless row, which meant the hover stopped
+ * short of the Remove control and the row had no edge of its own.
  */
 function Row({
 	href,
@@ -296,20 +301,26 @@ function Row({
 	onArm: (() => void) | null;
 	children: React.ReactNode;
 }) {
-	const shell = `block rounded-md px-2 py-1 ${open ? 'bg-violet-50 dark:bg-violet-950' : ''}`;
+	const shell = 'block min-w-0 flex-1 text-left';
 
 	return (
-		<li className="group/row flex items-baseline gap-1">
+		<li
+			className={`group/row flex items-center gap-2 rounded-lg border px-2 py-1.5 ${
+				open
+					? 'border-brand/40 bg-brand/5'
+					: 'border-transparent hover:border-slate-200 dark:hover:border-slate-700'
+			}`}
+		>
 			{href ? (
 				<a
 					href={href}
 					onClick={onLeaving}
-					className={`${shell} min-w-0 flex-1 hover:bg-slate-100 dark:hover:bg-slate-800`}
+					className={`${shell} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand`}
 				>
 					{children}
 				</a>
 			) : (
-				<span className={`${shell} min-w-0 flex-1`}>{children}</span>
+				<span className={shell}>{children}</span>
 			)}
 			{onArm && (
 				/*
