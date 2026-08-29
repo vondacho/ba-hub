@@ -1,0 +1,48 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Server-rendered by @astrojs/node (standalone) on port {{ .Values.containerPort }},
+except the Starlight pages under /doc/*, which are prerendered into the image
+along with Pagefind's search index.
+
+Outbound links (browser-facing, resolved per request):
+  Architecture hub     -> {{ .Values.app.archPortalUrl }}
+  API hub              -> {{ .Values.app.apiPortalUrl }}
+  Development hub      -> {{ .Values.app.devPortalUrl }}
+  Quality hub          -> {{ .Values.app.qaPortalUrl }}
+  Event storming board -> {{ .Values.app.eventStormerUrl }}
+  DDD mapper           -> {{ .Values.app.dddMapperUrl }}
+  Landscape collector  -> {{ .Values.app.landscapeApiUrl }}
+
+The prerendered docs reach those through /go/<target>, which resolves the
+environment per request — arch, api, dev, qa, stormer, mapper, landscape.
+
+Read by this server: nothing. The catalog is compiled in, so this portal starts,
+serves and passes its probes with every neighbour above down; the links are then
+simply dead, one click at a time.
+
+Browse the portal:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+{{- $scheme := ternary "https" "http" (not (empty $.Values.ingress.tls)) }}
+  {{ $scheme }}://{{ $host.host }}/                 home
+  {{ $scheme }}://{{ $host.host }}/catalog          the catalog
+  {{ $scheme }}://{{ $host.host }}/landscapes       the landscapes
+  {{ $scheme }}://{{ $host.host }}/tools            the toolbox
+  {{ $scheme }}://{{ $host.host }}/academy          the curriculum
+  {{ $scheme }}://{{ $host.host }}/doc/             documentation
+{{- end }}
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "ba-portal.fullname" . }} 4321:{{ .Values.service.port }}
+
+  then open http://localhost:4321
+{{- end }}
+
+Verify the release:
+  helm test {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+
+Reminder: image.tag is pinned with pullPolicy: Never in values-local.yaml, so a
+rebuilt image under the same tag leaves the running pods untouched. After
+rebuilding, force them over:
+  kubectl rollout restart deployment/{{ include "ba-portal.fullname" . }} -n {{ .Release.Namespace }}
+
+or just run helm/ba-portal/deploy.sh, which does all three steps.

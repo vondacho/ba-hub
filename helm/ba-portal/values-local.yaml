@@ -1,0 +1,54 @@
+# Overrides for a locally built image on a single-node cluster
+# (Rancher Desktop / Docker Desktop).
+#
+#   ./helm/ba-portal/deploy.sh
+#
+# or by hand:
+#
+#   cd ba-portal && docker build -t ba-portal:dev .
+#   helm upgrade --install ba-portal helm/ba-portal \
+#     -n ba-hub --create-namespace \
+#     -f helm/ba-portal/values-local.yaml
+#   kubectl rollout restart deployment/ba-portal -n ba-hub
+
+image:
+  repository: ba-portal
+  tag: dev
+  # The image is built straight into the node's image store, never pulled.
+  pullPolicy: Never
+
+# Rancher Desktop runs Traefik as the default IngressClass and *.localhost
+# resolves to 127.0.0.1, so the portal is reachable from the host browser
+# without a port-forward. Named explicitly here rather than relying on the
+# cluster default.
+ingress:
+  enabled: true
+  className: traefik
+  hosts:
+    - host: ba-portal.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+
+# ba-ddd-mapper is the other release in this namespace; the four hub portals and
+# doc-es are releases in their own. Every one of these is the ingress host that
+# release's own values-local.yaml enables on this cluster — reachable from the
+# browser whether or not it is installed, and a dead link when it is not.
+#
+# landscape-api is the exception: nothing serves that host on any cluster yet.
+# The panels pointing at it say so rather than linking.
+app:
+  archPortalUrl: http://arch-portal.localhost
+  apiPortalUrl: http://api-portal.localhost
+  devPortalUrl: http://dev-portal.localhost
+  qaPortalUrl: http://qa-portal.localhost
+  eventStormerUrl: http://doc-es.localhost
+  dddMapperUrl: http://ba-ddd-mapper.localhost
+  landscapeApiUrl: http://landscape-api.localhost
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

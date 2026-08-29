@@ -47,6 +47,7 @@ import {
 	lastModel,
 	loadModelView,
 	loadAgent,
+	loadAgentWidth,
 	loadInspector,
 	loadLegend,
 	loadPanes,
@@ -58,6 +59,7 @@ import {
 	unusedTitle,
 	saveModelView,
 	saveAgent,
+	saveAgentWidth,
 	saveInspector,
 	saveLegend,
 	savePanes,
@@ -65,6 +67,9 @@ import {
 	saveText,
 	saveTheme,
 	takeLegacyModel,
+	AGENT_DEFAULT_WIDTH,
+	AGENT_MAX,
+	AGENT_MIN,
 	type DocumentKeys,
 	type GraphTheme,
 	type Panes,
@@ -268,7 +273,18 @@ function blank(source: string): boolean {
 	return source.trim() === '';
 }
 
-export default function ModelEditor() {
+/**
+ * ba-portal's prompt page, resolved by the page and passed in.
+ *
+ * `links.ts` reads `process.env`, which a client bundle does not have — so the
+ * address is computed where there is a server and handed to the island, exactly
+ * as the footer's links are.
+ */
+interface Props {
+	promptsUrl: string;
+}
+
+export default function ModelEditor({ promptsUrl }: Props) {
 	// Computed once, on the first render, and never again.
 	const [start] = useState(arrival);
 	const [source, setSource] = useState(start.source);
@@ -305,6 +321,12 @@ export default function ModelEditor() {
 	 * somebody wanted it and not because nobody has said otherwise yet.
 	 */
 	const [agent, setAgent] = useState(false);
+	/**
+	 * How wide the assistant is, as a percentage of the window. Dragged by the
+	 * handle beside it, and remembered — the width somebody settled on is a
+	 * property of how they work, not of the document they were reading.
+	 */
+	const [agentWidth, setAgentWidth] = useState(AGENT_DEFAULT_WIDTH);
 	const [theme, setTheme] = useState<GraphTheme | null>(null);
 	const [positions, setPositions] = useState<Positions>(start.positions);
 	const [saveFailed, setSaveFailed] = useState(false);
@@ -356,6 +378,8 @@ export default function ModelEditor() {
 		if (storedInspector !== null) setInspector(storedInspector);
 		const storedAgent = loadAgent();
 		if (storedAgent !== null) setAgent(storedAgent);
+		const storedWidth = loadAgentWidth();
+		if (storedWidth !== null) setAgentWidth(storedWidth);
 	}, []);
 
 	/**
@@ -1251,6 +1275,7 @@ export default function ModelEditor() {
 
 				{panes === 'both' && (
 					<Divider
+						percent={split}
 						onMove={(percent) => {
 							setSplit(percent);
 							saveSplit(percent);
@@ -1319,16 +1344,31 @@ export default function ModelEditor() {
 				    about a document is read *beside* the document, and a panel that
 				    covered the thing it is discussing would be the wrong shape. */}
 				{agent && (
-					<AgentPanel
-						language="ddm"
-						source={source}
-						check={(text) => parse(text).problems}
-						onApply={applyEdit}
-						onClose={() => {
-							setAgent(false);
-							saveAgent(false);
-						}}
-					/>
+					<>
+						<Divider
+							percent={agentWidth}
+							from="right"
+							min={AGENT_MIN}
+							max={AGENT_MAX}
+							label="Resize the assistant"
+							onMove={(percent) => {
+								setAgentWidth(percent);
+								saveAgentWidth(percent);
+							}}
+						/>
+						<AgentPanel
+							language="ddm"
+							source={source}
+							promptsUrl={promptsUrl}
+							check={(text) => parse(text).problems}
+							onApply={applyEdit}
+							onClose={() => {
+								setAgent(false);
+								saveAgent(false);
+							}}
+							width={agentWidth}
+						/>
+					</>
 				)}
 			</div>
 		</div>
@@ -1341,14 +1381,36 @@ const PANE_CHOICES: readonly { panes: Panes; icon: IconName; label: string }[] =
 	{ panes: 'graph', icon: 'panes-graph', label: 'Show the diagram only' },
 ];
 
-/** The drag handle. Keyboard-operable, because a mouse-only split is a trap. */
-function Divider({ onMove }: { onMove: (percent: number) => void }) {
+/**
+ * The drag handle. Keyboard-operable, because a mouse-only split is a trap.
+ *
+ * `from` says which edge the percentage is measured against. The split between
+ * source and picture is a distance from the left; the assistant's width is a
+ * slice off the right, and reading its handle the same way would have it grow
+ * as the visitor dragged it inwards.
+ */
+function Divider({
+	percent,
+	onMove,
+	from = 'left',
+	min = 20,
+	max = 75,
+	label = 'Resize panels',
+}: {
+	percent: number;
+	onMove: (percent: number) => void;
+	from?: 'left' | 'right';
+	min?: number;
+	max?: number;
+	label?: string;
+}) {
 	const dragging = useRef(false);
 
 	useEffect(() => {
 		const move = (event: PointerEvent) => {
 			if (!dragging.current) return;
-			onMove(Math.min(75, Math.max(20, (event.clientX / window.innerWidth) * 100)));
+			const along = from === 'left' ? event.clientX : window.innerWidth - event.clientX;
+			onMove(Math.min(max, Math.max(min, (along / window.innerWidth) * 100)));
 		};
 		const up = () => {
 			dragging.current = false;
@@ -1359,20 +1421,28 @@ function Divider({ onMove }: { onMove: (percent: number) => void }) {
 			window.removeEventListener('pointermove', move);
 			window.removeEventListener('pointerup', up);
 		};
-	}, [onMove]);
+	}, [onMove, from, min, max]);
 
 	return (
 		<div
 			role="separator"
-			aria-label="Resize panels"
+			aria-label={label}
 			aria-orientation="vertical"
+			aria-valuenow={Math.round(percent)}
+			aria-valuemin={min}
+			aria-valuemax={max}
 			tabIndex={0}
 			onPointerDown={() => {
 				dragging.current = true;
 			}}
+			/* A nudge rather than two fixed stops: the keyboard reaches every
+			   width the pointer does, in both directions, on either handle. */
 			onKeyDown={(event) => {
-				if (event.key === 'ArrowLeft') onMove(30);
-				if (event.key === 'ArrowRight') onMove(60);
+				const step = event.key === 'ArrowLeft' ? -4 : event.key === 'ArrowRight' ? 4 : 0;
+				if (step === 0) return;
+				event.preventDefault();
+				const next = percent + (from === 'left' ? step : -step);
+				onMove(Math.min(max, Math.max(min, next)));
 			}}
 			className="hidden w-1.5 shrink-0 cursor-col-resize bg-slate-200 hover:bg-brand focus-visible:bg-brand focus-visible:outline-none lg:block dark:bg-slate-800"
 		/>

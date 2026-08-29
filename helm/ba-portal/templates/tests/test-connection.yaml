@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "ba-portal.fullname" . }}-test-connection
+  labels:
+    {{- include "ba-portal.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    # More than /healthz: that route is a bare handler and answers 200 even if
+    # every rendered page is broken. So this fetches one URL per thing that can
+    # independently fail:
+    #   /healthz              the Node server is serving
+    #   /                     server-side rendering works at all
+    #   /catalog              the catalog page
+    #   /landscapes           the page that reads the outbound addresses from
+    #                         the ConfigMap — this is what proves envFrom is
+    #                         wired
+    #   /tools                the panels that front the mapper and the stormer
+    #   /academy              the curriculum page
+    #   /doc/                 the prerendered Starlight docs shipped in the
+    #                         image, and with them Pagefind's index
+    #   /doc/strategic/bounded-contexts/  a nested docs page, not just the
+    #                         section index
+    #   /go/mapper            the redirect the prerendered pages reach the
+    #                         mapper through. --fail treats the 302 as success
+    #                         without following it, which is the point: this
+    #                         asserts the portal answers, not that the mapper
+    #                         is installed.
+    - name: health
+      image: curlimages/curl:8.11.1
+      args:
+        - --fail
+        - --silent
+        - --show-error
+        - --output
+        - /dev/null
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}{{ .Values.probes.path }}
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/catalog
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/landscapes
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/tools
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/academy
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/doc/
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/doc/strategic/bounded-contexts/
+        - http://{{ include "ba-portal.fullname" . }}:{{ .Values.service.port }}/go/mapper

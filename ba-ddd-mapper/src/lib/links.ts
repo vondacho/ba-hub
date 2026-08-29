@@ -21,6 +21,16 @@ export function baPortalUrl(): string {
   );
 }
 
+/**
+ * ba-portal's prompt page — the canonical set, by role, across every board.
+ *
+ * The assistant panel carries this notation's prompts inline; this is where the
+ * reasoning behind them lives, and the other boards' sets with it.
+ */
+export function promptsUrl(): string {
+  return `${baPortalUrl()}/doc/tooling/prompts/`;
+}
+
 /** doc-es: the board the contexts on a map were usually found on. */
 export function eventStormerUrl(): string {
   return (

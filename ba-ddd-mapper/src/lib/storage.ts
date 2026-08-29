@@ -42,6 +42,7 @@ const PANES = 'ba-ddd-mapper-mapper:panes';
 const LEGEND = 'ba-ddd-mapper-mapper:legend';
 const INSPECTOR = 'ba-ddd-mapper-mapper:inspector';
 const AGENT = 'ba-ddd-mapper-mapper:agent';
+const AGENT_WIDTH = 'ba-ddd-mapper-mapper:agent-width';
 const AGENT_CONFIG = 'ba-ddd-mapper-mapper:agent-config';
 /** Apart from the rest of the configuration, and deliberately. See `loadKey`. */
 const AGENT_KEY = 'ba-ddd-mapper-mapper:agent-key';
@@ -54,6 +55,16 @@ const LEGACY_POSITIONS = 'ba-ddd-mapper-mapper:positions';
 const LEGACY_CURVES = 'ba-ddd-mapper-mapper:curves';
 const LEGACY_MODEL_SOURCE = 'ba-ddd-mapper-model:source';
 const LEGACY_MODEL_POSITIONS = 'ba-ddd-mapper-model:positions';
+
+/**
+ * What the assistant's width may be dragged to, and where it starts.
+ *
+ * Wide enough to read a diff in, never wide enough to leave the document it is
+ * talking about as a sliver.
+ */
+export const AGENT_DEFAULT_WIDTH = 30;
+export const AGENT_MIN = 18;
+export const AGENT_MAX = 60;
 
 export type GraphTheme = 'light' | 'dark';
 
@@ -296,6 +307,31 @@ export function saveAgent(show: boolean): void {
 		store()?.setItem(AGENT, show ? 'on' : 'off');
 	} catch {
 		// As with the theme: a preference that does not persist is survivable.
+	}
+}
+
+/**
+ * How wide the agent panel sits, as a percentage of the window.
+ *
+ * Its own key rather than the split's, because they are two different
+ * proportions: the split divides text from picture, and this one takes a slice
+ * off the end of whatever those two are showing. Sharing a number would move
+ * one every time the visitor dragged the other.
+ */
+export function loadAgentWidth(): number | null {
+	try {
+		const value = Number(store()?.getItem(AGENT_WIDTH));
+		return Number.isFinite(value) && value >= AGENT_MIN && value <= AGENT_MAX ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveAgentWidth(percent: number): void {
+	try {
+		store()?.setItem(AGENT_WIDTH, String(Math.round(percent)));
+	} catch {
+		// Same.
 	}
 }
 

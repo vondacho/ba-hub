@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Multi-stage build for the ba-ddd-mapper-mapper Astro frontend.
+# Multi-stage build for the ba-ddd-mapper Astro frontend.
 #
 # `astro build` with the @astrojs/node adapter in standalone mode emits a Node
 # HTTP server at dist/server/entry.mjs plus the client assets under dist/client.
@@ -24,8 +24,6 @@ RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund
 COPY astro.config.mjs tsconfig.json ./
 COPY public ./public
 COPY src ./src
-# Starlight is configured with prerender: true, so this step also runs Pagefind
-# over the emitted HTML and writes its search index into dist/client/pagefind.
 RUN npm run build
 
 # Re-resolve without devDependencies so only the runtime tree moves forward.
@@ -49,7 +47,9 @@ USER app
 
 # The standalone adapter reads HOST/PORT. 0.0.0.0 so the kubelet can reach the
 # probes; both are overridable from the chart.
-ENV HOST=0.0.0.0 PORT=4321
-EXPOSE 4321
+# 4322, after ba-portal's 4321. The chart injects the same number as PORT and
+# as the container port, so the two cannot drift apart.
+ENV HOST=0.0.0.0 PORT=4322
+EXPOSE 4322
 
 CMD ["node", "./dist/server/entry.mjs"]

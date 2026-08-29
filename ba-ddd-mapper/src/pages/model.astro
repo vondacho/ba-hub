@@ -1,13 +1,17 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import ModelEditor from '../components/model/ModelEditor.tsx';
-import { archPortalUrl, baPortalUrl, eventStormerUrl } from '../lib/links';
+import { archPortalUrl, baPortalUrl, eventStormerUrl, promptsUrl } from '../lib/links';
 
 // Server-rendered like `/`, and now for the same reason rather than for
 // symmetry: the footer resolves the neighbouring components' addresses from the
 // environment, which is configuration read per request rather than baked into
 // the image at build time.
 const portal = baPortalUrl();
+// Browser-facing, and resolved here rather than in the island: `links.ts` reads
+// `process.env`, which does not exist in a client bundle. The footer's addresses
+// are resolved the same way, a few lines above.
+const prompts = promptsUrl();
 const stormer = eventStormerUrl();
 const arch = archPortalUrl();
 ---
@@ -43,7 +47,7 @@ const arch = archPortalUrl();
 			</p>
 		</header>
 
-		<ModelEditor client:only="react" />
+		<ModelEditor client:only="react" promptsUrl={prompts} />
 
 		<noscript>
 			<div class="rounded-2xl border border-slate-200 p-6 dark:border-slate-700">

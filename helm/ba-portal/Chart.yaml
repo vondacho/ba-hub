@@ -1,0 +1,22 @@
+apiVersion: v2
+name: ba-portal
+description: Business analysis hub portal — the practice, its catalog, the landscapes it is checked against, and the tools that produce it
+type: application
+
+# Chart version. Bump on every change to the chart itself.
+version: 0.1.0
+
+# Version of ba-portal shipped by default. Matches "version" in
+# ba-portal/package.json and is used as the default image tag.
+appVersion: "0.0.1"
+
+keywords:
+  - astro
+  - starlight
+  - business-analysis
+  - domain-driven-design
+home: https://github.com/vondacho/ba-hub
+sources:
+  - https://github.com/vondacho/ba-hub/tree/main/ba-portal
+maintainers:
+  - name: Olivier von Dach

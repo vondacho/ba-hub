@@ -1,0 +1,49 @@
+# Overrides for a locally built image on a single-node cluster
+# (Rancher Desktop / Docker Desktop).
+#
+#   ./helm/ba-ddd-mapper/deploy.sh
+#
+# or by hand:
+#
+#   cd ba-ddd-mapper && docker build -t ba-ddd-mapper:dev .
+#   helm upgrade --install ba-ddd-mapper helm/ba-ddd-mapper \
+#     -n ba-hub --create-namespace \
+#     -f helm/ba-ddd-mapper/values-local.yaml
+#   kubectl rollout restart deployment/ba-ddd-mapper -n ba-hub
+
+image:
+  repository: ba-ddd-mapper
+  tag: dev
+  # The image is built straight into the node's image store, never pulled.
+  pullPolicy: Never
+
+# Rancher Desktop runs Traefik as the default IngressClass and *.localhost
+# resolves to 127.0.0.1, so the mapper is reachable from the host browser
+# without a port-forward. Named explicitly here rather than relying on the
+# cluster default.
+ingress:
+  enabled: true
+  className: traefik
+  hosts:
+    - host: ba-ddd-mapper.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+
+# ba-portal is the other release in this namespace; doc-es and arch-portal are
+# releases in doc-hub and arch-hub. All three are the ingress hosts their own
+# values-local.yaml files enable on this cluster, so all three are reachable
+# from the host browser — and all three are dead links when that release is not
+# installed. Nothing here is called from the server, so a dead link costs a
+# click, never a page.
+app:
+  baPortalUrl: http://ba-portal.localhost
+  eventStormerUrl: http://doc-es.localhost
+  archPortalUrl: http://arch-portal.localhost
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi

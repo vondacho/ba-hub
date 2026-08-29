@@ -98,6 +98,10 @@ export default defineConfig({
             { label: 'DDD mapper', link: '/doc/tooling/ddd-mapper/' },
             { label: 'Modelling and diagramming', link: '/doc/tooling/modelling/' },
             { label: 'Evidence and discovery', link: '/doc/tooling/evidence/' },
+            // Last in the group, and deliberately: it is about using the
+            // tools above rather than about any one of them, and it only
+            // makes sense once a reader knows what the boards are.
+            { label: 'Assistant prompts', link: '/doc/tooling/prompts/' },
           ],
         },
         {

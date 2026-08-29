@@ -1,0 +1,22 @@
+apiVersion: v2
+name: ba-ddd-mapper
+description: DDD mapper — the context map, and the domain model behind each context, read from and written to .ddd and .ddm files
+type: application
+
+# Chart version. Bump on every change to the chart itself.
+version: 0.1.0
+
+# Version of ba-ddd-mapper shipped by default. Matches "version" in
+# ba-ddd-mapper/package.json and is used as the default image tag.
+appVersion: "0.0.1"
+
+keywords:
+  - astro
+  - domain-driven-design
+  - context-mapping
+  - living-documentation
+home: https://github.com/vondacho/ba-hub
+sources:
+  - https://github.com/vondacho/ba-hub/tree/main/ba-ddd-mapper
+maintainers:
+  - name: Olivier von Dach

@@ -29,14 +29,29 @@ import {
 } from '../../lib/agent/protocol';
 import type { Problem } from '../../lib/ddd/problems';
 import { loadAgentConfig, loadKey, type AgentConfig } from '../../lib/storage';
+import { PROMPTS, type PromptGroup } from '../../lib/agent/prompts';
 import Settings from './Settings';
 
 interface Props {
 	language: Language;
 	/** The document as it stands. Sent whole; the model needs all of it. */
 	source: string;
+	/**
+	 * ba-portal's prompt page, resolved by the page and passed in.
+	 *
+	 * Not read from `links.ts` here, and that is not a style choice: those
+	 * helpers read `process.env`, which does not exist in a client bundle.
+	 * This component only ever runs in a browser.
+	 */
+	promptsUrl: string;
 	/** The parser for this language. Gates whether a proposal may be applied. */
 	check: (text: string) => readonly Problem[];
+	/**
+	 * How much of the window the panel takes, as a percentage. Owned by the
+	 * page, because the handle that changes it sits between the panes and
+	 * belongs to the layout rather than to the panel.
+	 */
+	width: number;
 	onApply: (next: string) => void;
 	onClose: () => void;
 }
@@ -50,7 +65,15 @@ interface Answer {
 
 const EMPTY: Answer = { text: '', thinking: '', usage: null, error: null };
 
-export default function AgentPanel({ language, source, check, onApply, onClose }: Props) {
+export default function AgentPanel({
+	language,
+	source,
+	promptsUrl,
+	check,
+	width,
+	onApply,
+	onClose,
+}: Props) {
 	const [prompt, setPrompt] = useState('');
 	const [answer, setAnswer] = useState<Answer>(EMPTY);
 	const [asking, setAsking] = useState(false);
@@ -60,6 +83,16 @@ export default function AgentPanel({ language, source, check, onApply, onClose }
 	/** What was asked, kept beside the answer so the panel reads as an exchange. */
 	const [asked, setAsked] = useState('');
 	const abort = useRef<AbortController | null>(null);
+	/**
+	 * Whether the prompt library is showing over the exchange.
+	 *
+	 * It shows on its own before the first question — there is nothing else to
+	 * put there — and after that it is a thing you open. The header button
+	 * exists because the second question is the one somebody has no idea how to
+	 * phrase: the first was obvious enough to type.
+	 */
+	const [browsing, setBrowsing] = useState(false);
+	const box = useRef<HTMLTextAreaElement>(null);
 	const tail = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -142,6 +175,31 @@ export default function AgentPanel({ language, source, check, onApply, onClose }
 		}
 	}, [asking, config, key, language, prompt, source]);
 
+	/**
+	 * Take a prompt from the library into the box — and stop there.
+	 *
+	 * Deliberately does not send. Every prompt in that list is a starting point
+	 * somebody should name a context, an aggregate or a relationship in before
+	 * asking, and one that sent itself would teach the opposite habit.
+	 */
+	const pick = useCallback((text: string) => {
+		setPrompt(text);
+		setBrowsing(false);
+		box.current?.focus();
+	}, []);
+
+	/**
+	 * Whether the library is what the body is currently showing.
+	 *
+	 * Two reasons it can be, and the button has to report both. Before the first
+	 * question there is nothing else to put there, so it shows without anybody
+	 * asking; after that it shows because somebody pressed Prompts. A toggle that
+	 * read only the second would sit there looking off while the list it controls
+	 * was on screen — and pressing it would appear to do nothing, which is exactly
+	 * what it did.
+	 */
+	const showingPrompts = browsing || (asked === '' && !asking);
+
 	/*
 	 * The proposal, checked before it is offered.
 	 *
@@ -159,7 +217,14 @@ export default function AgentPanel({ language, source, check, onApply, onClose }
 	return (
 		<section
 			aria-label="Assistant"
-			className="flex min-h-0 flex-1 flex-col border-t border-slate-200 bg-white lg:border-t-0 lg:border-l dark:border-slate-800 dark:bg-slate-950"
+			className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-slate-200 bg-white lg:flex-[0_0_var(--agent-width)] lg:border-t-0 lg:border-l dark:border-slate-800 dark:bg-slate-950"
+			/* A basis and no grow, so the document beside it takes the rest and
+			   dragging the handle moves this edge and nothing else. Only once
+			   the panes are side by side: stacked there is no handle to drag,
+			   and a share of the *height* is not what the number means. The
+			   width goes through a custom property because that is the only way
+			   a dragged number reaches a class with a breakpoint on it. */
+			style={{ ['--agent-width' as string]: `${width}%` }}
 		>
 			<div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
 				<strong className="text-sm">Assistant</strong>
@@ -167,6 +232,16 @@ export default function AgentPanel({ language, source, check, onApply, onClose }
 					reading this {LANGUAGE_LABEL[language]}
 				</span>
 				<span className="ml-auto flex items-center gap-1">
+					<button
+						type="button"
+						onClick={() => setBrowsing((was) => !was)}
+						aria-pressed={showingPrompts}
+						className={`rounded px-2 py-0.5 text-xs ${
+							showingPrompts ? 'bg-brand text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800'
+						}`}
+					>
+						Prompts
+					</button>
 					<button
 						type="button"
 						onClick={() => setShowSettings(true)}
@@ -186,8 +261,14 @@ export default function AgentPanel({ language, source, check, onApply, onClose }
 			</div>
 
 			<div ref={tail} className="min-h-0 flex-1 overflow-y-auto px-3 py-3 text-sm">
-				{asked === '' && !asking ? (
-					<Blank hasKey={key !== ''} onSettings={() => setShowSettings(true)} language={language} />
+				{showingPrompts ? (
+					<Blank
+						hasKey={key !== ''}
+						onSettings={() => setShowSettings(true)}
+						language={language}
+						onPick={pick}
+						promptsUrl={promptsUrl}
+					/>
 				) : (
 					<>
 						<p className="mb-3 rounded-md bg-slate-100 px-2.5 py-1.5 text-xs whitespace-pre-wrap dark:bg-slate-800">
@@ -239,6 +320,7 @@ export default function AgentPanel({ language, source, check, onApply, onClose }
 
 			<div className="border-t border-slate-200 p-2 dark:border-slate-800">
 				<textarea
+					ref={box}
 					value={prompt}
 					rows={3}
 					onChange={(event) => setPrompt(event.target.value)}
@@ -403,65 +485,106 @@ function Proposal({
 }
 
 /**
- * The empty state, which is really two: no key yet, and nothing asked yet.
+ * The empty state: the prompt library, with a notice above it when there is no
+ * key yet.
  *
- * The examples are not decoration. Somebody meeting this has no idea what it is
- * for, and "ask me anything" is the least useful thing a panel can say — these
- * are the three questions the notation exists to provoke.
+ * The library is not decoration and it is not "ask me anything". Somebody
+ * meeting this panel has no idea what it is for, and the honest answer is that
+ * it depends who they are — a technical architect and a business analyst open
+ * the same model with different questions. So the prompts are grouped by role,
+ * and clicking one puts it in the box to be edited rather than sending it.
+ *
+ * Keyed by language, like everything else here: the questions worth asking about
+ * a context map and about a domain model have almost nothing in common.
+ *
+ * The full set, with the reasoning for each role, is on ba-portal; this is that
+ * page's prompts for this notation. See `src/lib/agent/prompts.ts` on why the
+ * two are allowed to be separate copies.
  */
 function Blank({
 	hasKey,
 	language,
 	onSettings,
+	onPick,
+	promptsUrl,
 }: {
 	hasKey: boolean;
 	language: Language;
 	onSettings: () => void;
+	onPick: (text: string) => void;
+	promptsUrl: string;
 }) {
-	if (!hasKey) {
-		return (
-			<div className="text-xs text-ink-muted dark:text-slate-400">
-				<p>
-					No API key yet. It stays in this browser and is sent with each request; nothing is kept
-					on the server.
-				</p>
-				<button
-					type="button"
-					onClick={onSettings}
-					className="mt-2 rounded-md bg-brand px-3 py-1 text-xs font-semibold text-white hover:bg-brand-strong"
-				>
-					Add a key
-				</button>
-			</div>
-		);
-	}
-
-	const examples =
-		language === 'ddd'
-			? [
-					'Is any of these relationships more aspirational than honest?',
-					'Which subdomain is doing too much to be one subdomain?',
-					'Give the arrows that have no `because` a rationale worth arguing with.',
-				]
-			: [
-					'What invariant is each aggregate missing?',
-					'Is any of these aggregates really two?',
-					'Should anything here be referenced by identity rather than contained?',
-				];
-
 	return (
-		<div className="text-xs text-ink-muted dark:text-slate-400">
-			<p>
-				The whole document goes with whatever you ask. Questions come back as prose; ask for a
-				change and you get a document to review before it replaces yours.
+		<div className="text-xs">
+			{/*
+			 * The notice, and then the prompts anyway.
+			 *
+			 * This used to return early without a key, which made the Prompts
+			 * button do nothing at all for the one person it most needed to work
+			 * for. Somebody with no key is exactly who the list is written for:
+			 * reading what the assistant is good at is how they decide whether to
+			 * go and get one, and hiding it until they have one is backwards.
+			 *
+			 * Picking a prompt still works with no key. It fills the box, and Ask
+			 * opens the settings panel — which is a better moment to ask for a
+			 * credential than an empty screen was.
+			 */}
+			{hasKey ? (
+				<p className="text-ink-muted dark:text-slate-400">
+					The whole document goes with whatever you ask. Questions come back as prose; ask for a
+					change and you get a document to review before it replaces yours.
+				</p>
+			) : (
+				<div className="rounded-md border border-slate-300 px-2.5 py-2 dark:border-slate-700">
+					<p className="text-ink-muted dark:text-slate-400">
+						No API key yet — these are what it would be for. A key stays in this browser and is
+						sent with each request; nothing is kept on the server.
+					</p>
+					<button
+						type="button"
+						onClick={onSettings}
+						className="mt-2 rounded-md bg-brand px-3 py-1 text-xs font-semibold text-white hover:bg-brand-strong"
+					>
+						Add a key
+					</button>
+				</div>
+			)}
+
+			{PROMPTS[language].map((group: PromptGroup) => (
+				<section key={group.role} className="mt-4">
+					<h3 className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase dark:text-slate-400">
+						{group.role}
+					</h3>
+					<ul className="mt-1 flex flex-col gap-0.5">
+						{group.prompts.map((prompt) => (
+							<li key={prompt}>
+								{/* A button, not a link: it fills the box below rather than
+								    going anywhere. */}
+								<button
+									type="button"
+									onClick={() => onPick(prompt)}
+									className="w-full rounded-md px-2 py-1 text-left text-xs leading-snug hover:bg-slate-100 dark:hover:bg-slate-800"
+								>
+									{prompt}
+								</button>
+							</li>
+						))}
+					</ul>
+				</section>
+			))}
+
+			<p className="mt-5 border-t border-slate-200 pt-3 text-[11px] text-ink-muted dark:border-slate-800 dark:text-slate-500">
+				These are this {LANGUAGE_LABEL[language]}'s.{' '}
+				<a
+					href={promptsUrl}
+					target="_blank"
+					rel="noopener"
+					className="font-semibold text-brand hover:underline"
+				>
+					The full set, by role, across every board
+				</a>{' '}
+				— with what each technique is worth to whom.
 			</p>
-			<ul className="mt-2 space-y-1">
-				{examples.map((example) => (
-					<li key={example} className="italic">
-						“{example}”
-					</li>
-				))}
-			</ul>
 		</div>
 	);
 }

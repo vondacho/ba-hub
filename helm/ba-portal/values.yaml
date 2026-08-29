@@ -1,0 +1,175 @@
+# Default values for ba-portal.
+# Tuned for a local single-node cluster (Rancher Desktop / Docker Desktop).
+
+replicaCount: 1
+
+image:
+  repository: ba-portal
+  # Defaults to .Chart.AppVersion when empty.
+  tag: ""
+  # IfNotPresent so a locally built image is used without a registry push.
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Port the standalone @astrojs/node server listens on. Injected as PORT and
+# used as the container port, so the two cannot drift apart.
+containerPort: 4321
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # Defaults to the fullname template when empty.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# Update strategy, applied as-is. The portal is stateless, so a rolling update
+# is always safe here.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+podSecurityContext:
+  runAsNonRoot: true
+  # Must match the "app" user baked into ba-portal/Dockerfile. 1000 is
+  # deliberately avoided there — the node base image already uses it.
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 4321
+
+# On by default, matching every sibling chart: a browser frontend nobody can
+# open is not a useful default, and *.localhost costs nothing on a local
+# cluster.
+ingress:
+  enabled: true
+  # Empty uses the cluster's default IngressClass. Rancher Desktop ships
+  # "traefik" as the default.
+  className: ""
+  annotations: {}
+  hosts:
+    - host: ba-portal.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    # No CPU limit: the Node server is bursty at startup and during SSR.
+    memory: 512Mi
+
+# Probes hit the /healthz route served by src/pages/healthz.ts. Node boots
+# fast, so the startup budget is tight.
+probes:
+  path: /healthz
+  startup:
+    enabled: true
+    initialDelaySeconds: 2
+    periodSeconds: 2
+    failureThreshold: 15
+  liveness:
+    enabled: true
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    periodSeconds: 5
+    failureThreshold: 3
+
+# ---------------------------------------------------------------------------
+# Application configuration.
+# Rendered into a ConfigMap and injected wholesale via envFrom.
+#
+# Seven addresses, and **every one of them is a browser-facing link**. The
+# visitor's browser resolves them, so an in-cluster address like
+# http://arch-portal:4321 would be wrong even though this portal is
+# server-rendered — and doubly wrong, because each neighbouring hub is a
+# separate release in its own namespace.
+#
+# There is no in-cluster call in this list, and no REGISTRY_API_URL beside it
+# the way doc-portal has one: ba-portal renders its catalog from a compiled-in
+# array, so it starts, serves and passes its probes with every neighbour down.
+#
+# src/lib/links.ts reads each one through process.env at call time and falls
+# back to the same default the chart ships, so an unset value and the default
+# look identical in the page. Override one to something obviously wrong if you
+# ever need to prove the wiring works.
+#
+# The prerendered Starlight pages under /doc/* cannot read any of these — they
+# were rendered on the build machine — which is what /go/<target> exists for:
+# a docs page links there with a relative URL and the redirect resolves the
+# environment per request. The portal's own pages skip the hop.
+# ---------------------------------------------------------------------------
+app:
+  # arch-hub's portal: the architecture the bounded contexts are realised in.
+  archPortalUrl: http://arch-portal.localhost
+
+  # api-hub's portal: the published contracts a context integration runs over.
+  apiPortalUrl: http://api-portal.localhost
+
+  # dev-hub's portal: how a model gets implemented once it has been agreed.
+  devPortalUrl: http://dev-portal.localhost
+
+  # qa-hub's portal: the test strategy the acceptance criteria feed.
+  qaPortalUrl: http://qa-portal.localhost
+
+  # doc-hub's event storming board: the workshop surface a domain is discovered
+  # on. Deployed, which is why the Event Stormer panel reads live.
+  eventStormerUrl: http://doc-es.localhost
+
+  # The DDD mapper — ba-hub's own second component, a release in this same
+  # namespace. An ingress host and not http://ba-ddd-mapper:4322, because the
+  # visitor's browser is what follows this link; the Service name would resolve
+  # only inside the cluster, and nothing here calls it from the server.
+  #
+  # src/lib/links.ts defaults to http://ddd-mapper.localhost, which predates the
+  # chart. The chart is now the authority on the address and names the release.
+  dddMapperUrl: http://ba-ddd-mapper.localhost
+
+  # The landscape collector: the service that observes running systems and
+  # produces the evidence the system map is drawn from. Nothing is deployed
+  # behind this yet, which is why the panels pointing at it read planned. The
+  # value exists now so that the day one is deployed it takes a value change
+  # and a restart rather than a rebuild.
+  landscapeApiUrl: http://landscape-api.localhost
+
+  # Arbitrary extra entries, merged verbatim into the same ConfigMap and so
+  # injected as env vars too:
+  #   extraConfig:
+  #     LOG_LEVEL: debug
+  extraConfig: {}
+
+# Flags passed to the Node process, e.g. "--max-old-space-size=384".
+nodeOptions: ""
+
+# Additional raw environment variables (full valueFrom syntax available), e.g.
+#   - name: SOME_SECRET
+#     valueFrom:
+#       secretKeyRef: { name: portal, key: token }
+extraEnv: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

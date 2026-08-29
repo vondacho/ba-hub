@@ -1,0 +1,413 @@
+---
+title: Assistant prompts
+description: What to ask the assistant in each board, by role — and why the cheap questions are the ones not worth asking.
+---
+
+Every board in this hub has an assistant in it: the
+[Event Stormer](/doc/tooling/event-stormer/), the story mapper and the example
+mapper in [doc-hub](/go/stormer), and both halves of the
+[DDD mapper](/doc/tooling/ddd-mapper/). It reads the whole document and answers
+beside it, and a change comes back as a diff you apply or ignore.
+
+This page is the set of questions worth spending it on, arranged by who is
+asking.
+
+## The one rule: never ask it to do what a click does
+
+Adding a lane, an activity, a step, a rule, an aggregate, a domain, a context, a
+card — every one of those is a single gesture on the board. It is instant, it is
+free, and it puts the thing exactly where you meant it.
+
+Asking the assistant to do it costs a request, a wait, and a diff to read, and
+gives you a worse version of a button. Worse, it trains a habit: a session where
+the model places the cards is a session where nobody in the room decided
+anything, and the whole value of these five techniques is the deciding.
+
+**Spend it on the questions the notation exists to provoke.** A wall is worth
+building because it surfaces the thing nobody agreed on; a map is worth drawing
+because it shows which release is not a whole slice. Those are readings, and a
+reading is what a model with the practice in its head can genuinely do while the
+room is still in front of it.
+
+## The five techniques, and what each is for
+
+| Technique | Where | The question it answers | What a good session leaves behind |
+|---|---|---|---|
+| [Event storming](/doc/processes/event-storming/) | Event Stormer, `.eventstorm` | What actually happens, in what order, and where nobody agrees | A timeline with hotspots on it, and the seams the map will use |
+| [Context mapping](/doc/strategic/context-mapping/) | DDD mapper, `.ddd` | Where one model's language stops, and who owes what to whom | A map whose arrows carry honest rationales |
+| [Domain model mapping](/doc/model/) | DDD mapper, `.ddm` | What one context keeps true, and across what transaction | Aggregates with invariants worth reading |
+| [Story mapping](/go/dev) | Story mapper, `.storymap` | What ships first, and whether that is a whole slice | A plan you can draw a line across |
+| [Example mapping](/go/dev) | Example mapper, `.examplemap` | Whether we agree what this story means | Rules with examples, and the questions nobody could answer |
+
+The five are not alternatives. A storm finds the seams, a context map names them,
+a domain model goes inside one, a story map decides what to build first, and an
+example map settles what one story means. Most roles below use three of them.
+
+Story mapping and example mapping are written up in [dev-hub](/go/dev), which is
+where the practices that turn an agreed model into running code live; the other
+three are documented here.
+
+**Three of them are commonly mis-assigned.** Context mapping and domain model
+mapping read as architecture, and example mapping reads as testing, because that
+is where each one's output is eventually spent. The *finding* in all three is a
+domain one: a boundary is where language changes, an aggregate is what a business
+rule needs held together, and a rule with its examples is what the business
+actually promised. The analyst leads all three; the architects and the test
+manager own what each finding costs and whether it can be observed. The role
+sections below are written that way.
+
+## How to use what follows
+
+Open the assistant in the board that holds the document, paste the prompt, and
+send it. The whole document travels with the question, so nothing needs
+describing first. Answers come back as prose; a prompt that asks for a change
+comes back as prose *and* a proposed document you review as a diff before it
+replaces yours.
+
+If you always want something said — your house terms, a language, a convention
+this shop keeps — put it in **Settings → Standing instructions** rather than
+retyping it. It is appended last, so it wins.
+
+Reach for higher **effort** for the reading questions ("is this boundary right")
+and lower for the mechanical ones ("which rules have no examples").
+
+---
+
+## Product manager
+
+**Scope.** What gets built next, and why. The release plan and the case for it.
+
+**The daily challenge.** Being asked to commit to a date for a scope nobody has
+sized; a backlog that is a list rather than a plan; a first release that
+everybody wants everything in. The recurring failure is a plan that looks
+complete and ships something a user cannot finish a job with.
+
+**What the techniques are worth here.** Story mapping is the one that pays
+directly — it is the only artefact that shows a release as a *slice* rather than
+a prefix. Example mapping tells you whether a story is ready to be estimated at
+all. Event storming tells you where in the process the value actually sits.
+
+**Story mapper**
+
+- Which activities does the first delivery leave empty? Tell me what a user could not finish if we shipped only what is scheduled.
+- Read this map as a plan rather than a backlog. If I have to cut a third of it, which stories go and what stops working?
+- Which "so that" clauses fail to justify their story? List them with what is missing.
+- Which steps carry so many stories that the step is really two, and where would you cut them?
+- Which unscheduled stories are the ones this plan is quietly depending on?
+
+**Example mapper**
+
+- Is this story ready to estimate? Count the open questions and say which one would change the size most.
+- This story looks too big. Which rules would split it, and what would each half be worth shipping on its own?
+
+**Event Stormer**
+
+- Where in this timeline does the customer wait, and what event would tell them what is happening?
+- Which part of this process would we still have to run by hand after everything on this wall is built?
+
+---
+
+## Business analyst
+
+**Scope.** Turning what the business means into something a team can build
+without guessing.
+
+**The daily challenge.** Requirements that are decisions in disguise; agreement
+that evaporates between the workshop and the sprint; one word that means two
+things in two departments and nobody has noticed. The recurring failure is a
+specification everybody signed and nobody read the same way.
+
+**What the techniques are worth here.** All five, and three of them are the
+analyst's to *lead* rather than to attend.
+
+**Context mapping, domain model mapping and example mapping are business
+analysis, not architecture or testing.** A bounded context is found by noticing
+that two departments mean different things by one word. An aggregate exists to
+keep a *business* rule true across a transaction. A rule on an example map is a
+statement about how the business behaves, and the example that proves it is a
+fact somebody in the business knows. All three findings are domain expertise
+before they are anybody's technical decision.
+
+The roles downstream own the consequence, not the finding: what it costs to split
+an aggregate, what a `conformist` relationship means for a release train, whether
+an example can be observed as a failing test. An analyst who leaves these three to
+the architects and the testers gets a map drawn from system boundaries rather than
+from language, and rules written from what is easy to assert rather than from what
+the business actually promised — wrong in the expensive direction, and expensive
+precisely because it looks finished.
+
+The other two do what they always do: event storming is where the disagreements
+surface while the room is still together, and story mapping is where the journey
+is checked against the plan.
+
+**Example mapper**
+
+- Which rules here have no examples? For each, write the one example that would show whether we actually agree.
+- Which of these examples restates its rule instead of illustrating it? Rewrite them with concrete values, dates and names.
+- Turn every open question into the smallest decision somebody could make this week, and say who would have to make it.
+- Which two rules here are really the same rule said twice?
+- Which rules are policy the business chose, and which are constraints it is stuck with? Say which ones somebody could decide to change.
+- Which rule here would a person in the business phrase differently? Rewrite each in the words they would use.
+- What does this story assume about the domain that nobody has written down as a rule?
+
+**Event Stormer**
+
+- Which events on this wall are commands wearing an event's colour? Rename them to what actually happened.
+- Where is this timeline suspiciously free of hotspots? Name what the room probably agreed too quickly.
+- Which policies have no event before them or no command after them? That is where a decision has no owner.
+
+**DDD mapper — context map**
+
+- Which terms appear in the `language` of two contexts? For each, say whether the two mean the same thing — that is where the boundary really is.
+- Which contexts have an empty `language`? Propose the three terms that would make each a real boundary.
+- Read this map as a description of the business rather than of the systems. Which boundary follows an org chart or a database instead of a language?
+- Which `intent` lines say what a context *does* rather than what it is *for*? Rewrite them as the reason the business would miss it.
+- Which subdomain classifications would the business disagree with? Say which `core` is really something we buy, and which `generic` is the thing we actually compete on.
+- For each relationship, say what crosses in business terms — not payloads, but what one side is asking the other for.
+
+**DDD mapper — domain model**
+
+- Which aggregates have no invariant? For each, name the business rule it is supposed to keep true, in the words the business would use.
+- Which invariants here are technical constraints wearing a business rule's clothes? Say which ones nobody in the business would recognise.
+- Which names in this model are not words the business actually says? Propose the term each should be, and say where you would go to confirm it.
+- Read the `intent` of each aggregate. Which one could be deleted without the business noticing?
+- Which two things here are called different names and are the same thing to the business — or share a name and are not?
+
+---
+
+## Process manager
+
+**Scope.** The process end to end, across departments and systems. Handoffs,
+waiting, exceptions, and who owns which step.
+
+**The daily challenge.** A process nobody has ever drawn end to end; handoffs
+where work sits for two days and no document records it; a happy path that is
+written down and a set of exceptions that live as folklore in three people's
+heads. The recurring failure is optimising a step that was never the bottleneck.
+
+**What the techniques are worth here.** Event storming is the technique — it is
+the only one of the five whose subject *is* the process, and its
+process-modelling level draws the causal chain `event → policy → command →
+system → event` that shows where decisions actually happen. Context mapping then
+says which department owns which stretch. Story mapping says whether the plan
+follows the process or cuts across it.
+
+**Event Stormer**
+
+- Walk this timeline end to end and name every handoff between lanes. For each, say what is waiting and on whom.
+- Which stretch of this process has no actor and no system anywhere near it? That is work nobody has claimed.
+- This wall documents the happy path. Name the five most likely exceptions and say where each would branch off.
+- Which columns hold cards from three or more lanes? Say whether that is genuine concurrency or a queue we have drawn as simultaneity.
+- Which policies here are really manual decisions somebody makes in a meeting? Say what would have to be true to automate each.
+- Read this wall as a cycle time. Where would you look first for the delay, and what card is missing that would prove it?
+
+**DDD mapper — context map**
+
+- Which context would have to change for this process to run faster, and which relationship pattern is holding it in place?
+
+---
+
+## UX leader
+
+**Scope.** The experience across the whole journey, not the screen at the end of
+it.
+
+**The daily challenge.** Being asked for screens before the journey is agreed;
+research findings that never reach the plan; personas that decorate a deck and
+influence nothing. The recurring failure is a beautifully designed step inside a
+journey nobody checked the shape of.
+
+**What the techniques are worth here.** A story map's backbone *is* the journey
+— which makes it the one planning artefact that can be wrong about UX in a way
+you can point at. Event storming shows where a person waits, is left uninformed,
+or has to decide with nothing in front of them. Example mapping is where "good"
+stops being an adjective.
+
+**Story mapper**
+
+- Read this backbone as a user journey. Where does it stop being a narrative and start being a list of features?
+- Which stories name a persona their own activity does not list? Say whether the story is in the wrong place or the activity has not admitted who it is for.
+- Which activity is doing work for every persona at once? That is usually two journeys drawn as one.
+- If a new user met this product at the first activity and stopped at the end of the first delivery, what would they have failed to do?
+
+**Event Stormer**
+
+- Where in this timeline does a person have to decide something with no read model in front of them?
+- Which events would the customer never learn about? List the ones where silence is the experience.
+- Which hotspots here are actually experience problems rather than system problems?
+
+**Example mapper**
+
+- Rewrite these examples from the user's point of view — what they did and what they saw — rather than from the system's.
+
+---
+
+## Solution architect
+
+**Scope.** How the whole solution hangs together across contexts, teams and
+vendors.
+
+**The daily challenge.** Integrations agreed in a corridor and discovered in
+production; a context map where every arrow says `customer-supplier` because
+`conformist` felt like a defeat; a design that ignores who actually holds the
+budget for the system on the other end. The recurring failure is a map of what
+everybody wishes were true.
+
+**What the techniques are worth here.** Context mapping is the technique you
+live in — but you share it. The analyst finds the boundaries, because a boundary
+is a place where language changes and that is a domain finding; what you own is
+the *consequence* of each one: the pattern, the `because` line, and what the
+relationship costs the teams on both ends. A map drawn only by architects follows
+the systems; a map drawn only by analysts ignores who holds the budget. Event
+storming supplies the raw material — clusters of events that share a language are
+candidate boundaries. Domain model mapping is how you check that a boundary you
+drew can actually hold.
+
+**You are in the storm, not downstream of it.** Event storming is not a workshop
+whose output gets handed to you — it is where the seams are found, and the seams
+are the input to every decision you own. A solution architect who reads the wall
+afterwards inherits boundaries somebody else drew from the events they happened
+to remember. One who is in the room asks the question that changes the map:
+*which of these events change together, and which never do?* Attend at
+process-modelling level, where the causal chain shows which decisions cross a
+boundary and which stay inside one.
+
+**DDD mapper — context map**
+
+- Which of these relationships is more aspirational than honest? Rewrite each `because` with the answer somebody would be embarrassed to say out loud.
+- Which arrows have no `because` at all? Give each a rationale worth arguing with, and say which one you are least confident in.
+- Count the `core` subdomains. If more than a couple are core, say which are really supporting and what that would change about who staffs them.
+- Which boundary here has no owner? Say what will happen to it at the next deadline.
+- For each `anticorruption-layer` on this map, say what evidence would tell us the layer is being bypassed.
+- Which contexts serve a second subdomain? Say whether that straddle is a real one or a boundary we have not finished drawing.
+
+**Event Stormer**
+
+- Group these events into clusters that share a language and change together, and propose the context boundaries they imply.
+- Which events cross from one lane to another? For each crossing, say what the relationship between those two sides would have to be.
+- Which terms on this wall are used by two lanes to mean different things? Those are boundaries, not vocabulary problems.
+- Which external systems appear more than once, and in how many places would we be coupled to each?
+- Read this wall as a set of candidate contexts. For each, say what it would own and what it would have to ask somebody else for.
+- Which policies here span two lanes? A rule that reacts in one place and commands in another is an integration we have not designed yet.
+- Which hotspots are really boundary disputes — two groups defending different models of the same thing?
+
+**DDD mapper — domain model**
+
+- Does this model fit inside one bounded context, or is it two contexts that have been merged for convenience?
+
+---
+
+## Technical architect
+
+**Scope.** What gets built inside a context: the model, what it protects, and
+what it will cost under load.
+
+**The daily challenge.** Aggregates that are tables with ceremony; invariants
+that live in a service class nobody can find; a transaction that quietly spans
+three boundaries. The recurring failure is a model that reads well and contends
+badly.
+
+**What the techniques are worth here.** Domain model mapping is the technique you
+live in — but the invariants are not yours to invent. An aggregate exists to keep
+a *business* rule true across a transaction, and which rule that is comes from the
+analyst and the domain. What you own is whether the boundary can hold it: what
+gets loaded and saved together, what contends, what has to become eventually
+consistent. The notation is built so that an aggregate with nothing to protect is
+visibly empty, which is a question to take back to the business rather than a gap
+to fill in yourself. Context mapping says what crosses the boundary and by which
+contract. Event storming at software-design level names the components that accept
+commands and emit events.
+
+**DDD mapper — domain model**
+
+- Which aggregates have no invariant? For each, either name the rule it protects or say why it should not be an aggregate.
+- Is any of these aggregates really two? Say what would have to become eventually consistent if we split it.
+- Which `contains` should be a `references`? Name the boundary each part actually belongs to.
+- Which aggregate here becomes the contention point under load, and what gets loaded and saved along with it?
+- Which entities should be value objects? Say what identity is doing for each one that a value could not.
+- Where does something outside need to reach past a root? That is either a wrong boundary or a missing aggregate — say which.
+
+**DDD mapper — context map**
+
+- For each relationship, say what the downstream team has to change when the upstream one ships. That is the real coupling.
+
+**Event Stormer**
+
+- Which aggregates does this wall imply, and which commands would each accept?
+
+---
+
+## Test manager
+
+**Scope.** Whether what was built is what was agreed, and whether anyone can
+tell.
+
+**The daily challenge.** Acceptance criteria that are opinions; test cases
+written from screenshots because nothing else was concrete; ambiguity discovered
+in the test phase, when it is most expensive. The recurring failure is a suite
+that is green against a specification nobody agreed.
+
+**What the techniques are worth here.** Example mapping is the cheapest testing
+you will ever do — the examples *are* the tests, written before the code. But the
+rules and the examples are the analyst's and the domain's; what they mean is a
+business question and you are not the one who answers it. What you own is whether
+each one can *fail*: whether an example is concrete enough to become a red test,
+whether a rule has a breaking case at all, and whether anybody could observe the
+outcome. Bring that to the session rather than a set of rewritten rules. Story
+mapping shows coverage across the journey rather than per screen. Event storming
+names the exceptions the happy path never mentions.
+
+**Example mapper**
+
+- Which of these examples is too vague to become a failing test? Say what value, date or name is missing from each.
+- Which rules could never fail? A rule you cannot write a breaking example for is a description, not an acceptance criterion.
+- For each rule, name the boundary case nobody has written — the one right at the edge.
+- Which `then` clauses only say what did not happen? Add the one that says what did.
+- List the open questions in order of how much test work each would invalidate if it were answered the other way.
+- Which rules would need the same setup? Group them, and say what that shared setup tells us about the model.
+
+**Story mapper**
+
+- Which steps have stories in the first delivery but nothing that tests the step's own outcome?
+
+**Event Stormer**
+
+- Which hotspots on this wall would become defects if nobody resolved them before the build?
+
+---
+
+## Writing your own
+
+The prompts above have three things in common, and they are what make a prompt
+worth sending:
+
+**They ask about shape, not truth.** "Which rules have no examples" is a question
+about the document. "Is this the right rule for our business" is a question about
+your business, and the assistant does not know your business — it knows the
+notation and the practice.
+
+**They ask for a list with reasons.** "Name them and say why" produces something
+you can disagree with item by item. "What do you think of this map" produces a
+paragraph nobody acts on.
+
+**They accept "nothing is wrong" as an answer.** Every guide tells the assistant
+that "this looks right, and here is why" is a complete answer. A prompt that
+demands findings will get findings.
+
+## What it cannot see
+
+One document, and only the one on screen. Not your other maps, not the
+[catalog](/catalog), not your tickets, not last month's version of this file, and
+not what was said in the room. If context matters to the question, it has to be
+in the document — which is usually a good argument for putting it there anyway.
+
+## The failure mode to watch
+
+A fluent answer about a domain it does not know. The assistant is genuinely good
+at the shape of these documents and has no way to tell whether your business
+actually works the way the wall says. Treat every answer as a well-read colleague
+who has never met your customers: worth arguing with, never worth deferring to.
+
+The proposal flow is built for exactly that. A change arrives as a diff, it is
+checked against the parser before it is offered, and applying it is a button you
+press and an undo away from being gone.
