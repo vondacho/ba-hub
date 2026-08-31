@@ -37,6 +37,30 @@ locals {
   ))
 }
 
+# GitHub mints the `sub` claim in one of two shapes, and which one you get is
+# not under this repository's control:
+#
+#   classic     repo:vondacho/ba-hub:environment:production
+#   immutable   repo:vondacho@3777501/ba-hub@1343390785:environment:production
+#
+# Since 2026-07-15 every newly created repository gets the immutable form
+# automatically — the numeric owner and repository IDs close a real hole, where
+# deleting a repository and recreating it under the same name let a new owner
+# mint the same subject. This repository is on the immutable form (confirm with
+# `gh api /repos/OWNER/NAME/actions/oidc/customization/sub`, which reports the
+# prefix in use).
+#
+# So `sub` is deliberately NOT the load-bearing condition here: matching it
+# exactly means pinning IDs that differ per fork and per account, and silently
+# breaks again the day a repository flips form. The authorization is carried by
+# the dedicated claim keys below — `repository`, `ref`, `environment` — which
+# STS has validated natively for GitHub since January 2026 and which say what
+# they mean instead of packing three facts into one string.
+locals {
+  github_owner = split("/", var.github_repository)[0]
+  github_repo  = split("/", var.github_repository)[1]
+}
+
 data "aws_iam_policy_document" "deploy_trust" {
   statement {
     effect  = "Allow"
@@ -53,13 +77,40 @@ data "aws_iam_policy_document" "deploy_trust" {
       values   = ["sts.amazonaws.com"]
     }
 
-    # The tightest useful constraint: this repository, on this ref only. A
-    # wildcard on `sub` (or omitting it) would let *any* repository on GitHub
-    # assume the role — the classic misconfiguration.
+    # The tightest useful constraint: this repository, on this branch, from
+    # this environment. All three must hold. Dropping `repository` — or
+    # widening it — would let *any* repository on GitHub assume the role, the
+    # classic misconfiguration.
     condition {
       test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:repository"
+      values   = [var.github_repository]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:ref"
+      values   = [var.github_deploy_ref]
+    }
+
+    # The deploy job declares `environment: production`, so the token carries
+    # it. Keep this in step with the workflow's `environment:` name.
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:environment"
+      values   = [var.github_deploy_environment]
+    }
+
+    # STS still requires the trust policy to constrain `sub` at all, so it is
+    # constrained to both shapes of *this* repository's subject and no further.
+    # It adds nothing the three conditions above do not already enforce.
+    condition {
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:ref:${var.github_deploy_ref}"]
+      values = [
+        "repo:${local.github_owner}/${local.github_repo}:*",
+        "repo:${local.github_owner}@*/${local.github_repo}@*:*",
+      ]
     }
   }
 }

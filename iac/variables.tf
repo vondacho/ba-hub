@@ -69,6 +69,12 @@ variable "github_deploy_ref" {
   default     = "refs/heads/main"
 }
 
+variable "github_deploy_environment" {
+  description = "GitHub Actions environment the deploy job declares. It selects the `sub` claim GitHub puts in the OIDC token, so it must match the workflow's `environment:` name exactly."
+  type        = string
+  default     = "production"
+}
+
 variable "create_github_oidc_provider" {
   description = "Create the GitHub OIDC provider. Set false if the account already has one — AWS allows only a single provider per issuer URL."
   type        = bool

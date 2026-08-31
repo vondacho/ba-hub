@@ -18,6 +18,8 @@ create_github_oidc_provider = true
 # instance_type     = "t3.small"
 # github_repository = "vondacho/ba-hub"
 # github_deploy_ref = "refs/heads/main"
+# Must match the `environment:` name in the workflow's deploy job.
+# github_deploy_environment = "production"
 
 # Break-glass only. Both default to nothing: administration goes through SSM
 # Session Manager, so the host normally has no key pair and no open port 22.

@@ -49,10 +49,23 @@ PAYLOAD="$(tar -C "$HERE/host" -czf - . | base64 | tr -d '\n')"
 
 # The tar carries only what is tracked in host/, so /opt/ba-hub/.env — written
 # once by user-data.sh and holding ACME_EMAIL — is never overwritten.
+#
+# AWS-RunShellScript writes the command to _script.sh and runs it with /bin/sh,
+# which on Ubuntu is dash. Dash has no `pipefail`, so setting it at the top of
+# the remote script aborts the whole deploy on line 1 with
+# "set: Illegal option -o pipefail". Hand the body to bash explicitly instead —
+# a `#!/bin/bash` shebang would not help, since the agent chooses the
+# interpreter rather than executing the file directly.
+#
+# `set -x` starts *after* the payload is unpacked: tracing a multi-kilobyte
+# base64 blob would push the useful output past the 24,000-character limit that
+# get-command-invocation returns.
 read -r -d '' REMOTE_SCRIPT <<REMOTE || true
-set -euxo pipefail
+exec /bin/bash -s <<'INNER'
+set -euo pipefail
 cd $REMOTE_DIR
-echo '$PAYLOAD' | base64 -d | tar -xzf - -C $REMOTE_DIR
+printf %s '$PAYLOAD' | base64 -d | tar -xzf - -C $REMOTE_DIR
+set -x
 chown -R ubuntu:ubuntu $REMOTE_DIR
 docker compose pull
 docker compose up -d --remove-orphans --wait
@@ -60,6 +73,7 @@ docker compose ps
 # The superseded images are unreferenced once the containers have swapped;
 # without this the root volume fills up over a few dozen deploys.
 docker image prune -f
+INNER
 REMOTE
 
 say "Sending to $INSTANCE_ID"

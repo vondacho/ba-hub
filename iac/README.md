@@ -43,15 +43,42 @@ expire when the job ends.
 ```
 role      ba-hub-deploy                       (iac/oidc.tf)
 trusts    token.actions.githubusercontent.com
-only if   aud = sts.amazonaws.com
-    and   sub = repo:vondacho/ba-hub:ref:refs/heads/main
+only if   aud         = sts.amazonaws.com
+    and   repository  = vondacho/ba-hub
+    and   ref         = refs/heads/main
+    and   environment = production
 may do    ssm:SendCommand  → AWS-RunShellScript, on instances tagged Project=ba-hub
           plus the read calls needed to find the host and collect the output
 ```
 
-The `sub` condition is the load-bearing one. Without it — or with a wildcard —
-any repository on GitHub could assume the role. It is pinned to this repository
-*and* to `main`, so a workflow on a branch or a fork gets nothing.
+The three claim conditions are the load-bearing ones, and all must hold: a
+workflow in another repository, on a branch, or outside the `production`
+environment gets nothing.
+
+They are separate conditions rather than one `sub` string on purpose. GitHub
+mints `sub` in two shapes and the choice is not ours to make:
+
+```
+classic    repo:vondacho/ba-hub:environment:production
+immutable  repo:vondacho@3777501/ba-hub@1343390785:environment:production
+```
+
+Every repository created since 2026-07-15 gets the immutable form
+automatically — the numeric IDs stop a deleted-and-recreated repository name
+from inheriting someone else's trust. This one is on it. Matching `sub`
+exactly would mean pinning IDs that differ per fork and per account, and would
+break again on any future flip, so the policy only requires `sub` to look like
+this repository (STS insists it be constrained somehow) and does the real work
+with `repository`, `ref`, and `environment`, which STS has validated natively
+for GitHub since January 2026.
+
+Symptom when any of them disagrees with the token: `Could not assume role with
+OIDC: Not authorized to perform sts:AssumeRoleWithWebIdentity`. To see what
+GitHub actually mints:
+
+```sh
+gh api /repos/vondacho/ba-hub/actions/oidc/customization/sub
+```
 
 The role cannot start, stop, or reconfigure the instance, and cannot touch any
 instance that is not tagged as part of this project.
