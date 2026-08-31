@@ -1,0 +1,74 @@
+# Runtime definition for the ba-hub Docker host (/opt/ba-hub).
+#
+# Shipped by the `deploy` job in .github/workflows/build-images.yml, which
+# rsyncs this directory and then runs `docker compose pull && up -d`. Editing
+# it is a git push — the instance itself never needs to be replaced.
+#
+# ACME_EMAIL comes from /opt/ba-hub/.env, written by iac/user-data.sh.
+
+name: ba-hub
+
+services:
+  # The only service bound to the host. Both apps are reachable exclusively
+  # through it, so there is no way to hit them over plain HTTP.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in /opt/ba-hub/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and ACME account keys. Losing this volume means
+      # re-issuing from scratch, which is how you meet Let's Encrypt's
+      # duplicate-certificate rate limit.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      ba-portal:
+        condition: service_healthy
+      ba-ddd-mapper:
+        condition: service_healthy
+
+  ba-portal:
+    image: ghcr.io/vondacho/ba-hub/ba-portal:latest
+    restart: unless-stopped
+    # No `ports`: reachable on the compose network only.
+    expose:
+      - "4321"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4321
+      NODE_ENV: production
+      # Resolved per request by src/lib/links.ts — this is what the browser
+      # gets in the rendered links, so it must be the public URL.
+      DDD_MAPPER_URL: https://ddd-mapper.obya.ch
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4321/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  ba-ddd-mapper:
+    image: ghcr.io/vondacho/ba-hub/ba-ddd-mapper:latest
+    restart: unless-stopped
+    expose:
+      - "4322"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4322
+      NODE_ENV: production
+      BA_PORTAL_URL: https://ba-portal.obya.ch
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4322/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  caddy_data:
+  caddy_config:

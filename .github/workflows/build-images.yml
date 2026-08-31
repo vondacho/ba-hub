@@ -57,13 +57,15 @@ env:
   REGISTRY: ghcr.io
   PLATFORMS: linux/amd64
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   # Which components does this ref actually need rebuilt?
   changes:
     name: select components
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     outputs:
       # JSON array of component names, consumed as the build job's matrix.
       components: ${{ steps.select.outputs.components }}
@@ -181,4 +183,62 @@ jobs:
             echo '```'
             echo "${{ steps.meta.outputs.tags }}"
             echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Rolls the freshly published images onto the EC2 Docker host provisioned by
+  # iac/. Only `main` deploys: tags publish images, they do not promote them,
+  # and a pull request has nothing to roll out.
+  #
+  # `always()` with an explicit build check so that a push touching only, say,
+  # iac/host/Caddyfile still redeploys — that run has an empty component matrix,
+  # which skips `build`, and a skipped dependency would otherwise skip this job
+  # too.
+  deploy:
+    name: deploy to host
+    needs: [changes, build]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.build.result != 'failure' &&
+      needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Lets the runner mint the OIDC token that AWS exchanges for temporary
+      # credentials. Without it the assume-role step fails with a missing
+      # ACTIONS_ID_TOKEN_REQUEST_URL.
+      id-token: write
+    # One rollout at a time, and never cancelled half-applied.
+    concurrency:
+      group: deploy-host
+      cancel-in-progress: false
+    environment:
+      name: production
+      url: https://ba-portal.obya.ch
+    steps:
+      - uses: actions/checkout@v5
+
+      # No stored AWS key: the runner presents a GitHub-signed OIDC token and
+      # STS returns credentials that expire with the job. The role's trust
+      # policy pins this repository and this ref (see iac/oidc.tf).
+      - name: Assume the deploy role
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-central-1' }}
+          role-session-name: ba-hub-deploy-${{ github.run_id }}
+
+      # Ships iac/host/ to /opt/ba-hub over SSM and restarts the stack. The
+      # same script runs unchanged from a laptop.
+      - name: Deploy
+        run: ./iac/deploy.sh
+
+      - name: Summarise
+        run: |
+          {
+            echo '### Deployed'
+            echo '- https://ba-portal.obya.ch'
+            echo '- https://ddd-mapper.obya.ch'
           } >> "$GITHUB_STEP_SUMMARY"

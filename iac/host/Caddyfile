@@ -1,0 +1,18 @@
+# Caddy issues and renews the Let's Encrypt certificates itself and redirects
+# HTTP to HTTPS by default, so a site block is the whole configuration.
+
+{
+	email {$ACME_EMAIL}
+}
+
+ba-portal.obya.ch {
+	encode zstd gzip
+	reverse_proxy ba-portal:4321
+}
+
+ddd-mapper.obya.ch {
+	# `encode` deliberately leaves text/event-stream alone, so the SSE
+	# response from POST /api/agent still arrives token by token.
+	encode zstd gzip
+	reverse_proxy ba-ddd-mapper:4322
+}
