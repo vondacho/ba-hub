@@ -1,3 +1,10 @@
+locals {
+  # Names this stack: the value of the Project tag on everything it creates
+  # (see the provider's default_tags in versions.tf), and the tag oidc.tf reads
+  # back to tell an OIDC provider this stack owns from one another stack owns.
+  project = "ba-hub"
+}
+
 # The default VPC is enough for a single public host: it already has an
 # internet gateway and public subnets, and there is nothing here to isolate
 # from anything else. Building a VPC would add five resources that only

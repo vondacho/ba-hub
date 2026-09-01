@@ -144,16 +144,29 @@ same provider build.
    You add the two A records by hand after the apply — the `dns_records`
    output prints them. Deliberate: the zone serves more than this stack, and a
    delegation move would put all of it through a cutover for two records.
-3. **Check for an existing GitHub OIDC provider.** An AWS account may hold only
-   one per issuer URL:
+3. **Nothing to decide about the GitHub OIDC provider.** An AWS account may
+   hold only one per issuer URL, and this stack owns this account's —
+   `create_github_oidc_provider` defaults to `true`, and dev-hub and doc-hub
+   reference what is created here. `terraform plan` verifies that against the
+   account before anything is created: `iac/oidc-provider-exists.sh` asks AWS
+   which providers exist and who owns them (the `Project` tag), and a
+   precondition turns a disagreement into a failed plan with the fix in the
+   message. The two failures it replaces both used to happen mid-apply:
 
    ```sh
-   aws iam list-open-id-connect-providers
+   aws iam list-open-id-connect-providers   # the same question, by hand
    ```
 
-   If one already exists for `token.actions.githubusercontent.com`, set
-   `create_github_oidc_provider = false` and this stack will reference it
-   instead of colliding with it.
+   | Setting | Account | What happens now |
+   |---|---|---|
+   | `true` | none, or this stack's own | created, or kept — the normal case here |
+   | `true` | another stack's provider | plan fails, naming the owner; set it to `false` |
+   | `false` | provider exists | referenced |
+   | `false` | none | plan fails; set it to `true` |
+
+   The tag is what makes the second and third rows distinguishable, and it is
+   also what stops this stack from failing its own check on every plan after it
+   created the provider.
 
 ## Apply
 
@@ -265,7 +278,7 @@ terraform destroy
 ```
 
 Removes the instance, EIP, security group, both IAM roles, and the OIDC
-provider — the last of which will break *any other* repository relying on it,
-so check `create_github_oidc_provider` first if the account is shared. The DNS
-records and the GHCR packages are untouched; delete the two A records at
-DigitalOcean by hand.
+provider. That last one is shared: **dev-hub and doc-hub both reference it**,
+and destroying it breaks their deploy jobs until one of them recreates it
+(`create_github_oidc_provider = true` there). The DNS records and the GHCR
+packages are untouched; delete the two A records at DigitalOcean by hand.

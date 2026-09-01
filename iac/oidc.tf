@@ -6,9 +6,26 @@
 # This replaces the SSH key the deploy job used to hold — which is also why the
 # security group no longer opens port 22 at all (see security.tf).
 
+# Does the account already hold a provider for this issuer? Asked here rather
+# than assumed, because AWS allows exactly one per issuer URL account-wide and
+# the answer decides whether this stack creates it or references it. Getting it
+# wrong surfaces as EntityAlreadyExists partway through an apply, with the
+# security group, the instance and the host role already created.
+data "external" "github_oidc" {
+  program = ["${path.module}/oidc-provider-exists.sh"]
+
+  query = {
+    region = var.aws_region
+    # The external program takes strings only, and an unset profile means "use
+    # the ambient credential chain" to it as much as to the AWS provider.
+    profile = var.aws_profile == null ? "" : var.aws_profile
+  }
+}
+
 # An account can hold only one provider per issuer URL, so an account that
 # already has one for another repository must reuse it rather than create a
-# second.
+# second. This stack is the one that owns it in this account — dev-hub and
+# doc-hub both reference what is created here.
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.create_github_oidc_provider ? 1 : 0
 
@@ -22,12 +39,57 @@ resource "aws_iam_openid_connect_provider" "github" {
   tags = {
     Name = "github-actions"
   }
+
+  lifecycle {
+    precondition {
+      # "One already exists" is only a problem when it is somebody else's. This
+      # stack created this account's, so every plan since sees its own provider,
+      # tagged with this project — and must not be told to give it up.
+      condition = (
+        data.external.github_oidc.result.exists == "false" ||
+        data.external.github_oidc.result.project == local.project
+      )
+      error_message = <<-MSG
+        This account already has an OpenID Connect provider for
+        token.actions.githubusercontent.com, and it belongs to another stack:
+
+          ${data.external.github_oidc.result.arn}
+          Project = ${
+      data.external.github_oidc.result.project == "" ? "(untagged)" : data.external.github_oidc.result.project
+    }
+
+        AWS allows only one per issuer URL, so creating a second fails with
+        EntityAlreadyExists — halfway through the apply, once the security
+        group, the instance and the host role already exist.
+
+        Set create_github_oidc_provider = false in terraform.tfvars and this
+        stack will reference the existing provider instead. It is shared
+        account-wide and nothing here needs to own it.
+      MSG
+  }
+}
 }
 
 data "aws_iam_openid_connect_provider" "github" {
   count = var.create_github_oidc_provider ? 0 : 1
 
   url = "https://token.actions.githubusercontent.com"
+
+  lifecycle {
+    # The mirror image: referencing a provider the account does not have would
+    # otherwise fail with the AWS provider's own "couldn't find resource", which
+    # does not say what to do about it.
+    precondition {
+      condition     = data.external.github_oidc.result.exists == "true"
+      error_message = <<-MSG
+        create_github_oidc_provider = false, but this account has no OpenID
+        Connect provider for token.actions.githubusercontent.com to reference.
+
+        Set it to true so this stack creates one. Exactly one stack in the
+        account may do so; the others reference it.
+      MSG
+    }
+  }
 }
 
 locals {

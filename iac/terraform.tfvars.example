@@ -3,9 +3,11 @@
 # Contact address Let's Encrypt uses for expiry warnings.
 acme_email = "you@example.com"
 
-# Set false if the account already has a provider for
-# token.actions.githubusercontent.com — AWS allows only one per issuer URL.
-# Check with: aws iam list-open-id-connect-providers
+# This stack owns the account's provider for token.actions.githubusercontent.com
+# — AWS allows only one per issuer URL, and dev-hub and doc-hub reference this
+# one. Set false only in an account where something else created it; terraform
+# plan checks either answer against the account before anything is created.
+# Check by hand with: aws iam list-open-id-connect-providers
 create_github_oidc_provider = true
 
 # Optional — these are the defaults.

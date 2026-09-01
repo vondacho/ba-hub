@@ -6,6 +6,12 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
+    # Runs one shell script, at plan time, to ask whether the account already
+    # has the GitHub OIDC provider — see oidc.tf. It creates nothing.
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
   }
 
   # State is local on purpose: this stack is a single host owned by a single
@@ -35,7 +41,7 @@ provider "aws" {
   # keeps the individual resource blocks free of boilerplate.
   default_tags {
     tags = {
-      Project   = "ba-hub"
+      Project   = local.project
       ManagedBy = "terraform"
     }
   }
