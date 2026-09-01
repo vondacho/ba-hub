@@ -19,12 +19,12 @@ data:
   QA_PORTAL_URL: {{ .Values.app.qaPortalUrl | quote }}
   EVENT_STORMER_URL: {{ .Values.app.eventStormerUrl | quote }}
 
-  # ba-ddd-mapper is a release in this same namespace, and this is still its
-  # ingress host rather than http://ba-ddd-mapper:4322: the visitor's browser is
+  # ba-cm is a release in this same namespace, and this is still its
+  # ingress host rather than http://ba-cm:4322: the visitor's browser is
   # what follows the link. Nothing in this portal calls the mapper from the
   # server, so there is no second entry the way doc-portal needs one for its
   # registry.
-  DDD_MAPPER_URL: {{ .Values.app.dddMapperUrl | quote }}
+  CONTEXT_MAPPER_URL: {{ .Values.app.contextMapperUrl | quote }}
 
   # Nothing is deployed behind this one yet. Rendered unconditionally so that
   # pointing it somewhere is a value change rather than a template change.

@@ -1,0 +1,71 @@
+---
+import Layout from '../layouts/Layout.astro';
+import DddMapper from '../components/mapper/DddMapper.tsx';
+import { archPortalUrl, baPortalUrl, eventStormerUrl, promptsUrl } from '../lib/links';
+
+// Server-rendered: the footer resolves the neighbouring components' addresses
+// from the environment, and those are configuration that has to be read per
+// request rather than baked into the image at build time.
+const portal = baPortalUrl();
+// Browser-facing, and resolved here rather than in the island: `links.ts` reads
+// `process.env`, which does not exist in a client bundle. The footer's addresses
+// are resolved the same way, a few lines above.
+const prompts = promptsUrl();
+const stormer = eventStormerUrl();
+const arch = archPortalUrl();
+---
+
+<Layout
+	title="Context mapper — ba-hub"
+	description="Who depends on whom, and on whose terms. A context map as text and as a graph: domains, subdomains and the bounded contexts that serve them, with every relationship tagged by the strategic pattern that governs it."
+>
+	<main id="main" class="mx-auto w-full max-w-[110rem] px-6 py-10">
+		<header class="mb-8">
+			{/*
+				Three levels, and each answers a different question: the eyebrow says
+				what this page is, the heading says why the artefact exists, and the
+				paragraph says why at length. The heading used to say "the context
+				map, and the text it is made of", which is how the tool works rather
+				than what it is for — true, and no reason to draw one.
+			*/}
+			<p class="text-xs font-semibold tracking-[0.16em] text-ink-muted uppercase dark:text-slate-400">
+				ba-hub · ddd mapper · context map
+			</p>
+			<h1 class="mt-2 text-3xl font-bold sm:text-4xl">Who depends on whom, and on whose terms</h1>
+			<p class="mt-3 text-ink-muted dark:text-slate-400">
+				The estate seen whole: the domains the business is in, the subdomains they divide into,
+				and the bounded contexts that serve them — with every relationship between contexts
+				tagged by the pattern that governs it.
+			</p>
+		</header>
+
+		<DddMapper client:only="react" promptsUrl={prompts} />
+
+		<noscript>
+			<div class="rounded-2xl border border-slate-200 p-6 dark:border-slate-700">
+				<h2 class="font-semibold">The mapper needs JavaScript</h2>
+				<p class="mt-2 max-w-prose text-ink-muted dark:text-slate-400">
+					A graph is direct manipulation, which is not something a page can do without
+					scripting. The file format is plain text and is documented on
+					<a class="font-semibold text-brand underline" href="/dsl" target="_blank" rel="noopener">the format page</a>, which
+					needs none.
+				</p>
+			</div>
+		</noscript>
+
+		<footer
+			class="mt-10 border-t border-slate-200 pt-6 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400"
+		>
+			<p>
+				Nothing here is stored on the server — the mapper keeps a copy in this browser, and that
+				copy goes no further. The <code>.ddd</code> file you export is the context map. The practice is
+				written up in the <a class="font-semibold text-brand hover:underline" href={portal} target="_blank" rel="noopener">business
+				analysis hub</a>; the contexts on a map are usually found first on a wall in
+				the <a class="font-semibold text-brand hover:underline" href={stormer} target="_blank" rel="noopener">Event Stormer</a>, and
+				what they get realised as lives in
+				the <a class="font-semibold text-brand hover:underline" href={arch} target="_blank" rel="noopener">architecture hub</a>.
+				The <a class="font-semibold text-brand hover:underline" href="/dsl" target="_blank" rel="noopener">format is documented</a>.
+			</p>
+		</footer>
+	</main>
+</Layout>

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "ba-cm.fullname" . }}-test-connection
+  labels:
+    {{- include "ba-cm.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    # More than /healthz: that route is a bare handler and answers 200 even if
+    # every rendered page is broken. So this fetches one URL per thing that can
+    # independently fail:
+    #   /healthz  the Node server is serving
+    #   /         the context map page: its shell, its footer — which is where
+    #             the three configured addresses are resolved, so this is what
+    #             proves envFrom is wired — and the script tag that loads the
+    #             island
+    #   /model    the domain model page, a second island on its own route
+    #   /dsl      the format reference, prerendered rather than server-rendered,
+    #             which makes it the one URL here that proves the *build* output
+    #             shipped and not just that the server is up
+    #
+    # There is no fifth URL. /api/agent is a POST that needs the visitor's own
+    # Anthropic key and would spend their money; a test that called it would be
+    # testing Anthropic. That route's failure mode is visible in the panel, and
+    # a 200 on / already proves the panel is served.
+    #
+    # What a 200 on / does *not* prove: that the mapper works. Both boards are
+    # `client:only`, so the server sends an empty island and every node, drag,
+    # parse and export happens in the visitor's browser. This test claims the
+    # routes and the assets are being served — nothing beyond that, and nothing
+    # here can.
+    - name: health
+      image: curlimages/curl:8.11.1
+      args:
+        - --fail
+        - --silent
+        - --show-error
+        - --output
+        - /dev/null
+        - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}{{ .Values.probes.path }}
+        - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/
+        - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/model
+        - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/dsl

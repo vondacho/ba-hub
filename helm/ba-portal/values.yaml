@@ -139,14 +139,14 @@ app:
   # on. Deployed, which is why the Event Stormer panel reads live.
   eventStormerUrl: http://doc-es.localhost
 
-  # The DDD mapper — ba-hub's own second component, a release in this same
-  # namespace. An ingress host and not http://ba-ddd-mapper:4322, because the
+  # The Context mapper — ba-hub's own second component, a release in this same
+  # namespace. An ingress host and not http://ba-cm:4322, because the
   # visitor's browser is what follows this link; the Service name would resolve
   # only inside the cluster, and nothing here calls it from the server.
   #
-  # src/lib/links.ts defaults to http://ddd-mapper.localhost, which predates the
+  # src/lib/links.ts defaults to http://ba-cm.localhost, which predates the
   # chart. The chart is now the authority on the address and names the release.
-  dddMapperUrl: http://ba-ddd-mapper.localhost
+  contextMapperUrl: http://ba-cm.localhost
 
   # The landscape collector: the service that observes running systems and
   # produces the evidence the system map is drawn from. Nothing is deployed

@@ -1,0 +1,249 @@
+/**
+ * The sample map, embedded.
+ *
+ * Byte-for-byte `samples/insurance.ddd`, which is itself the seed catalog from
+ * ba-portal — the same nine subdomains, nine contexts and eleven relationships
+ * that `ba-portal/src/lib/catalog.ts` and `landscapes.ts` hold as hand-written
+ * TypeScript. Generating those two files from this one is the obvious next
+ * step and is not built.
+ *
+ * It opens on a first visit rather than an empty map. An empty text editor
+ * beside an empty canvas teaches nothing about a notation, and the fastest way
+ * to learn this one is to change something in a map that already means
+ * something.
+ *
+ * It carries two deliberate warnings — the domain has no owner, and the
+ * Notifications subdomain has no context — so the problems panel has something
+ * true to show on first load rather than looking broken when it later does.
+ */
+
+export const SAMPLE = `// The seed catalog from ba-portal, in the format ba-cm authors.
+//
+// This file is the same model as ba-portal's src/lib/catalog.ts and
+// src/lib/landscapes.ts, written once instead of twice. That is the point of
+// the component: the catalog stops being TypeScript somebody maintains by hand.
+
+map "Personal and commercial insurance" {
+
+  domain "Personal and commercial insurance" {
+    intent "Underwrite risk, price it, collect premium for it, and pay what is
+            owed when it materialises. Everything else in the estate exists to
+            make one of those four things possible."
+
+    // ---- core: the reason the business wins -------------------------------
+
+    subdomain core "Underwriting" {
+      intent "Deciding which risks to accept and on what terms."
+      owner  "Head of underwriting"
+
+      context "Risk appetite" {
+        intent    "Where a submission is judged against what the carrier is
+                   currently willing to take on. A Risk here is a described
+                   exposure under consideration."
+        language  "Submission" "Risk" "Appetite rule" "Referral" "Decline reason"
+        aggregate "Submission" "AppetiteRuleSet" "Referral"
+        owner     "Head of underwriting"
+      }
+    }
+
+    subdomain core "Pricing and rating" {
+      intent "Turning an accepted risk into a number."
+      owner  "Chief actuary"
+
+      context "Rating" {
+        intent    "Where a Risk becomes a premium. The same word arrives from
+                   Risk appetite meaning a judgement; here it means a vector of
+                   rating factors."
+        language  "Rating factor" "Rate table" "Base premium" "Loading"
+                  "Technical price"
+        aggregate "RatingRequest" "RateTableVersion"
+        owner     "Chief actuary"
+      }
+
+      context "Quotation" {
+        intent    "Where a technical price becomes an offer with a validity
+                   period. A price is a calculation; a quote is a commitment
+                   with an expiry."
+        language  "Quote" "Offer" "Validity period" "Condition" "Lapse"
+        aggregate "Quote"
+        owner     "Head of underwriting"
+      }
+    }
+
+    subdomain core "Claims handling" {
+      intent "Establishing what is owed and paying it."
+      owner  "Claims director"
+
+      context "Claims" {
+        intent    "From first notification to settlement or repudiation.
+                   \\"Policy\\" here is a snapshot of cover as it stood on the
+                   date of loss, not the live policy."
+        language  "Notification" "Claim" "Reserve" "Settlement" "Repudiation"
+                  "Cover snapshot"
+        aggregate "Claim" "Reserve" "Payment"
+        owner     "Claims director"
+      }
+    }
+
+    // ---- supporting: necessary, ours, not a differentiator -----------------
+
+    subdomain supporting "Policy administration" {
+      intent "Keeping a policy correct through its life."
+      owner  "Operations manager, policy services"
+
+      context "Policy lifecycle" {
+        intent    "The policy as a thing with a history. Every change is an
+                   event with an effective date, because \\"what did the cover
+                   say on 3 March\\" gets asked in court."
+        language  "Policy" "Inception" "Endorsement" "Effective date" "Renewal"
+                  "Cancellation"
+        aggregate "Policy" "Endorsement"
+        owner     "Operations manager, policy services"
+        status    drafted
+      }
+    }
+
+    subdomain supporting "Distribution and party management" {
+      intent "Who we deal with and through whom, and the commission that follows."
+      owner  "Head of distribution"
+
+      context "Party and relationships" {
+        intent    "People and organisations, and the roles they play. The model
+                   is role-based because the same organisation is a broker on
+                   one policy and a policyholder on another."
+        language  "Party" "Role" "Relationship" "Broker" "Policyholder" "Claimant"
+        aggregate "Party" "PartyRelationship"
+        owner     "Head of distribution"
+        status    drafted
+      }
+    }
+
+    subdomain supporting "Product definition" {
+      intent "What can be sold and how it may be assembled."
+      owner  "Product owner, personal lines"
+
+      context "Product catalogue" {
+        intent    "Covers, limits, exclusions, wordings, and the compatibility
+                   rules between them. Upstream of nearly everything."
+        language  "Product" "Cover" "Limit" "Exclusion" "Wording"
+                  "Compatibility rule"
+        aggregate "Product" "WordingVersion"
+        owner     "Product owner, personal lines"
+      }
+    }
+
+    // ---- generic: bought, wrapped, deliberately not modelled ---------------
+
+    subdomain generic "Billing and collections" {
+      intent "Invoicing, instalments, dunning, reconciliation."
+      owner  "Finance systems manager"
+
+      context "Billing" {
+        intent   "Bought whole and wrapped. Nothing inside this boundary is our
+                  model."
+        language "Invoice" "Instalment" "Dunning" "Write-off"
+        owner    "Finance systems manager"
+        status   unmodelled
+      }
+    }
+
+    subdomain generic "Document generation" {
+      intent "Producing the schedule, the certificate and the letter."
+      owner  "Operations manager, policy services"
+
+      context "Documents" {
+        intent   "Rendering from a template and a payload, and keeping the
+                  evidence of what was sent."
+        language "Template" "Rendition" "Dispatch record"
+        owner    "Operations manager, policy services"
+        status   unmodelled
+      }
+    }
+
+    subdomain generic "Notifications" {
+      intent "Email, SMS and postal dispatch with delivery evidence."
+      owner  "Operations manager, policy services"
+      // No context: bought, wrapped, and not worth a boundary of its own yet.
+      // A subdomain with no context is a warning, not an error — see the
+      // problems panel.
+    }
+  }
+
+  // ---- the context map ----------------------------------------------------
+  //
+  // Direction is about the model, not the network: upstream is whoever's model
+  // the other has to accommodate.
+
+  "Product catalogue" -> "Rating" : open-host-service {
+    exchange "Versioned product definitions: covers, limits, exclusions and
+              their compatibility rules."
+    because  "Consumed by five contexts with no two wanting the same shape. One
+              published interface is cheaper than five bespoke integrations."
+  }
+
+  "Product catalogue" -> "Quotation" : open-host-service {
+    exchange "The same versioned definitions, pinned to the version a quote was
+              made against."
+    because  "A quote has to remain explicable after the product changes."
+  }
+
+  "Risk appetite" -> "Quotation" : customer-supplier {
+    exchange "An accepted Risk with its terms and any referral conditions."
+    because  "Both teams sit under the same director, so quotation can ask for a
+              change upstream and get it. That is what makes this
+              customer/supplier rather than conformist."
+  }
+
+  "Rating" -> "Quotation" : published-language {
+    exchange "A technical price with its rating factor breakdown and the rate
+              table version used."
+    because  "Read by quotation, by the regulator, and by the actuarial review.
+              A published schema is the only version that survives three
+              audiences."
+  }
+
+  "Quotation" -> "Policy lifecycle" : customer-supplier {
+    exchange "An accepted offer, which becomes an inception."
+    because  "The handover where a commitment becomes an obligation."
+  }
+
+  "Policy lifecycle" -> "Claims" : open-host-service / anticorruption-layer {
+    exchange "A cover snapshot as at the date of loss — deliberately not the
+              live policy."
+    because  "Claims must never see a policy change made after the loss. The
+              layer exists to make that impossible rather than unlikely."
+  }
+
+  "Party and relationships" <-> "Policy lifecycle" : shared-kernel {
+    exchange "Party identity and the roles a party plays on a policy."
+    because  "Neither context can be made downstream of the other without a lie.
+              The most expensive pattern on this map, chosen knowingly."
+  }
+
+  "Policy lifecycle" -> "Billing" : conformist {
+    exchange "Premium due, instalment plan, and any mid-term adjustment."
+    because  "The billing package will not change its model for us and we will
+              not fork it. Recorded honestly as conformist rather than dressed
+              up as customer/supplier."
+  }
+
+  "Claims" -> "Billing" : conformist {
+    exchange "Settlement payments and recoveries."
+    because  "Same package, same trade-off."
+  }
+
+  "Policy lifecycle" -> "Documents" : anticorruption-layer {
+    exchange "A render request: template identifier plus a payload in our
+              language."
+    because  "The vendor template vocabulary is not ours and must not become
+              ours."
+  }
+
+  "Risk appetite" <-> "Rating" : partnership {
+    exchange "Appetite signals that change the price, and prices that change the
+              appetite."
+    because  "Neither side can succeed if the other fails, and the two models
+              are changed in the same conversation."
+  }
+}
+`;

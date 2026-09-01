@@ -1,0 +1,152 @@
+# Default values for ba-cm.
+# Tuned for a local single-node cluster (Rancher Desktop / Docker Desktop).
+
+replicaCount: 1
+
+image:
+  repository: ba-cm
+  # Defaults to .Chart.AppVersion when empty.
+  tag: ""
+  # IfNotPresent so a locally built image is used without a registry push.
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Port the standalone @astrojs/node server listens on. Injected as PORT and
+# used as the container port, so the two cannot drift apart.
+containerPort: 4322
+
+serviceAccount:
+  create: true
+  annotations: {}
+  # Defaults to the fullname template when empty.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+# Update strategy, applied as-is. The mapper is stateless, so a rolling update
+# is always safe here.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+podSecurityContext:
+  runAsNonRoot: true
+  # Must match the "app" user baked into ba-cm/Dockerfile. 1000 is
+  # deliberately avoided there — the node base image already uses it.
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 4322
+
+# On by default, matching every sibling chart: a browser frontend nobody can open
+# is not a useful default, and *.localhost costs nothing on a local cluster.
+ingress:
+  enabled: true
+  # Empty uses the cluster's default IngressClass. Rancher Desktop ships
+  # "traefik" as the default.
+  className: ""
+  annotations: {}
+  hosts:
+    - host: ba-cm.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    # No CPU limit: the Node server is bursty at startup and during SSR.
+    memory: 512Mi
+
+# Probes hit the /healthz route served by src/pages/healthz.ts. Node boots
+# fast, so the startup budget is tight.
+probes:
+  path: /healthz
+  startup:
+    enabled: true
+    initialDelaySeconds: 2
+    periodSeconds: 2
+    failureThreshold: 15
+  liveness:
+    enabled: true
+    periodSeconds: 10
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    periodSeconds: 5
+    failureThreshold: 3
+
+# ---------------------------------------------------------------------------
+# Application configuration.
+# Rendered into a ConfigMap and injected wholesale via envFrom.
+#
+# Three addresses, and all three are **browser-facing links**: the visitor's
+# browser resolves them, so an in-cluster address like http://ba-portal:4321
+# would be wrong here even though this component is server-rendered — and
+# doubly wrong for doc-es, which is a release in another namespace.
+#
+# There is no in-cluster call to configure, because this component makes none.
+# It owns no database, reads no registry, and the one server route it has —
+# /api/agent — is a relay to Anthropic that carries the visitor's own key on
+# the request and keeps nothing. So this chart has no Secret, and adding one
+# would be the wrong answer to "where does the API key live": it lives in the
+# visitor's browser.
+#
+# src/lib/links.ts reads each one through process.env at call time and falls
+# back to the same default the chart ships, so an unset value and the default
+# look identical in the page. Override one to something obviously wrong if you
+# ever need to prove the wiring works.
+# ---------------------------------------------------------------------------
+app:
+  # ba-hub's own portal — the practice this tool serves. Linked from the
+  # mapper's footer, and the base of the prompt library's address: the
+  # assistant panel carries this notation's prompts inline and links to
+  # <baPortalUrl>/doc/tooling/prompts/ for the reasoning behind them.
+  baPortalUrl: http://ba-portal.localhost
+
+  # doc-hub's event storming board — where the contexts on a map were usually
+  # found before anybody drew them. A release in the doc-hub namespace, so this
+  # is its ingress host and could not be a Service name even if this were an
+  # in-cluster call.
+  eventStormerUrl: http://doc-es.localhost
+
+  # arch-hub's portal — where a bounded context stops being a model and becomes
+  # components. Also another namespace, also browser-facing.
+  archPortalUrl: http://arch-portal.localhost
+
+  # Arbitrary extra entries, merged verbatim into the same ConfigMap and so
+  # injected as env vars too:
+  #   extraConfig:
+  #     LOG_LEVEL: debug
+  extraConfig: {}
+
+# Flags passed to the Node process, e.g. "--max-old-space-size=384".
+nodeOptions: ""
+
+# Additional raw environment variables (full valueFrom syntax available).
+extraEnv: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

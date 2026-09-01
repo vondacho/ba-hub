@@ -10,7 +10,7 @@ Outbound links (browser-facing, resolved per request):
   Development hub      -> {{ .Values.app.devPortalUrl }}
   Quality hub          -> {{ .Values.app.qaPortalUrl }}
   Event storming board -> {{ .Values.app.eventStormerUrl }}
-  DDD mapper           -> {{ .Values.app.dddMapperUrl }}
+  Context mapper           -> {{ .Values.app.contextMapperUrl }}
   Landscape collector  -> {{ .Values.app.landscapeApiUrl }}
 
 The prerendered docs reach those through /go/<target>, which resolves the

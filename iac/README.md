@@ -1,10 +1,10 @@
 # iac — AWS Docker host for ba-hub
 
-Terraform for a single EC2 instance that runs `ba-portal` and `ba-ddd-mapper` as
+Terraform for a single EC2 instance that runs `ba-portal` and `ba-cm` as
 separate containers behind Caddy, published as:
 
 - https://ba-portal.obya.ch
-- https://ddd-mapper.obya.ch
+- https://ba-cm.obya.ch
 
 The images are the ones `.github/workflows/build-images.yml` already pushes to
 GHCR — nothing is built here. This stack is the *host*; `host/` is what runs on
@@ -17,14 +17,14 @@ and are unaffected by any of this.
 
 ```
         DigitalOcean DNS (obya.ch)   ← records added by hand, outside Terraform
-    ba-portal ─┐               ┌─ ddd-mapper
+    ba-portal ─┐               ┌─ ba-cm
                └──► Elastic IP ─┘
                         │
                    EC2 t3.small ── security group: 80 + 443 only, no inbound admin port
                         │
                     Caddy :80 :443          TLS, Let's Encrypt, HTTP→HTTPS
                      ├── ba-portal      :4321   (not published to the host)
-                     └── ba-ddd-mapper  :4322   (not published to the host)
+                     └── ba-cm          :4322   (not published to the host)
 
     GitHub Actions ──OIDC──► sts:AssumeRoleWithWebIdentity ──► ssm:SendCommand ──┘
 ```
@@ -123,7 +123,7 @@ Very few, by construction — CI holds none and the host holds none:
 | CI's AWS credentials | nowhere — minted per job, expire with it | That is the whole point of OIDC. |
 | SSH private key | nowhere — the host has no key pair by default | Replaced by SSM Session Manager, authenticated by your AWS identity. |
 | Let's Encrypt account key | the `caddy_data` volume on the host | Generated there, never leaves. |
-| Anthropic API key | nowhere — the browser sends it per request as `x-model-key` | `ba-ddd-mapper` never stores or logs it; there is no server-side key to provision. |
+| Anthropic API key | nowhere — the browser sends it per request as `x-model-key` | `ba-cm` never stores or logs it; there is no server-side key to provision. |
 | GHCR pull credential | none — the packages are public | See step 1 below. |
 | DigitalOcean API token | none — the two records are created by hand | Terraform never talks to DigitalOcean. |
 
@@ -135,9 +135,9 @@ same provider build.
 ## Before the first apply
 
 1. **Make both GHCR packages public.** In the repo's *Packages → package
-   settings*, set `ba-hub/ba-portal` and `ba-hub/ba-ddd-mapper` to public. The
+   settings*, set `ba-hub/ba-portal` and `ba-hub/ba-cm` to public. The
    host then pulls anonymously and there is no registry credential to provision
-   or rotate. (Neither image contains a secret: `ba-ddd-mapper` takes the
+   or rotate. (Neither image contains a secret: `ba-cm` takes the
    Anthropic key off the request header, it is never baked in.)
 2. **Know where `obya.ch` DNS lives.** It is served by DigitalOcean
    (`ns[1-3].digitalocean.com`), not Route 53, so Terraform does not touch it.
@@ -186,7 +186,7 @@ prints them ready to copy:
 
 ```
 A  ba-portal    <elastic ip>  TTL 300
-A  ddd-mapper   <elastic ip>  TTL 300
+A  ba-cm        <elastic ip>  TTL 300
 ```
 
 Because the address is an Elastic IP, this is a one-time step: it survives an

@@ -69,7 +69,7 @@ export function eventStormerUrl(): string {
 }
 
 /**
- * The DDD mapper: the modelling tool that reads the catalog, draws the context
+ * The Context mapper: the modelling tool that reads the catalog, draws the context
  * map, and reconciles it against what the running systems actually do.
  *
  * Nothing is deployed behind this yet, which is why every panel pointing at it
@@ -77,11 +77,11 @@ export function eventStormerUrl(): string {
  * day one is deployed, it takes a value change and a restart rather than a
  * rebuild.
  */
-export function dddMapperUrl(): string {
+export function contextMapperUrl(): string {
   return (
-    process.env.DDD_MAPPER_URL ??
-    import.meta.env.DDD_MAPPER_URL ??
-    'http://ddd-mapper.localhost'
+    process.env.CONTEXT_MAPPER_URL ??
+    import.meta.env.CONTEXT_MAPPER_URL ??
+    'http://ba-cm.localhost'
   );
 }
 
@@ -90,7 +90,7 @@ export function dddMapperUrl(): string {
  * between services, schema shapes, event topics — and produces the evidence the
  * system map is drawn from.
  *
- * Also not deployed. See the caveat on `dddMapperUrl`.
+ * Also not deployed. See the caveat on `contextMapperUrl`.
  */
 export function landscapeApiUrl(): string {
   return (

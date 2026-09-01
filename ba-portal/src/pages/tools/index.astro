@@ -10,7 +10,7 @@ import { eventStormerUrl } from '../../lib/links';
  * The tools. Definitions live in src/lib/tools.ts so the panel copy has exactly
  * one home.
  *
- * Two of them link *out*: the DDD mapper and the landscape collector, whose
+ * Two of them link *out*: the Context mapper and the landscape collector, whose
  * addresses are configuration read per request from the environment. That is
  * safe because this page is server-rendered; the prerendered /doc/* pages have
  * to go through /go/ instead.
@@ -36,7 +36,7 @@ const panels: readonly Panel[] = tools.map((tool) => ({
 
 <Layout
 	title="Tools — BA Hub"
-	description="The DDD mapper and the tools around it: catalog in, context map drawn, landscape evidence ingested, and a conformance verdict against every edge."
+	description="The Context mapper and the tools around it: catalog in, context map drawn, landscape evidence ingested, and a conformance verdict against every edge."
 >
 	<main id="main">
 		<Hero
@@ -52,7 +52,7 @@ const panels: readonly Panel[] = tools.map((tool) => ({
 			parent={{ label: 'Home', href: '/' }}
 			actions={[
 				{ label: 'Open the Event Stormer', href: eventStormerUrl(), external: true },
-				{ label: 'Read the mapper design', href: '/doc/tooling/ddd-mapper/' },
+				{ label: 'Read the mapper design', href: '/doc/tooling/context-mapper/' },
 			]}
 		/>
 

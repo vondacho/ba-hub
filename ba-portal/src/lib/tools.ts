@@ -1,7 +1,7 @@
 /**
  * The tools, defined once.
  *
- * One is the point of the section and the rest support it. The **DDD mapper**
+ * One is the point of the section and the rest support it. The **Context mapper**
  * is the piece of software this hub is arguing for: it reads the catalog, draws
  * the context map, ingests the landscape evidence, and produces the conformance
  * table that says where intent and reality have parted company. Everything else
@@ -20,7 +20,7 @@
  * route, matching src/lib/links.ts.
  */
 
-import { dddMapperUrl, eventStormerUrl, landscapeApiUrl } from './links';
+import { contextMapperUrl, eventStormerUrl, landscapeApiUrl } from './links';
 
 /*
  * Spelled out rather than imported from SectionPanels.astro: a `.ts` module that
@@ -65,8 +65,8 @@ export const tools: readonly Tool[] = [
 		external: true,
 	},
 	{
-		slug: 'ddd-mapper',
-		title: 'DDD mapper',
+		slug: 'context-mapper',
+		title: 'Context mapper',
 		purpose:
 			'Hold the catalog and the two landscapes in one place, and compute the difference between them.',
 		description:
@@ -75,7 +75,7 @@ export const tools: readonly Tool[] = [
 		output:
 			'A context map, a system map, and a conformance table with an owner against every finding.',
 		icon: 'M4 7.5 9.5 5l5 2.5L20 5v11.5L14.5 19l-5-2.5L4 19V7.5Z M9.5 5v11.5 M14.5 7.5V19',
-		href: dddMapperUrl,
+		href: contextMapperUrl,
 		cta: 'Open the mapper',
 		status: 'planned',
 		external: true,
@@ -87,7 +87,7 @@ export const tools: readonly Tool[] = [
 		description:
 			'Observes running systems — service-to-service traffic, database access, schema shapes, event topics — and emits the integration edges the system map is drawn from, each with the observation that produced it.',
 		input: 'Service meshes, database audit logs, broker topic metadata, schema registries.',
-		output: 'Observed integrations with evidence, consumed by the DDD mapper.',
+		output: 'Observed integrations with evidence, consumed by the Context mapper.',
 		icon: 'M12 3a9 9 0 1 0 9 9 M12 7.5a4.5 4.5 0 1 0 4.5 4.5 M12 12h9 M12 12V3',
 		href: landscapeApiUrl,
 		cta: 'See what it collects',

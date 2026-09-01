@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   // Server-rendered, matching dev-portal, api-portal, arch-portal and
   // qa-portal. Nothing here reads a backend yet, but the Landscapes and Tools
-  // panels front the neighbouring hubs and the DDD mapper, and those addresses
+  // panels front the neighbouring hubs and the Context mapper, and those addresses
   // are configuration — they have to be resolved per request rather than baked
   // into the image.
   output: 'server',
@@ -95,7 +95,7 @@ export default defineConfig({
             // First because it is the only one that exists, and because the
             // workshop it runs comes before everything else in the hub.
             { label: 'Event Stormer', link: '/doc/tooling/event-stormer/' },
-            { label: 'DDD mapper', link: '/doc/tooling/ddd-mapper/' },
+            { label: 'Context mapper', link: '/doc/tooling/context-mapper/' },
             { label: 'Modelling and diagramming', link: '/doc/tooling/modelling/' },
             { label: 'Evidence and discovery', link: '/doc/tooling/evidence/' },
             // Last in the group, and deliberately: it is about using the

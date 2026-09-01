@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ba-cm.fullname" . }}
+  labels:
+    {{- include "ba-cm.labels" . | nindent 4 }}
+data:
+  # Read by src/lib/links.ts through process.env at call time, and all three are
+  # **browser-facing links** — the visitor's browser resolves them, so an
+  # in-cluster address would be wrong. Two of the three name releases in other
+  # namespaces, where it would also be impossible.
+  #
+  # BA_PORTAL_URL is the one with a second job: the assistant panel builds the
+  # prompt library's address from it, <BA_PORTAL_URL>/doc/tooling/prompts/.
+  BA_PORTAL_URL: {{ .Values.app.baPortalUrl | quote }}
+  EVENT_STORMER_URL: {{ .Values.app.eventStormerUrl | quote }}
+  ARCH_PORTAL_URL: {{ .Values.app.archPortalUrl | quote }}
+
+  # There is no in-cluster address in this ConfigMap, and that is not an
+  # omission. This component reads no registry and owns no database; its only
+  # server route is /api/agent, a relay that carries the visitor's own Anthropic
+  # key on each request and keeps nothing. Nothing here is called from the pod.
+  {{- range $key, $value := .Values.app.extraConfig }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}

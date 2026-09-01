@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import {
   apiPortalUrl,
   archPortalUrl,
-  dddMapperUrl,
+  contextMapperUrl,
   devPortalUrl,
   eventStormerUrl,
   landscapeApiUrl,
@@ -37,7 +37,7 @@ const targets: Record<string, () => string> = {
   dev: devPortalUrl,
   qa: qaPortalUrl,
   stormer: eventStormerUrl,
-  mapper: dddMapperUrl,
+  mapper: contextMapperUrl,
   landscape: landscapeApiUrl,
 };
 

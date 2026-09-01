@@ -6,7 +6,7 @@ description: What to ask the assistant in each board, by role — and why the ch
 Every board in this hub has an assistant in it: the
 [Event Stormer](/doc/tooling/event-stormer/), the story mapper and the example
 mapper in [doc-hub](/go/stormer), and both halves of the
-[DDD mapper](/doc/tooling/ddd-mapper/). It reads the whole document and answers
+[Context mapper](/doc/tooling/context-mapper/). It reads the whole document and answers
 beside it, and a change comes back as a diff you apply or ignore.
 
 This page is the set of questions worth spending it on, arranged by who is
@@ -34,8 +34,8 @@ room is still in front of it.
 | Technique | Where | The question it answers | What a good session leaves behind |
 |---|---|---|---|
 | [Event storming](/doc/processes/event-storming/) | Event Stormer, `.eventstorm` | What actually happens, in what order, and where nobody agrees | A timeline with hotspots on it, and the seams the map will use |
-| [Context mapping](/doc/strategic/context-mapping/) | DDD mapper, `.ddd` | Where one model's language stops, and who owes what to whom | A map whose arrows carry honest rationales |
-| [Domain model mapping](/doc/model/) | DDD mapper, `.ddm` | What one context keeps true, and across what transaction | Aggregates with invariants worth reading |
+| [Context mapping](/doc/strategic/context-mapping/) | Context mapper, `.ddd` | Where one model's language stops, and who owes what to whom | A map whose arrows carry honest rationales |
+| [Domain model mapping](/doc/model/) | Context mapper, `.ddm` | What one context keeps true, and across what transaction | Aggregates with invariants worth reading |
 | [Story mapping](/go/dev) | Story mapper, `.storymap` | What ships first, and whether that is a whole slice | A plan you can draw a line across |
 | [Example mapping](/go/dev) | Example mapper, `.examplemap` | Whether we agree what this story means | Rules with examples, and the questions nobody could answer |
 
@@ -156,7 +156,7 @@ is checked against the plan.
 - Where is this timeline suspiciously free of hotspots? Name what the room probably agreed too quickly.
 - Which policies have no event before them or no command after them? That is where a decision has no owner.
 
-**DDD mapper — context map**
+**Context mapper — context map**
 
 - Which terms appear in the `language` of two contexts? For each, say whether the two mean the same thing — that is where the boundary really is.
 - Which contexts have an empty `language`? Propose the three terms that would make each a real boundary.
@@ -165,7 +165,7 @@ is checked against the plan.
 - Which subdomain classifications would the business disagree with? Say which `core` is really something we buy, and which `generic` is the thing we actually compete on.
 - For each relationship, say what crosses in business terms — not payloads, but what one side is asking the other for.
 
-**DDD mapper — domain model**
+**Context mapper — domain model**
 
 - Which aggregates have no invariant? For each, name the business rule it is supposed to keep true, in the words the business would use.
 - Which invariants here are technical constraints wearing a business rule's clothes? Say which ones nobody in the business would recognise.
@@ -201,7 +201,7 @@ follows the process or cuts across it.
 - Which policies here are really manual decisions somebody makes in a meeting? Say what would have to be true to automate each.
 - Read this wall as a cycle time. Where would you look first for the delay, and what card is missing that would prove it?
 
-**DDD mapper — context map**
+**Context mapper — context map**
 
 - Which context would have to change for this process to run faster, and which relationship pattern is holding it in place?
 
@@ -272,7 +272,7 @@ to remember. One who is in the room asks the question that changes the map:
 process-modelling level, where the causal chain shows which decisions cross a
 boundary and which stay inside one.
 
-**DDD mapper — context map**
+**Context mapper — context map**
 
 - Which of these relationships is more aspirational than honest? Rewrite each `because` with the answer somebody would be embarrassed to say out loud.
 - Which arrows have no `because` at all? Give each a rationale worth arguing with, and say which one you are least confident in.
@@ -291,7 +291,7 @@ boundary and which stay inside one.
 - Which policies here span two lanes? A rule that reacts in one place and commands in another is an integration we have not designed yet.
 - Which hotspots are really boundary disputes — two groups defending different models of the same thing?
 
-**DDD mapper — domain model**
+**Context mapper — domain model**
 
 - Does this model fit inside one bounded context, or is it two contexts that have been merged for convenience?
 
@@ -318,7 +318,7 @@ to fill in yourself. Context mapping says what crosses the boundary and by which
 contract. Event storming at software-design level names the components that accept
 commands and emit events.
 
-**DDD mapper — domain model**
+**Context mapper — domain model**
 
 - Which aggregates have no invariant? For each, either name the rule it protects or say why it should not be an aggregate.
 - Is any of these aggregates really two? Say what would have to become eventually consistent if we split it.
@@ -327,7 +327,7 @@ commands and emit events.
 - Which entities should be value objects? Say what identity is doing for each one that a value could not.
 - Where does something outside need to reach past a root? That is either a wrong boundary or a missing aggregate — say which.
 
-**DDD mapper — context map**
+**Context mapper — context map**
 
 - For each relationship, say what the downstream team has to change when the upstream one ships. That is the real coupling.
 

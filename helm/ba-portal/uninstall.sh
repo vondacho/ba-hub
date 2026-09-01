@@ -10,7 +10,7 @@
 #   RELEASE    (default ba-portal)
 #
 # The namespace is left in place by default: it is cheap, and deleting it takes
-# everything else in it — which is not ba-portal's to delete: ba-ddd-mapper is
+# everything else in it — which is not ba-portal's to delete: ba-cm is
 # a release in the same namespace. --namespace refuses while any other release
 # is still installed.
 

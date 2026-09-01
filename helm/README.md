@@ -8,7 +8,7 @@ umbrella chart.
 | Chart | Component | Status |
 |-------|-----------|--------|
 | `ba-portal/` | `ba-portal` Astro + Starlight frontend | present |
-| `ba-ddd-mapper/` | `ba-ddd-mapper` context map and domain model boards | present |
+| `ba-cm/` | `ba-cm` context map and domain model boards | present |
 
 `ba-ddd-monitor/` and `ba-ddd-registry/` are directories with nothing in them
 yet, so neither has a chart. The day one does, it is this pair copied.
@@ -38,7 +38,7 @@ whole rest of the family down.
 **Nothing here holds state.** A context map is the `.ddd` file the visitor
 exports and a domain model its `.ddm`; the mapper keeps a copy of both in the
 browser's local storage and this side of it keeps neither. The one server route
-in either component — `ba-ddd-mapper`'s `/api/agent` — relays to Anthropic with
+in either component — `ba-cm`'s `/api/agent` — relays to Anthropic with
 the key the visitor pasted into their own browser, holds nothing between calls,
 and is why neither chart has a Secret. A pod can be deleted at any moment
 without losing anybody's work.
@@ -55,7 +55,7 @@ without losing anybody's work.
 
 ```bash
 ./helm/ba-portal/deploy.sh
-./helm/ba-ddd-mapper/deploy.sh
+./helm/ba-cm/deploy.sh
 ```
 
 Either order. Both scripts are the same script: each builds its image with
@@ -72,7 +72,7 @@ waits for the rollout, prints the running pods with their image IDs, and runs
 | Variable | Default |
 |----------|---------|
 | `NAMESPACE` | `ba-hub` |
-| `RELEASE` | the chart name — `ba-portal` or `ba-ddd-mapper` |
+| `RELEASE` | the chart name — `ba-portal` or `ba-cm` |
 | `IMAGE_TAG` | `dev` (must match `image.tag` in `values-local.yaml`) |
 
 By hand, the same three steps:
@@ -116,8 +116,8 @@ docker inspect ba-portal:dev --format '{{.Id}}'
 helm test ba-portal -n ba-hub
 open http://ba-portal.localhost
 
-helm test ba-ddd-mapper -n ba-hub
-open http://ba-ddd-mapper.localhost
+helm test ba-cm -n ba-hub
+open http://ba-cm.localhost
 ```
 
 Rancher Desktop runs Traefik as the default IngressClass and `*.localhost`
@@ -126,7 +126,7 @@ With `ingress.enabled=false`:
 
 ```bash
 kubectl -n ba-hub port-forward svc/ba-portal 4321:4321
-kubectl -n ba-hub port-forward svc/ba-ddd-mapper 4322:4322
+kubectl -n ba-hub port-forward svc/ba-cm 4322:4322
 ```
 
 `helm test` fetches one URL per thing that can independently fail. The portal's
@@ -157,7 +157,7 @@ the routes and the assets are served, and nothing more.
 
 ```bash
 ./helm/ba-portal/uninstall.sh
-./helm/ba-ddd-mapper/uninstall.sh
+./helm/ba-cm/uninstall.sh
 
 ./helm/ba-portal/uninstall.sh --namespace    # and the namespace, if empty
 ```
@@ -181,7 +181,7 @@ build`. This machine currently reports `moby`.
 
 ## Ports
 
-`ba-portal` is on **4321**, the port every hub's portal uses. `ba-ddd-mapper`
+`ba-portal` is on **4321**, the port every hub's portal uses. `ba-cm`
 took **4322**, the same slot `doc-sm` took in doc-hub. Each release has its own
 Service, so nothing would collide if they shared a number — the numbering is for
 the person reading, and for the port-forwards above.
@@ -219,14 +219,14 @@ whoever runs the image outside Kubernetes.
   | `DEV_PORTAL_URL` | dev-hub's portal — how an agreed model gets implemented |
   | `QA_PORTAL_URL` | qa-hub's portal — the test strategy the criteria feed |
   | `EVENT_STORMER_URL` | doc-hub's `doc-es` — where a domain is discovered |
-  | `DDD_MAPPER_URL` | this repo's `ba-ddd-mapper` release |
+  | `CONTEXT_MAPPER_URL` | this repo's `ba-cm` release |
   | `LANDSCAPE_API_URL` | the landscape collector — nothing serves this yet |
 
-- **`DDD_MAPPER_URL` is an ingress host even though the mapper is one Service
+- **`CONTEXT_MAPPER_URL` is an ingress host even though the mapper is one Service
   name away.** doc-portal's `REGISTRY_API_URL` is an in-cluster address because
   the *portal's own process* fetches it while rendering; this one is a link the
   visitor's browser follows, and a Service name would resolve only inside the
-  cluster. `src/lib/links.ts` still defaults to `http://ddd-mapper.localhost`,
+  cluster. `src/lib/links.ts` still defaults to `http://ba-cm.localhost`,
   which predates the chart — the chart names the release and is the authority.
 - **There is no in-cluster call in this chart at all**, which is why there is no
   second entry for anything the way doc-portal needs two for its CMS.
@@ -239,9 +239,9 @@ whoever runs the image outside Kubernetes.
 - The pod runs as **uid/gid 10001**, matching the `app` user in the Dockerfile.
   1000 is deliberately avoided — the `node` base image already uses it.
 
-## Notes on the ba-ddd-mapper chart
+## Notes on the ba-cm chart
 
-`ba-ddd-mapper` is the modelling tool: a context map on `/`, the domain model
+`ba-cm` is the modelling tool: a context map on `/`, the domain model
 behind one bounded context on `/model`, read from and written to `.ddd` and
 `.ddm` files.
 
@@ -271,7 +271,7 @@ Both charts have the same shape, and it is `doc-hub/helm/doc-sm`'s shape with a
 different ConfigMap:
 
 ```
-ba-portal/                      ba-ddd-mapper/
+ba-portal/                      ba-cm/
   Chart.yaml                      Chart.yaml
   values.yaml                     values.yaml                # defaults
   values-local.yaml               values-local.yaml          # local overrides

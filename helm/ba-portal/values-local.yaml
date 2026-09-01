@@ -30,7 +30,7 @@ ingress:
         - path: /
           pathType: Prefix
 
-# ba-ddd-mapper is the other release in this namespace; the four hub portals and
+# ba-cm is the other release in this namespace; the four hub portals and
 # doc-es are releases in their own. Every one of these is the ingress host that
 # release's own values-local.yaml enables on this cluster — reachable from the
 # browser whether or not it is installed, and a dead link when it is not.
@@ -43,7 +43,7 @@ app:
   devPortalUrl: http://dev-portal.localhost
   qaPortalUrl: http://qa-portal.localhost
   eventStormerUrl: http://doc-es.localhost
-  dddMapperUrl: http://ba-ddd-mapper.localhost
+  contextMapperUrl: http://ba-cm.localhost
   landscapeApiUrl: http://landscape-api.localhost
 
 resources:

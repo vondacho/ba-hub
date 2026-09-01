@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+
+/*
+ * ba-cm's theme. ba-portal's palette, so the two read as one hub.
+ *
+ * Dark mode is NOT the bare `prefers-color-scheme` media query Tailwind ships.
+ * It is a `@custom-variant` that resolves against the nearest ancestor carrying
+ * `data-theme`, which is what lets the graph panel be pinned light while the
+ * rest of the page follows the operating system — a graph on a projector in a
+ * lit room wants to be white. doc-es settled on this mechanism and the reason
+ * to copy it exactly is that the alternative is a second mechanism scattered
+ * through the components.
+ *
+ * The rule that makes it sound: **every themed root states its own foreground
+ * and background.** Anything inside the graph panel that does not set a colour
+ * inherits one, and without the restatement the nearest is on <body>, whose
+ * `dark:` resolves where there is no `data-theme` and so follows the OS.
+ * Pinning the graph to daylight on a dark-mode machine would then turn its
+ * surfaces white while every unstyled string inside stayed near-white.
+ */
+
+/*
+ * `dark:` applies when the OS says dark, or when an ancestor says so — and an
+ * ancestor can say the opposite.
+ *
+ * Two rules, and the order of the conditions in the first is the whole trick:
+ * the OS is in dark mode *and* nothing between here and the root has opted out
+ * with `data-theme="light"`; or something has explicitly opted in.
+ *
+ * Lifted from doc-es, which settled it. A page with no attribute anywhere
+ * behaves byte-for-byte as a plain `prefers-color-scheme` build would.
+ */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:not([data-theme='light'], [data-theme='light'] *)) {
+      @slot;
+    }
+  }
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+}
+
+@theme {
+  --color-ink: oklch(0.24 0.03 300);
+  --color-ink-muted: oklch(0.52 0.03 300);
+  --color-brand: oklch(0.52 0.18 305);
+  --color-brand-strong: oklch(0.44 0.19 305);
+  --color-night: oklch(0.19 0.03 300);
+  --color-night-raised: oklch(0.24 0.03 300);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

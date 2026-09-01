@@ -1,0 +1,81 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ModelEditor from '../components/model/ModelEditor.tsx';
+import { archPortalUrl, baPortalUrl, eventStormerUrl, promptsUrl } from '../lib/links';
+
+// Server-rendered like `/`, and now for the same reason rather than for
+// symmetry: the footer resolves the neighbouring components' addresses from the
+// environment, which is configuration read per request rather than baked into
+// the image at build time.
+const portal = baPortalUrl();
+// Browser-facing, and resolved here rather than in the island: `links.ts` reads
+// `process.env`, which does not exist in a client bundle. The footer's addresses
+// are resolved the same way, a few lines above.
+const prompts = promptsUrl();
+const stormer = eventStormerUrl();
+const arch = archPortalUrl();
+---
+
+<Layout
+	title="Domain model — Context mapper"
+	description="What has to be true at the same time. The inside of one bounded context as text and as a class diagram: aggregates with the invariants they protect, the classes they own outright, and the identities they hold across a boundary."
+>
+	<main id="main" class="mx-auto w-full max-w-[110rem] px-6 py-10">
+		<header class="mb-8">
+			{/*
+				The map page's three levels, and its reasoning — what the page is,
+				why the artefact exists, why at length. The heading used to say "the
+				inside of one context", which is where the document sits rather than
+				what it is for.
+			*/}
+			<p class="text-xs font-semibold tracking-[0.16em] text-ink-muted uppercase dark:text-slate-400">
+				ba-hub · ddd mapper · domain model
+			</p>
+			<h1 class="mt-2 text-3xl font-bold sm:text-4xl">What has to be true at the same time</h1>
+			{/*
+				Full width, like the map page's, and rewritten for it: the old line
+				was set to `max-w-prose` and wrapped after a third of the screen,
+				which put a ragged column above an editor that runs edge to edge.
+			*/}
+			<p class="mt-3 text-ink-muted dark:text-slate-400">
+				The <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/">context map</a> says
+				a bounded context has an aggregate called <code>Submission</code>; this says what <code>Submission</code> is.
+				An aggregate is a consistency boundary — the things loaded,
+				saved and kept correct together — so this is where you write down what it keeps true
+				across a transaction, what it owns outright, and what it may only hold by identity
+				because it belongs to somebody else.
+			</p>
+		</header>
+
+		<ModelEditor client:only="react" promptsUrl={prompts} />
+
+		<noscript>
+			<div class="rounded-2xl border border-slate-200 p-6 dark:border-slate-700">
+				<h2 class="font-semibold">The editor needs JavaScript</h2>
+				<p class="mt-2 max-w-prose text-ink-muted dark:text-slate-400">
+					A diagram is direct manipulation, which is not something a page can do without
+					scripting. The <code>.ddm</code> format is plain text, though, so any editor will do
+					— and the <a class="font-semibold text-brand hover:underline dark:text-purple-400" href="/dsl#ddm">format page</a>
+					documents its grammar.
+				</p>
+			</div>
+		</noscript>
+
+		<footer
+			class="mt-10 border-t border-slate-200 pt-6 text-sm text-ink-muted dark:border-slate-700 dark:text-slate-400"
+		>
+			<p>
+				Nothing here is stored on the server — the editor keeps a copy in this browser, and that
+				copy goes no further. The <code>.ddm</code> file you export is the domain model, and it belongs
+				beside the <a class="font-semibold text-brand hover:underline" href="/" target="_blank" rel="noopener">context map</a> that names the
+				context it is the inside of. The practice is written up in the
+				the <a class="font-semibold text-brand hover:underline" href={portal} target="_blank" rel="noopener">business analysis hub</a>;
+				the contexts a model goes one level inside are usually found first on a wall in
+				the <a class="font-semibold text-brand hover:underline" href={stormer} target="_blank" rel="noopener">Event Stormer</a>, and
+				what they get realised as lives in
+				the <a class="font-semibold text-brand hover:underline" href={arch} target="_blank" rel="noopener">architecture hub</a>.
+				The <a class="font-semibold text-brand hover:underline" href="/dsl#ddm" target="_blank" rel="noopener">format is documented</a>.
+			</p>
+		</footer>
+	</main>
+</Layout>

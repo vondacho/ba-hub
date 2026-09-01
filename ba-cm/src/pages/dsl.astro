@@ -1,0 +1,221 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { PATTERNS, patternAdmits, patternLabel, symmetric } from '../lib/model-reexport';
+import { SAMPLE } from '../lib/ddd/sample';
+import { SAMPLE as MODEL_SAMPLE } from '../lib/ddm/sample';
+
+// Prerendered: the format is prose and asks the server for nothing. It is also
+// the page a reader without scripting is sent to, so it must not depend on an
+// island — everything below is server-rendered HTML.
+export const prerender = true;
+
+const shape: Record<string, string> = {
+	mutual: 'mutual, written with <->',
+	directed: 'directed, written with ->',
+	either: 'either',
+};
+---
+
+<Layout
+	title="The .ddd and .ddm formats — Context mapper"
+	description="The grammar of a .ddd file: domains, subdomains, bounded contexts, and the nine strategic patterns that tag the relationships between them — and of a .ddm file, which is the inside of one of those contexts."
+>
+	<main id="main" class="mx-auto w-full max-w-3xl px-6 py-12">
+		<p class="text-xs font-semibold tracking-[0.16em] text-ink-muted uppercase dark:text-slate-400">
+			ba-hub · ddd mapper
+		</p>
+		<h1 class="mt-2 text-3xl font-bold sm:text-4xl">The <code>.ddd</code> format</h1>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			Braces rather than indentation, so a file that has been through a chat window or a
+			different editor still parses. <code>//</code> line comments, which survive every edit
+			made in the graph — the mapper splices the text rather than re-serialising a model, which
+			is what makes the file reviewable.
+		</p>
+
+		<h2 class="mt-10 text-xl font-semibold">Grammar</h2>
+		<pre class="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{`File        = Map , EOF ;
+Map         = 'map' , String , '{' , { Domain | Relationship } , '}' ;
+
+Domain      = 'domain' , String ,
+              [ '{' , { Intent | Owner | Subdomain | Context } , '}' ] ;
+Subdomain   = 'subdomain' , Class , String ,
+              [ '{' , { Intent | Owner | Context } , '}' ] ;
+Context     = 'context' , String ,
+              [ '{' , { Intent | Owner | Language | Aggregate
+                      | Status | Serves } , '}' ] ;
+
+Class       = 'core' | 'supporting' | 'generic' ;
+Intent      = 'intent'    , String ;          (* at most one *)
+Owner       = 'owner'     , String ;          (* at most one *)
+Language    = 'language'  , String , { String } ;
+Aggregate   = 'aggregate' , String , { String } ;
+Status      = 'status'    , ( 'modelled' | 'drafted' | 'unmodelled' ) ;
+Serves      = 'serves'    , String ;          (* the straddle; repeatable *)
+
+Relationship = String , Arrow , String , ':' , Patterns ,
+               [ '{' , { Exchange | Because } , '}' ] ;
+Arrow        = '->' | '<->' ;
+Patterns     = Pattern , [ '/' , Pattern ] ;
+Exchange     = 'exchange' , String ;
+Because      = 'because'  , String ;`}</code></pre>
+
+		<h2 class="mt-10 text-xl font-semibold">Strings</h2>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			Double-quoted. <code>\"</code> and <code>\\</code> escape; nothing else does. A literal
+			may span lines, and continuation lines are joined with a single space after leading
+			whitespace is stripped — which is what lets <code>intent</code> and <code>because</code>
+			hold a paragraph without the file growing 300-column lines.
+		</p>
+
+		<h2 class="mt-10 text-xl font-semibold">Names are identities</h2>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			A context is referred to in a relationship by its name in quotes. There is no separate
+			identifier, because the discipline rests on the claim that the words are the model, and a
+			file where the human name and the machine name can drift teaches the wrong lesson on
+			sight. Two nodes may not share a name.
+		</p>
+
+		<h2 class="mt-10 text-xl font-semibold">Direction</h2>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			<code>-&gt;</code> runs upstream to downstream, where <strong>upstream is whoever&rsquo;s
+			model the other has to accommodate</strong>. A downstream context frequently initiates the
+			call, and that is irrelevant here. <code>&lt;-&gt;</code> is mutual, and the parser
+			enforces the pairing: a mutual pattern may not be written with an arrow that asserts an
+			upstream it denies.
+		</p>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			Two patterns separated by <code>/</code> put a role on each end —
+			<code>open-host-service / anticorruption-layer</code> is upstream publishing and downstream
+			defending. That is Evans&rsquo;s own notation, and a single label loses it.
+		</p>
+
+		<h2 class="mt-10 text-xl font-semibold">The nine patterns</h2>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			The column that matters is the last one. Several of these describe the same arrow and
+			differ only in a political fact — customer/supplier and conformist are the same
+			integration, and the difference is whether the downstream team can ask for a change and
+			get it.
+		</p>
+		<div class="mt-4 overflow-x-auto">
+			<table class="w-full min-w-[40rem] border-collapse text-left text-sm">
+				<thead>
+					<tr class="border-b border-slate-300 dark:border-slate-700">
+						<th scope="col" class="py-2 pr-4 font-semibold">Keyword</th>
+						<th scope="col" class="py-2 pr-4 font-semibold">Shape</th>
+						<th scope="col" class="py-2 font-semibold">What it admits to</th>
+					</tr>
+				</thead>
+				<tbody>
+					{
+						PATTERNS.map((pattern) => (
+							<tr class="border-b border-slate-200 align-top dark:border-slate-800">
+								<th scope="row" class="py-2 pr-4 font-mono text-xs font-semibold whitespace-nowrap">
+									{pattern}
+								</th>
+								<td class="py-2 pr-4 text-xs whitespace-nowrap text-ink-muted dark:text-slate-400">
+									{shape[symmetric[pattern]]}
+								</td>
+								<td class="py-2 text-ink-muted dark:text-slate-400">
+									<strong class="text-ink dark:text-slate-200">{patternLabel[pattern]}</strong>
+									{' — '}
+									{patternAdmits[pattern]}
+								</td>
+							</tr>
+						))
+					}
+				</tbody>
+			</table>
+		</div>
+
+		<h2 class="mt-10 text-xl font-semibold">A complete file</h2>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			The sample the mapper opens with: the seed catalog from the business analysis hub, with
+			nine subdomains, nine bounded contexts and eleven relationships.
+		</p>
+		<pre class="mt-3 max-h-[36rem] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{SAMPLE}</code></pre>
+
+		<h2 id="ddm" class="mt-16 scroll-mt-6 border-t border-slate-200 pt-10 text-2xl font-bold dark:border-slate-700">
+			The <code>.ddm</code> format
+		</h2>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			One zoom level down: a <code>.ddm</code> file is the inside of a single bounded context
+			named on a map. Same discipline — braces, <code>//</code> comments, quoted strings, and
+			the text as the source of truth — and the same claim about names, except that here they
+			are unique within one model rather than one map.
+		</p>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			The file opens by naming that context — <code>context "Rating" &#123;</code> — and the name is
+			the identity in both formats: it is what lets a model be checked against the map without
+			either document holding a pointer into the other. Files written before this statement was
+			called <code>context</code> open with <code>model</code> instead; they are still read, and the
+			editor writes them back under the current spelling the first time you open one.
+		</p>
+
+		<h3 class="mt-8 text-lg font-semibold">Grammar</h3>
+		<pre class="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{`File         = Model , EOF ;
+Model        = 'context' , String , '{' , { Aggregate | Value | Enum } , '}' ;
+                                             (* 'model' is the old spelling,
+                                                still read, never written *)
+
+Aggregate    = 'aggregate' , String ,
+               '{' , { Intent | Invariant | Entity | Value | Enum } , '}' ;
+Entity       = [ 'root' ] , 'entity' , String ,
+               [ '{' , { Id | Attribute | Link } , '}' ] ;
+Value        = 'value' , String , [ '{' , { Attribute | Link } , '}' ] ;
+Enum         = 'enum'  , String , '{' , String , { String } , '}' ;
+
+Intent       = 'intent'    , String ;        (* at most one *)
+Invariant    = 'invariant' , String ;        (* repeatable *)
+Id           = 'id'        , String ;        (* the identity type; entities only *)
+Attribute    = 'attribute' , String , ':' , String ;
+
+Link         = ( 'contains' | 'embeds' | 'references' ) , String ,
+               [ Multiplicity ] ;
+Multiplicity = 'one' | 'optional' | 'many' | 'at-least-one' ;  (* default: one *)`}</code></pre>
+
+		<h3 class="mt-8 text-lg font-semibold">The three links</h3>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			<code>contains</code> is composition inside one boundary: the part is created, saved and
+			deleted with the root, and has no life of its own. <code>embeds</code> is a value object
+			or an enumeration, which has no identity and is therefore copied rather than shared.
+			<code>references</code> crosses a boundary <strong>by identity</strong> — it names another
+			aggregate, never something inside one, and holds its id rather than the thing itself. That
+			last rule is what makes an aggregate a consistency boundary rather than a diagram, and the
+			parser enforces it.
+		</p>
+
+		<h3 class="mt-8 text-lg font-semibold">What the parser refuses</h3>
+		<ul class="mt-2 list-disc space-y-1 pl-5 text-ink-muted dark:text-slate-400">
+			<li>
+				A value object with an <code>id</code>. Identity is the whole difference between a value
+				and an entity: two values with the same fields are the same value.
+			</li>
+			<li>
+				A link naming something that is not declared, and a <code>references</code> naming a
+				member instead of the aggregate that owns it.
+			</li>
+			<li>
+				Two declarations sharing a name. Two things called <code>Line</code> in one context is
+				precisely the ubiquitous-language failure this tool exists to surface.
+			</li>
+		</ul>
+		<p class="mt-3 text-ink-muted dark:text-slate-400">
+			It warns, rather than refuses, about the ones that are usually a smell and occasionally the
+			truth: an aggregate with no <code>root</code> or no <code>invariant</code>, a root with no
+			<code>id</code>, and a member nothing inside the aggregate reaches.
+		</p>
+
+		<h3 class="mt-8 text-lg font-semibold">A complete file</h3>
+		<p class="mt-2 text-ink-muted dark:text-slate-400">
+			The example the model editor loads: the inside of <code>Risk appetite</code>, whose
+			aggregates are the ones the map above declares for it.
+		</p>
+		<pre class="mt-3 max-h-[36rem] overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs dark:border-slate-700 dark:bg-slate-900"><code>{MODEL_SAMPLE}</code></pre>
+
+		<p class="mt-10 text-sm">
+			<a class="font-semibold text-brand underline" href="/">Back to the mapper</a>
+			<span class="mx-2 text-ink-muted dark:text-slate-500">·</span>
+			<a class="font-semibold text-brand underline" href="/model">the model editor</a>
+		</p>
+	</main>
+</Layout>

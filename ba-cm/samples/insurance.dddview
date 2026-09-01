@@ -1,0 +1,44 @@
+{
+  "format": "ba-cm-view",
+  "version": 1,
+  "map": "Personal and commercial insurance",
+  "positions": {
+    "context:Product catalogue": {
+      "x": 1010.4488714853248,
+      "y": 1079.9905598135522
+    },
+    "context:Party and relationships": {
+      "x": 1531.1665145068087,
+      "y": 964.1899536034057
+    },
+    "context:Documents": {
+      "x": 2023.3139711551526,
+      "y": 616.9471474039098
+    },
+    "context:Policy lifecycle": {
+      "x": 1006.0734804970518,
+      "y": 784.6547001572445
+    },
+    "context:Billing": {
+      "x": 1767.4590298225835,
+      "y": 514.7974251073423
+    },
+    "context:Rating": {
+      "x": 98.73603988263088,
+      "y": 935.6379711033352
+    },
+    "context:Risk appetite": {
+      "x": 80.778093022159,
+      "y": 501.04302398677726
+    },
+    "context:Quotation": {
+      "x": 493.4685089771084,
+      "y": 667.5029318047261
+    },
+    "context:Claims": {
+      "x": 754.7344995596027,
+      "y": 496.28637192013423
+    }
+  },
+  "curves": {}
+}

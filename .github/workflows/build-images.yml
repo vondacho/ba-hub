@@ -3,7 +3,7 @@
 #
 # The components are the directories that own a Dockerfile:
 # ba-portal (Astro/node)
-# ba-ddd-mapper (Astro/node)
+# ba-cm (Astro/node)
 #
 # There is no separate "npm ci && npm run build" job on purpose. Each
 # Dockerfile is already multi-stage and runs the real build in its `build`
@@ -12,7 +12,7 @@
 #
 # Images land at:
 #   ghcr.io/vondacho/ba-hub/ba-portal
-#   ghcr.io/vondacho/ba-hub/ba-ddd-mapper
+#   ghcr.io/vondacho/ba-hub/ba-cm
 #
 # They are nested under the repository path so GHCR links each package back to
 # this repo automatically (via the org.opencontainers.image.source label set
@@ -27,8 +27,8 @@
 #     --set image.repository=ghcr.io/vondacho/ba-hub/ba-portal \
 #     --set image.tag=sha-<short-sha> \
 #     --set image.pullPolicy=IfNotPresent
-#   helm upgrade --install ba-ddd-mapper helm/ba-ddd-mapper \
-#     --set image.repository=ghcr.io/vondacho/ba-hub/ba-ddd-mapper \
+#   helm upgrade --install ba-cm helm/ba-cm \
+#     --set image.repository=ghcr.io/vondacho/ba-hub/ba-cm \
 #     --set image.tag=sha-<short-sha> \
 #     --set image.pullPolicy=IfNotPresent
 name: build-images
@@ -88,9 +88,9 @@ jobs:
             ba-portal:
               - *workflow
               - 'ba-portal/**'
-            ba-ddd-mapper:
+            ba-cm:
               - *workflow
-              - 'ba-ddd-mapper/**'
+              - 'ba-cm/**'
 
       - id: select
         env:
@@ -101,7 +101,7 @@ jobs:
           # that all three images carry it, whether or not each one changed.
           # Same for an explicit "build everything" dispatch.
           if [ "${{ github.ref_type }}" = 'tag' ] || [ "${{ inputs.all }}" = 'true' ]; then
-            components='["ba-portal","ba-ddd-mapper"]'
+            components='["ba-portal","ba-cm"]'
           else
             # paths-filter emits every matched filter name, including the
             # "workflow" helper the anchors are attached to — drop it, it is
@@ -240,5 +240,5 @@ jobs:
           {
             echo '### Deployed'
             echo '- https://ba-portal.obya.ch'
-            echo '- https://ddd-mapper.obya.ch'
+            echo '- https://ba-cm.obya.ch'
           } >> "$GITHUB_STEP_SUMMARY"

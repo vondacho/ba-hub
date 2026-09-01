@@ -23,9 +23,9 @@ variable "portal_subdomain" {
 }
 
 variable "mapper_subdomain" {
-  description = "Subdomain serving ba-ddd-mapper."
+  description = "Subdomain serving ba-cm."
   type        = string
-  default     = "ddd-mapper"
+  default     = "ba-cm"
 }
 
 variable "instance_type" {
