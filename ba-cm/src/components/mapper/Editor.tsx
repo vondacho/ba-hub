@@ -29,6 +29,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { Problem } from '../../lib/ddd/problems';
+import { DEFAULT_TEXT_SIZE } from '../../lib/storage';
 
 interface Props {
 	value: string;
@@ -53,6 +54,15 @@ interface Props {
 	 * existed — the same spans a gesture splices.
 	 */
 	highlight?: { readonly start: number; readonly end: number } | null;
+	/**
+	 * The type size for the whole pane, in px. One of `TEXT_SIZES`.
+	 *
+	 * On the root rather than on the textarea, because the backdrop and the
+	 * gutter have to be drawn at the same size to the pixel — see the note at
+	 * the top. One declaration inherited by all three is the only version of
+	 * this that cannot drift.
+	 */
+	textSize?: number;
 }
 
 export default function Editor({
@@ -62,6 +72,7 @@ export default function Editor({
 	revealLine,
 	label = 'Map source',
 	highlight = null,
+	textSize = DEFAULT_TEXT_SIZE,
 }: Props) {
 	const area = useRef<HTMLTextAreaElement>(null);
 	const gutter = useRef<HTMLDivElement>(null);
@@ -116,12 +127,18 @@ export default function Editor({
 	 */
 	const metrics = 'px-3 py-3 whitespace-pre-wrap break-words';
 
+	/*
+	 * The line height stays a ratio and the gutter is measured in `em`, so both
+	 * follow the size rather than having to be chosen again at each stop. The
+	 * gutter was a fixed 56px, which held four digits at 13px and stopped
+	 * holding them well before the top of the scale.
+	 */
 	return (
-		<div className="flex h-full min-h-0 font-mono text-[13px] leading-[1.55]">
+		<div className="flex h-full min-h-0 font-mono leading-[1.55]" style={{ fontSize: `${textSize}px` }}>
 			<div
 				ref={gutter}
 				aria-hidden="true"
-				className="w-14 shrink-0 overflow-hidden border-r border-slate-200 bg-slate-50 py-3 text-right select-none dark:border-slate-800 dark:bg-slate-900"
+				className="w-[3.6em] shrink-0 overflow-hidden border-r border-slate-200 bg-slate-50 py-3 text-right select-none dark:border-slate-800 dark:bg-slate-900"
 			>
 				{lines.map((_, index) => {
 					const severity = flagged.get(index + 1);

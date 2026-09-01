@@ -69,6 +69,12 @@ set -x
 chown -R ubuntu:ubuntu $REMOTE_DIR
 docker compose pull
 docker compose up -d --remove-orphans --wait
+# caddy/ is a read-only bind mount, so editing the Caddyfile leaves the
+# container spec identical and \`up -d\` has nothing to recreate — the running
+# Caddy keeps the config it parsed at startup. Reload it explicitly: it is
+# graceful, it is a no-op when the config is unchanged, and it keeps the
+# certificates in caddy_data rather than re-issuing them.
+docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile
 docker compose ps
 # The superseded images are unreferenced once the containers have swapped;
 # without this the root volume fills up over a few dozen deploys.

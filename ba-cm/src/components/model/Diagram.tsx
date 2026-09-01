@@ -15,7 +15,15 @@
  * parents-first and hit-tested children-first.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import {
 	AGGREGATE_RULE,
 	applyPositions,
@@ -33,6 +41,7 @@ import { routeLinks, type RoutedLink } from '../../lib/ddm/route';
 import { paint } from '../../lib/ddm/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar, { type AddChoice } from '../mapper/CanvasBar';
+import type { CanvasControls } from '../ui/ViewControls';
 import { useNudge } from '../../lib/nudge';
 
 interface Props {
@@ -43,8 +52,9 @@ interface Props {
 	onSelect: (id: string | null) => void;
 	positions: Positions;
 	onPositions: (next: Positions) => void;
-	onFullscreen: () => void;
-	fullscreen: boolean;
+	/** The top bar's handle on this canvas. See `Graph`, which carries the note. */
+	controls: React.RefObject<CanvasControls | null>;
+	onScale: (scale: number) => void;
 	onExportSvg: (svg: string) => void;
 	/** What this canvas can make, and why each button is off. */
 	adds: readonly AddChoice[];
@@ -88,8 +98,8 @@ export default function Diagram({
 	onSelect,
 	positions,
 	onPositions,
-	onFullscreen,
-	fullscreen,
+	controls,
+	onScale,
 	onExportSvg,
 	adds,
 	onAdd,
@@ -217,6 +227,28 @@ export default function Diagram({
 		fit();
 	}, [shape, size.width, boxes.length, fit]);
 
+	/* Above the early return below — see `Graph`, which carries the reason. */
+	const zoomBy = (factor: number) => {
+		setView((current) => {
+			const scale = clampZoom(current.scale * factor, MAX_ZOOM);
+			const cx = size.width / 2;
+			const cy = size.height / 2;
+			return {
+				scale,
+				x: cx - ((cx - current.x) / current.scale) * scale,
+				y: cy - ((cy - current.y) / current.scale) * scale,
+			};
+		});
+	};
+
+	useImperativeHandle(controls, () => ({ zoomBy }), [size.width, size.height]);
+
+	// In the same display units the readout shows — the diagram's own natural
+	// size is ZOOM_UNIT, and nobody outside this file should have to know that.
+	useEffect(() => {
+		onScale(view.scale / ZOOM_UNIT);
+	}, [view.scale, onScale]);
+
 	if (!placement || boxes.length === 0) {
 		return (
 			<div className="flex h-full items-center justify-center p-8 text-center text-sm text-ink-muted dark:text-slate-400">
@@ -256,19 +288,6 @@ export default function Diagram({
 
 	const originBox = origin === null ? null : (boxes.find((box) => box.id === origin) ?? null);
 
-	const zoomBy = (factor: number) => {
-		setView((current) => {
-			const scale = clampZoom(current.scale * factor, MAX_ZOOM);
-			const cx = size.width / 2;
-			const cy = size.height / 2;
-			return {
-				scale,
-				x: cx - ((cx - current.x) / current.scale) * scale,
-				y: cy - ((cy - current.y) / current.scale) * scale,
-			};
-		});
-	};
-
 	// Aggregates first so their members draw on top of them.
 	const aggregates = boxes.filter((box) => box.parent === null && !isMemberBox(box));
 	const members = boxes.filter((box) => isMemberBox(box));
@@ -286,14 +305,10 @@ export default function Diagram({
 				onAdd={onAdd}
 				connecting={connecting}
 				onConnecting={setConnecting}
-				onZoom={zoomBy}
 				onFit={fit}
 				onReset={() => onPositions({})}
 				onExportSvg={() => setExporting(true)}
-				onFullscreen={onFullscreen}
-				fullscreen={fullscreen}
 				moved={Object.keys(positions).length}
-				scale={view.scale / ZOOM_UNIT}
 			/>
 
 			<svg

@@ -20,7 +20,13 @@ services:
     environment:
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in /opt/ba-hub/.env}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The *directory*, not caddy/Caddyfile itself. A single-file bind mount
+      # resolves to that file's inode, and deploy.sh unpacks with `tar -x`,
+      # which replaces the file rather than rewriting it — the container would
+      # stay pinned to the copy that existed when it was created and never see
+      # another edit. Mounting the directory makes the path the mount, so a
+      # replaced file is picked up and `caddy reload` has something to reload.
+      - ./caddy:/etc/caddy:ro
       # Certificates and ACME account keys. Losing this volume means
       # re-issuing from scratch, which is how you meet Let's Encrypt's
       # duplicate-certificate rate limit.

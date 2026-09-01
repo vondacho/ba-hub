@@ -48,6 +48,7 @@ import {
 	loadModelView,
 	loadAgent,
 	loadAgentWidth,
+	loadTextSize,
 	loadInspector,
 	loadLegend,
 	loadPanes,
@@ -60,6 +61,7 @@ import {
 	saveModelView,
 	saveAgent,
 	saveAgentWidth,
+	saveTextSize,
 	saveInspector,
 	saveLegend,
 	savePanes,
@@ -70,6 +72,7 @@ import {
 	AGENT_DEFAULT_WIDTH,
 	AGENT_MAX,
 	AGENT_MIN,
+	DEFAULT_TEXT_SIZE,
 	type DocumentKeys,
 	type GraphTheme,
 	type Panes,
@@ -85,6 +88,8 @@ import Icon, { type IconName } from '../mapper/Icon';
 import ProblemList from '../mapper/ProblemList';
 import IconButton from '../ui/IconButton';
 import { useFullscreen } from '../../lib/fullscreen';
+import TextSize from '../ui/TextSize';
+import ViewControls, { type CanvasControls } from '../ui/ViewControls';
 import Diagram from './Diagram';
 import AgentPanel from '../agent/AgentPanel';
 import type { AddChoice } from '../mapper/CanvasBar';
@@ -335,6 +340,10 @@ export default function ModelEditor({ promptsUrl }: Props) {
 	const [fresh, setFresh] = useState<string | null>(null);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
+	/* The map's, for the map's reason — see `DddMapper`. */
+	const canvas = useRef<CanvasControls | null>(null);
+	const [scale, setScale] = useState(1);
+	const [textSize, setTextSize] = useState(DEFAULT_TEXT_SIZE);
 	/**
 	 * The name the model's entries are stored under: the context it is the
 	 * inside of, which is what it would be called on disk.
@@ -380,6 +389,8 @@ export default function ModelEditor({ promptsUrl }: Props) {
 		if (storedAgent !== null) setAgent(storedAgent);
 		const storedWidth = loadAgentWidth();
 		if (storedWidth !== null) setAgentWidth(storedWidth);
+		const storedTextSize = loadTextSize();
+		if (storedTextSize !== null) setTextSize(storedTextSize);
 	}, []);
 
 	/**
@@ -1187,6 +1198,15 @@ export default function ModelEditor({ promptsUrl }: Props) {
 					<IconButton label="Replace with the sample model" onClick={loadExample}>
 						<Icon name="sample" />
 					</IconButton>
+					{/* The map's toolbar, in the map's order and for the map's reason:
+					    the window's questions, together, at the end. */}
+					<ViewControls
+						controls={canvas}
+						scale={scale}
+						fullscreen={fullscreen}
+						onFullscreen={toggleFullscreen}
+						noCanvas={panes === 'source'}
+					/>
 					<IconButton
 						label={`Diagram theme: ${theme ?? 'following the page'}. Shift-click to follow the page.`}
 						onClick={(event) => {
@@ -1262,6 +1282,7 @@ export default function ModelEditor({ promptsUrl }: Props) {
 								revealLine={revealLine}
 								label={SOURCE_LABEL}
 								highlight={highlight}
+								textSize={textSize}
 							/>
 						</div>
 						<ProblemList
@@ -1269,6 +1290,15 @@ export default function ModelEditor({ promptsUrl }: Props) {
 							onReveal={reveal}
 							collapsed={collapsed}
 							onToggle={() => setCollapsed((value) => !value)}
+							trailing={
+								<TextSize
+									size={textSize}
+									onSize={(size) => {
+										setTextSize(size);
+										saveTextSize(size);
+									}}
+								/>
+							}
 						/>
 					</section>
 				)}
@@ -1297,8 +1327,8 @@ export default function ModelEditor({ promptsUrl }: Props) {
 							onSelect={setSelected}
 							positions={positions}
 							onPositions={setPositions}
-							onFullscreen={toggleFullscreen}
-							fullscreen={fullscreen}
+							controls={canvas}
+							onScale={setScale}
 							onExportSvg={(svg) =>
 								downloadText(
 									`${slug(document_.context, 'model')}${SVG_EXTENSION}`,

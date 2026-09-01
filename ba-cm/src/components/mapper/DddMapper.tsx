@@ -59,6 +59,8 @@ import { freshMap } from '../../lib/ddd/seed';
 import { seedModel } from '../../lib/ddm/seed';
 import { modelHref } from '../../lib/links';
 import { useFullscreen } from '../../lib/fullscreen';
+import TextSize from '../ui/TextSize';
+import ViewControls, { type CanvasControls } from '../ui/ViewControls';
 import Icon, { type IconName } from './Icon';
 import IconButton from '../ui/IconButton';
 import {
@@ -67,6 +69,7 @@ import {
 	loadMapView,
 	loadAgent,
 	loadAgentWidth,
+	loadTextSize,
 	loadInspector,
 	loadLegend,
 	loadPanes,
@@ -82,6 +85,7 @@ import {
 	saveMapView,
 	saveAgent,
 	saveAgentWidth,
+	saveTextSize,
 	saveInspector,
 	saveLegend,
 	savePanes,
@@ -92,6 +96,7 @@ import {
 	AGENT_DEFAULT_WIDTH,
 	AGENT_MAX,
 	AGENT_MIN,
+	DEFAULT_TEXT_SIZE,
 	type DocumentKeys,
 	type GraphTheme,
 	type Panes,
@@ -285,6 +290,16 @@ export default function DddMapper({ promptsUrl }: Props) {
 	const [positions, setPositions] = useState<Positions>(start.positions);
 	const [curves, setCurves] = useState<Curves>(start.curves);
 	const { root, fullscreen, toggle: toggleFullscreen } = useFullscreen<HTMLDivElement>();
+	/*
+	 * The graph's zoom, reached from the top bar.
+	 *
+	 * The handle is how the bar asks for a step; the number is what the graph
+	 * says back, and it is state rather than a ref because the readout has to
+	 * re-render when the wheel moves it.
+	 */
+	const canvas = useRef<CanvasControls | null>(null);
+	const [scale, setScale] = useState(1);
+	const [textSize, setTextSize] = useState(DEFAULT_TEXT_SIZE);
 	const [saveFailed, setSaveFailed] = useState(false);
 	const fileInput = useRef<HTMLInputElement>(null);
 	const bundleInput = useRef<HTMLInputElement>(null);
@@ -351,6 +366,8 @@ export default function DddMapper({ promptsUrl }: Props) {
 		if (storedAgent !== null) setAgent(storedAgent);
 		const storedWidth = loadAgentWidth();
 		if (storedWidth !== null) setAgentWidth(storedWidth);
+		const storedTextSize = loadTextSize();
+		if (storedTextSize !== null) setTextSize(storedTextSize);
 	}, []);
 
 	/**
@@ -1269,6 +1286,17 @@ export default function DddMapper({ promptsUrl }: Props) {
 					<IconButton label="Replace with the sample map" onClick={loadExample}>
 						<Icon name="sample" />
 					</IconButton>
+					{/* Last before the theme switch, and beside it on purpose: these are
+					    the questions about the window rather than about the document —
+					    how much of the screen it takes, how close the picture is, and
+					    what light it is being read in. */}
+					<ViewControls
+						controls={canvas}
+						scale={scale}
+						fullscreen={fullscreen}
+						onFullscreen={toggleFullscreen}
+						noCanvas={panes === 'source'}
+					/>
 					<IconButton
 						label={`Graph theme: ${theme ?? 'following the page'}. Shift-click to follow the page.`}
 						onClick={(event) => {
@@ -1365,6 +1393,7 @@ export default function DddMapper({ promptsUrl }: Props) {
 								problems={problems}
 								revealLine={revealLine}
 								highlight={highlight}
+								textSize={textSize}
 							/>
 						</div>
 						<ProblemList
@@ -1372,6 +1401,15 @@ export default function DddMapper({ promptsUrl }: Props) {
 							onReveal={reveal}
 							collapsed={collapsed}
 							onToggle={() => setCollapsed((value) => !value)}
+							trailing={
+								<TextSize
+									size={textSize}
+									onSize={(size) => {
+										setTextSize(size);
+										saveTextSize(size);
+									}}
+								/>
+							}
 						/>
 					</section>
 				)}
@@ -1402,7 +1440,8 @@ export default function DddMapper({ promptsUrl }: Props) {
 							onPositions={setPositions}
 							curves={curves}
 							onCurves={setCurves}
-							onFullscreen={toggleFullscreen}
+							controls={canvas}
+							onScale={setScale}
 							fullscreen={fullscreen}
 							onAdd={addNode}
 							adds={adds}

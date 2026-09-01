@@ -190,9 +190,9 @@ jobs:
   # and a pull request has nothing to roll out.
   #
   # `always()` with an explicit build check so that a push touching only, say,
-  # iac/host/Caddyfile still redeploys — that run has an empty component matrix,
-  # which skips `build`, and a skipped dependency would otherwise skip this job
-  # too.
+  # iac/host/caddy/Caddyfile still redeploys — that run has an empty component
+  # matrix, which skips `build`, and a skipped dependency would otherwise skip
+  # this job too.
   deploy:
     name: deploy to host
     needs: [changes, build]

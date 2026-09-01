@@ -10,6 +10,13 @@
  * checks made continuous rather than quarterly — an unowned boundary, a generic
  * subdomain somebody has started modelling, a relationship with no rationale —
  * and a map that had to be perfect before it drew is a map nobody would start.
+ *
+ * ## The strip is also the pane's footer
+ *
+ * This bar is the only thing under the text, so it is where a setting about the
+ * text itself goes — the size it is drawn at, today. `trailing` is that slot,
+ * kept at the far right and outside the toggle: the whole summary is a button,
+ * and a control nested inside a button is a control nobody can click.
  */
 
 import type { Problem } from '../../lib/ddd/problems';
@@ -19,38 +26,43 @@ interface Props {
 	onReveal: (line: number) => void;
 	collapsed: boolean;
 	onToggle: () => void;
+	/** The right-hand end of the strip. See the note above. */
+	trailing?: React.ReactNode;
 }
 
-export default function ProblemList({ problems, onReveal, collapsed, onToggle }: Props) {
+export default function ProblemList({ problems, onReveal, collapsed, onToggle, trailing }: Props) {
 	const errors = problems.filter((problem) => problem.severity === 'error');
 	const warnings = problems.filter((problem) => problem.severity === 'warning');
 	const ordered = [...errors, ...warnings];
 
 	return (
 		<div className="border-t border-slate-200 dark:border-slate-800">
-			<button
-				type="button"
-				onClick={onToggle}
-				aria-expanded={!collapsed}
-				className="flex w-full items-center gap-3 px-3 py-2 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-900"
-			>
-				<span aria-hidden="true" className="text-slate-400">
-					{collapsed ? '▸' : '▾'}
-				</span>
-				{errors.length > 0 && (
-					<span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-						{errors.length} error{errors.length === 1 ? '' : 's'}
+			<div className="flex items-center">
+				<button
+					type="button"
+					onClick={onToggle}
+					aria-expanded={!collapsed}
+					className="flex grow items-center gap-3 px-3 py-2 text-left text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-900"
+				>
+					<span aria-hidden="true" className="text-slate-400">
+						{collapsed ? '▸' : '▾'}
 					</span>
-				)}
-				{warnings.length > 0 && (
-					<span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900 dark:bg-amber-950 dark:text-amber-300">
-						{warnings.length} warning{warnings.length === 1 ? '' : 's'}
-					</span>
-				)}
-				{problems.length === 0 && (
-					<span className="text-emerald-700 dark:text-emerald-400">No problems</span>
-				)}
-			</button>
+					{errors.length > 0 && (
+						<span className="rounded-full bg-rose-100 px-2 py-0.5 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+							{errors.length} error{errors.length === 1 ? '' : 's'}
+						</span>
+					)}
+					{warnings.length > 0 && (
+						<span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-900 dark:bg-amber-950 dark:text-amber-300">
+							{warnings.length} warning{warnings.length === 1 ? '' : 's'}
+						</span>
+					)}
+					{problems.length === 0 && (
+						<span className="text-emerald-700 dark:text-emerald-400">No problems</span>
+					)}
+				</button>
+				{trailing}
+			</div>
 
 			{!collapsed && ordered.length > 0 && (
 				<ul className="max-h-52 overflow-y-auto border-t border-slate-200 text-xs dark:border-slate-800">

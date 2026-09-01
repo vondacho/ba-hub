@@ -17,7 +17,15 @@
  * produces.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import type { Classification, DddDocument, Node } from '../../lib/ddd/model';
 import {
 	applyPositions,
@@ -32,6 +40,7 @@ import {
 import { classificationLabel, statusNote, styleFor } from '../../lib/graph/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar, { type AddChoice } from './CanvasBar';
+import type { CanvasControls } from '../ui/ViewControls';
 import { useNudge } from '../../lib/nudge';
 import Minimap from './Minimap';
 
@@ -46,7 +55,18 @@ interface Props {
 	onPositions: (next: Positions) => void;
 	curves: Curves;
 	onCurves: (next: Curves) => void;
-	onFullscreen: () => void;
+	/**
+	 * The top bar's handle on this canvas, and the scale it reports back.
+	 *
+	 * The zoom buttons and the readout live up there now — see `ViewControls`
+	 * for why — but the view itself cannot follow them: scale, pan and the
+	 * panel's measured size are one value, and only this component measures the
+	 * panel. So the bar holds a handle and asks for a step, and the canvas says
+	 * what the scale currently is however it changed — button, wheel, or a fit.
+	 */
+	controls: React.RefObject<CanvasControls | null>;
+	onScale: (scale: number) => void;
+	/** Not a control any more, but a refit trigger — see `refitOnResize`. */
 	fullscreen: boolean;
 	onAdd: (kind: string) => void;
 	adds: readonly AddChoice[];
@@ -101,7 +121,8 @@ export default function Graph({
 	onPositions,
 	curves,
 	onCurves,
-	onFullscreen,
+	controls,
+	onScale,
 	fullscreen,
 	onAdd,
 	adds,
@@ -340,6 +361,39 @@ export default function Graph({
 		fit();
 	}, [shape, size.width, placed.length, fit]);
 
+	/*
+	 * Zoom, and the two hooks that publish it — above the early return below,
+	 * which is the whole reason they are this far from the bar that uses them.
+	 *
+	 * "Nothing to draw yet" is a return out of the middle of this component, so
+	 * every hook has to be called before it. Reached from underneath, these two
+	 * ran only once a layout existed: the count changed between renders the
+	 * moment a map was opened, React refused the update, and the panel came
+	 * down with it. Hooks first, then the escape hatch.
+	 */
+	const zoomBy = (factor: number) => {
+		setView((current) => {
+			const scale = clamp(current.scale * factor, 0.1, 3);
+			// Zoom about the centre of the panel rather than the origin, so the
+			// thing being looked at stays under the eye.
+			const cx = size.width / 2;
+			const cy = size.height / 2;
+			return {
+				scale,
+				x: cx - ((cx - current.x) / current.scale) * scale,
+				y: cy - ((cy - current.y) / current.scale) * scale,
+			};
+		});
+	};
+
+	useImperativeHandle(controls, () => ({ zoomBy }), [size.width, size.height]);
+
+	// Whatever moved it — a button, the wheel, a fit — the readout is the same
+	// number, so it is reported from the value rather than from each gesture.
+	useEffect(() => {
+		onScale(view.scale);
+	}, [view.scale, onScale]);
+
 	if (!layout || placed.length === 0) {
 		return (
 			<div className="flex h-full items-center justify-center p-8 text-center text-sm text-ink-muted dark:text-slate-400">
@@ -387,21 +441,6 @@ export default function Graph({
 
 	const originNode = origin === null ? null : placed.find((node) => node.id === origin) ?? null;
 
-	const zoomBy = (factor: number) => {
-		setView((current) => {
-			const scale = clamp(current.scale * factor, 0.1, 3);
-			// Zoom about the centre of the panel rather than the origin, so the
-			// thing being looked at stays under the eye.
-			const cx = size.width / 2;
-			const cy = size.height / 2;
-			return {
-				scale,
-				x: cx - ((cx - current.x) / current.scale) * scale,
-				y: cy - ((cy - current.y) / current.scale) * scale,
-			};
-		});
-	};
-
 	return (
 		<div className="relative h-full overflow-hidden">
 			{stale && (
@@ -422,17 +461,13 @@ export default function Graph({
 				adds={adds}
 				connecting={connecting}
 				onConnecting={setConnecting}
-				onZoom={zoomBy}
 				onFit={fit}
 				onReset={() => {
 					onPositions({});
 					onCurves({});
 				}}
 				onExportSvg={() => setExporting(true)}
-				onFullscreen={onFullscreen}
-				fullscreen={fullscreen}
 				moved={Object.keys(positions).length + Object.keys(curves).length}
-				scale={view.scale}
 			/>
 
 			<svg

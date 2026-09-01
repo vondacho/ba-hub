@@ -35,18 +35,17 @@ export interface AddChoice {
  * The tooltip stays a native `title` for the same reason it does there — an
  * element tooltip is clipped at the edge of whatever scrolls.
  *
- * Four controls are worth explaining.
+ * Zoom and full screen used to be here and are now in the top bar — see
+ * `ViewControls`, which carries the argument. What is left is what genuinely
+ * belongs to the picture: what you draw on it, and how it is arranged.
+ *
+ * Three controls are worth explaining.
  *
  * **Connect** is a mode rather than a drag, and that is deliberate. A drag
  * from a box already means "move the box", and overloading it would make every
  * nudge a possible accidental relationship. In connect mode you click the
  * origin, the candidate follows the pointer, and you click the target — or
  * click nothing, and lose it.
- *
- * **Full screen** takes the whole mapper — editor, problems panel and graph —
- * to the full screen, not just the graph. Both panels are the tool; a graph
- * alone on a 27-inch display with the text it is made of hidden behind it would
- * be the wrong half.
  *
  * **Reset layout** drops every position and curve the visitor has nudged and
  * goes back to what was computed. That button is why moving things is safe:
@@ -69,26 +68,21 @@ interface Props {
 	/*
 	 * The drawing tools and the layout sidecar are optional groups.
 	 *
-	 * The domain model editor uses this bar for the half it already has — look
-	 * at the picture, reset it, take it full screen, write it out — and has no
-	 * `.ddmview` sidecar of its own yet. Omitting a group is how it says so; the
-	 * alternative was a second bar that would drift from this one in a week.
+	 * The domain model editor uses this bar for the half it already has — fit
+	 * the picture, reset it, write it out — and has no `.ddmview` sidecar of its
+	 * own yet. Omitting a group is how it says so; the alternative was a second
+	 * bar that would drift from this one in a week.
 	 */
 	onAdd?: (kind: string) => void;
 	/** What this canvas can make, and what the selection allows right now. */
 	adds?: readonly AddChoice[];
 	connecting?: boolean;
 	onConnecting?: (on: boolean) => void;
-	onZoom: (factor: number) => void;
 	onFit: () => void;
 	onReset: () => void;
 	onExportSvg: () => void;
-	onFullscreen: () => void;
-	fullscreen: boolean;
 	/** How many nodes and edges have been moved. Zero disables Reset. */
 	moved: number;
-	/** In zoom units rather than raw scale — see ZOOM_UNIT. */
-	scale: number;
 }
 
 export default function CanvasBar({
@@ -96,14 +90,10 @@ export default function CanvasBar({
 	adds,
 	connecting,
 	onConnecting,
-	onZoom,
 	onFit,
 	onReset,
 	onExportSvg,
-	onFullscreen,
-	fullscreen,
 	moved,
-	scale,
 }: Props) {
 	return (
 		<div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900/95">
@@ -133,22 +123,8 @@ export default function CanvasBar({
 				<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
 			)}
 
-			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-
-			<Button label="Zoom out" onClick={() => onZoom(0.8)}>
-				<Icon name="zoom-out" className="h-4 w-4" />
-			</Button>
-			<span className="w-11 text-center text-[11px] tabular-nums text-ink-muted dark:text-slate-400">
-				{Math.round(scale * 100)}%
-			</span>
-			<Button label="Zoom in" onClick={() => onZoom(1.25)}>
-				<Icon name="zoom-in" className="h-4 w-4" />
-			</Button>
-
-			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-
 			{/* A target rather than corner brackets: brackets read as "full screen",
-			    and full screen is a button on this same bar. */}
+			    which is a different button in a different bar. */}
 			<Button label="Fit the whole map in view" onClick={onFit}>
 				<Icon name="fit" className="h-4 w-4" />
 			</Button>
@@ -172,15 +148,6 @@ export default function CanvasBar({
 			 */}
 			<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
 				<Icon name="picture" className="h-4 w-4" />
-			</Button>
-
-			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-
-			<Button
-				label={fullscreen ? 'Leave full screen' : 'Full screen'}
-				onClick={onFullscreen}
-			>
-				<Icon name={fullscreen ? 'fullscreen-exit' : 'fullscreen'} className="h-4 w-4" />
 			</Button>
 		</div>
 	);

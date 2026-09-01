@@ -43,6 +43,7 @@ const LEGEND = 'ba-cm:legend';
 const INSPECTOR = 'ba-cm:inspector';
 const AGENT = 'ba-cm:agent';
 const AGENT_WIDTH = 'ba-cm:agent-width';
+const TEXT_SIZE = 'ba-cm:text-size';
 const AGENT_CONFIG = 'ba-cm:agent-config';
 /** Apart from the rest of the configuration, and deliberately. See `loadKey`. */
 const AGENT_KEY = 'ba-cm:agent-key';
@@ -412,6 +413,50 @@ export function saveKey(key: string, remember: boolean): void {
 	} catch {
 		// A key that does not persist still works for this page's lifetime; the
 		// panel holds it in memory too.
+	}
+}
+
+/**
+ * The type sizes the source pane offers, smallest first.
+ *
+ * doc-es's scale, to the pixel, for the reason it gives: stops rather than a
+ * free number, because the useful range is small, every step has to stay
+ * legible in a monospace face, and a spinner that can produce 14.5px is a
+ * control nobody wants to operate. Five of them, so the ends are reachable in
+ * two presses.
+ *
+ * 15px is where the pane sits by default and where the reset returns to.
+ */
+export const TEXT_SIZES = [13, 15, 17, 19, 21] as const;
+export const DEFAULT_TEXT_SIZE = 15;
+
+/**
+ * How big the source text is, in its own key beside the other desk settings.
+ *
+ * A property of the eyes rather than of the document, like the theme and the
+ * panes: the same person wants the same size in the map's editor and in the
+ * model's, and neither of them wants the file they opened to have an opinion
+ * about it. One key, therefore, and both editors read it.
+ *
+ * This is the one place ba-cm goes further than doc-es, which holds the size in
+ * component state and forgets it on reload. Everything on this shelf is a
+ * setting somebody makes once, and one they have to remake every visit is one
+ * they stop making.
+ */
+export function loadTextSize(): number | null {
+	try {
+		const value = Number(store()?.getItem(TEXT_SIZE));
+		return TEXT_SIZES.includes(value as (typeof TEXT_SIZES)[number]) ? value : null;
+	} catch {
+		return null;
+	}
+}
+
+export function saveTextSize(size: number): void {
+	try {
+		store()?.setItem(TEXT_SIZE, String(size));
+	} catch {
+		// As with the theme: a preference that does not persist is survivable.
 	}
 }
 

@@ -30,10 +30,19 @@ export default function IconButton({
 	label,
 	onClick,
 	pressed,
+	disabled,
 	children,
 }: {
 	label: string;
 	onClick: (event: React.MouseEvent) => void;
+	/*
+	 * Dimmed and inert, for a button whose target is not on screen — the zoom
+	 * pair when the picture is hidden. It stays in the row rather than being
+	 * dropped from it: a toolbar whose buttons shuffle under the pointer as
+	 * panels are toggled is one nobody learns the shape of. The tooltip says
+	 * why, because a grey button that does not say so reads as broken.
+	 */
+	disabled?: boolean;
 	/*
 	 * Omitted by the buttons that *do* something. Present only on the ones that
 	 * put the bar into a state, where a reader has to be able to see which state
@@ -47,9 +56,10 @@ export default function IconButton({
 			<button
 				type="button"
 				onClick={onClick}
+				disabled={disabled}
 				aria-label={label}
 				aria-pressed={pressed}
-				className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:transition-none ${
+				className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:text-current motion-reduce:transition-none dark:disabled:hover:border-slate-600 ${
 					pressed
 						? 'border-brand bg-white text-brand dark:border-purple-400 dark:bg-slate-800 dark:text-purple-300'
 						: 'border-slate-300 hover:border-brand hover:text-brand dark:border-slate-600 dark:hover:border-purple-400 dark:hover:text-purple-300'
