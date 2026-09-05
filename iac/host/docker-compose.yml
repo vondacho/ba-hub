@@ -49,8 +49,26 @@ services:
       PORT: 4321
       NODE_ENV: production
       # Resolved per request by src/lib/links.ts — this is what the browser
-      # gets in the rendered links, so it must be the public URL.
+      # gets in the rendered links, so it must be the public URL. Every entry
+      # the chart's ConfigMap carries has to be here too: an unset one falls
+      # back to the .localhost default in src/lib/links.ts, which is a link no
+      # visitor of this host can follow.
       CONTEXT_MAPPER_URL: https://ba-cm.obya.ch
+      # doc-hub's event storming board, and the one neighbour that is deployed
+      # today — the footer, the tools page and /go/stormer all point at it.
+      EVENT_STORMER_URL: https://doc-es.obya.ch
+      # The neighbouring hubs. These resolve only once those hubs are deployed,
+      # and until then they are dead links on the right host names — which is
+      # the trade the tools page's `planned` badges already describe. A
+      # .localhost default could never resolve at all.
+      ARCH_PORTAL_URL: https://arch-portal.obya.ch
+      API_PORTAL_URL: https://api-portal.obya.ch
+      DEV_PORTAL_URL: https://dev-portal.obya.ch
+      QA_PORTAL_URL: https://qa-portal.obya.ch
+      # Nothing is deployed behind the landscape collector yet. Named anyway,
+      # for the same reason the chart renders it unconditionally: pointing it
+      # somewhere becomes a value change rather than a template change.
+      LANDSCAPE_API_URL: https://landscape-api.obya.ch
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4321/healthz"]
       interval: 10s
@@ -67,7 +85,12 @@ services:
       HOST: 0.0.0.0
       PORT: 4322
       NODE_ENV: production
+      # Browser-facing, all three. BA_PORTAL_URL has a second job: the assistant
+      # panel builds the prompt library's address from it,
+      # <BA_PORTAL_URL>/doc/tooling/prompts/.
       BA_PORTAL_URL: https://ba-portal.obya.ch
+      EVENT_STORMER_URL: https://doc-es.obya.ch
+      ARCH_PORTAL_URL: https://arch-portal.obya.ch
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:4322/healthz"]
       interval: 10s
