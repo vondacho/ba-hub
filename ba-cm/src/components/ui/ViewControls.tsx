@@ -37,6 +37,33 @@ import IconButton from './IconButton';
  */
 export interface CanvasControls {
 	zoomBy: (factor: number) => void;
+	/**
+	 * The canvas as a standalone SVG document, or `null` when it cannot be had.
+	 *
+	 * On this handle rather than on one of its own, for the reason the handle
+	 * exists at all: the picture is a *copy of the live tree*, so only the
+	 * canvas can produce it, and asking for it is the same shape of request as
+	 * asking for a zoom step. A second ref threaded through the same components
+	 * would be a second thing to remember to pass.
+	 *
+	 * Null when there is no surface to clone. That is not an error state — the
+	 * mapper's panes may simply be set to source only, in which case the canvas
+	 * is not mounted — and it is why the export dialog can say "the map pane is
+	 * not showing" rather than writing an empty picture.
+	 *
+	 * ## Why it is a promise
+	 *
+	 * A picture must not carry the selection highlight, the hover ring or the
+	 * half-drawn connector: those are furniture, and a file with somebody's
+	 * cursor state baked into it is a file they have to take again. The canvas
+	 * suppresses all of it by re-rendering without it — which is a React render,
+	 * so the clone cannot happen until after the next paint.
+	 *
+	 * A synchronous method would therefore return the picture *with* the
+	 * chrome, correctly and invisibly wrong. Awaiting one paint is the whole
+	 * reason for the promise.
+	 */
+	serialize: () => Promise<string | null>;
 }
 
 interface Props {

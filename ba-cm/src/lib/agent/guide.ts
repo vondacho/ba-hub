@@ -33,7 +33,7 @@ document are true. What you have to offer is the modelling: whether the
 boundaries fall where the language and the transactions say they should, and
 whether the document is honest about what it does not know.`;
 
-const DDD_GRAMMAR = `## The notation: \`.ddd\`, a context map
+export const DDD_GRAMMAR = `## The notation: \`.ddd\`, a context map
 
 \`\`\`
 map "Title" {
@@ -80,7 +80,7 @@ Patterns: \`partnership\`, \`shared-kernel\`, \`customer-supplier\`,
 Comments are \`//\` to end of line. Strings may wrap across lines; a
 continuation line is joined to the one above with a single space.`;
 
-const DDM_GRAMMAR = `## The notation: \`.ddm\`, the inside of one bounded context
+export const DDM_GRAMMAR = `## The notation: \`.ddm\`, the inside of one bounded context
 
 \`\`\`
 context "Bounded context name" {
@@ -129,7 +129,178 @@ An aggregate is named after its root; the two sharing a name is the idiom, not a
 collision. Names are identities and must be unique within the model — two things
 called \`Line\` in one bounded context is the ubiquitous language failing.`;
 
-const DDD_DOCTRINE = `## What a good context map does
+/**
+ * The two notations, stated formally.
+ *
+ * The grammars above are worked examples and rules in prose, which is what a
+ * model needs in order to *write* a document. These are the production sets,
+ * which is what it needs in order to be sure — the difference between
+ * "relationships run context to context" and "a `Relationship` is the only
+ * production that takes a `Pattern`, it is the only thing that may appear at
+ * map level beside a `Domain`, and a mutual pattern may not be written with
+ * `->`".
+ *
+ * ## They sit here rather than with the documents that ship them
+ *
+ * Because they are statements about the notations, and this file is what tracks
+ * the notations. Beside the grammars means a change to one is made under the
+ * eyes of the other; in the exporting module they would be a second description
+ * of the same subject in a file whose stated job is framing, and a second
+ * description is the one that keeps documenting a spelling the parser stopped
+ * accepting.
+ *
+ * ## They are not in the panel prompt
+ *
+ * `guideFor` includes neither, and that is a judgement rather than an oversight.
+ * The assistant in the panel is given a worked example and is corrected by a
+ * parser the moment it gets something wrong — a proposal that does not parse is
+ * shown with its errors and cannot be applied — so a formal grammar buys
+ * precision it can already get by other means, at the cost of a page of tokens
+ * on every request. A session reading the exported document has no such loop:
+ * nothing there will tell it that `partnership` may not take an arrow until
+ * somebody tries to open the file.
+ *
+ * Every production below was read off the two `lexer.ts` and `parser.ts` pairs.
+ */
+export const DDD_EBNF = `## The context map grammar, formally
+
+EBNF. \`,\` is sequence, \`|\` is alternation, \`{ x }\` is zero or more, \`[ x ]\` is
+optional, \`? … ?\` is prose, and a quoted literal stands for itself.
+
+\`\`\`ebnf
+File         = Map , EOF ;
+Map          = 'map' , String , '{' , { Domain | Relationship } , '}' ;
+
+Domain       = 'domain' , String ,
+               [ '{' , { Intent | Owner | Subdomain | Context } , '}' ] ;
+Subdomain    = 'subdomain' , Classification , String ,
+               [ '{' , { Intent | Owner | Context } , '}' ] ;
+Context      = 'context' , String ,
+               [ '{' , { Intent | Owner | Language | Aggregate | Status | Serves } , '}' ] ;
+
+Intent       = 'intent' , String ;
+Owner        = 'owner'  , String ;
+Language     = 'language'  , String , { String } ;
+Aggregate    = 'aggregate' , String , { String } ;
+Status       = 'status' , ( 'modelled' | 'drafted' | 'unmodelled' ) ;
+Serves       = 'serves' , String ;
+
+Relationship = String , ( '->' | '<->' ) , String , ':' , Pattern , [ '/' , Pattern ] ,
+               [ '{' , { Exchange | Because } , '}' ] ;
+Exchange     = 'exchange' , String ;
+Because      = 'because'  , String ;
+
+Classification = 'core' | 'supporting' | 'generic' ;
+Pattern      = 'partnership' | 'shared-kernel' | 'customer-supplier'
+             | 'conformist' | 'anticorruption-layer' | 'open-host-service'
+             | 'published-language' | 'separate-ways' | 'big-ball-of-mud' ;
+
+String       = '"' , { ? any character except '"' ? } , '"' ;
+Comment      = '//' , { ? any character except a line break ? } ;
+\`\`\`
+
+Reading it:
+
+- **Every body inside the map is optional.** \`context "Claims"\` with no braces
+  is a legal context that nobody has said anything about yet, and so is a bare
+  \`domain\`. The map's own braces are the exception: they are required, because
+  a file whose block never opened has nothing in it and is almost always a
+  truncated paste rather than an empty map.
+- **Nesting is containment**, and it is the only way a context is attached.
+  \`serves\` is *additional*: it exists for the straddle, a context serving a
+  second subdomain as well as the one it is written inside. A context with no
+  enclosing declaration is a problem the parser reports.
+- **A \`context\` may sit directly inside a \`domain\`**, without a subdomain
+  between them. It is legal and it is usually a map that has not finished
+  dividing the domain yet.
+- **\`language\` and \`aggregate\` take one or more names on a line**, and either
+  may be written more than once; the names accumulate.
+- **Only a \`Relationship\` carries a \`Pattern\`**, and it runs context to
+  context. Containment never carries one.
+- **Direction is enforced against the pattern.** \`partnership\`,
+  \`shared-kernel\` and \`separate-ways\` are mutual and may not be written with
+  \`->\`, because an arrow asserts an upstream the pattern denies;
+  \`customer-supplier\`, \`conformist\`, \`anticorruption-layer\`,
+  \`open-host-service\` and \`published-language\` require one.
+  \`big-ball-of-mud\` takes either, deliberately: it is not a pattern anybody
+  chooses, and a ball of mud with a discernible direction is still a ball of
+  mud.
+- **A pattern may be a pair** — \`open-host-service / anticorruption-layer\` —
+  when the two ends play different roles. That is one relationship with two
+  named positions, not two relationships.
+- **On a directed edge the left name is upstream**: whoever's model the other
+  has to accommodate.
+- **Names are identities.** Two nodes may not share one, and a relationship
+  refers to a context by its name, so the names are resolved after the whole
+  file is read.
+- **\`Comment\` and whitespace are trivia.** The language is brace-delimited:
+  indentation is a formatting choice and never syntax. A quoted string may wrap
+  across lines, and a continuation is joined to the line above with one space.`;
+
+export const DDM_EBNF = `## The domain model grammar, formally
+
+\`\`\`ebnf
+File         = Model , EOF ;
+Model        = ( 'context' | 'model' ) , String ,
+               '{' , { Aggregate | Value | Enum } , '}' ;
+
+Aggregate    = 'aggregate' , String ,
+               [ '{' , { Intent | Invariant | Root | Entity | Value | Enum } , '}' ] ;
+Root         = 'root' , Entity ;
+Entity       = 'entity' , String , [ '{' , { Id | Attribute | Link } , '}' ] ;
+Value        = 'value'  , String , [ '{' , { Attribute | Link } , '}' ] ;
+Enum         = 'enum'   , String , [ '{' , { String } , '}' ] ;
+
+Intent       = 'intent'    , String ;
+Invariant    = 'invariant' , String ;
+Id           = 'id'        , String ;
+Attribute    = 'attribute' , String , ':' , String ;
+Link         = ( 'contains' | 'embeds' | 'references' ) , String , [ Multiplicity ] ;
+Multiplicity = 'one' | 'optional' | 'many' | 'at-least-one' ;
+\`\`\`
+
+Reading it, and each of these is a rule the parser enforces rather than a
+convention:
+
+- **The model's own braces are required**, where every body inside it is
+  optional *to the grammar*. That is not the same as legal: \`aggregate "A"\`
+  with no body parses and is then refused, because an aggregate is reached
+  through exactly one \`root\` and without one there is no boundary, only a
+  group of classes. Several rules work that way — they are checked once the
+  whole model has been read, and they are listed at the end.
+
+- **\`id\` belongs to an entity.** A \`value\` carrying one is refused, because
+  identity is the whole difference between the two: two values with the same
+  fields *are* the same value.
+- **An aggregate has exactly one \`root\`**, and it is an entity.
+- **\`contains\` is composition inside one boundary** — entities only, same
+  aggregate only. The part is created, saved and deleted with the root.
+- **\`embeds\` is a value object or an enumeration** — no identity, so copied
+  rather than shared. Same aggregate, or declared at model level and shared.
+- **\`references\` crosses a boundary by identity.** It names another
+  *aggregate*, never something inside one, and holds its id rather than the
+  thing itself. Reaching past a root is how a boundary stops being one.
+- **Multiplicity defaults to \`one\`** when it is left off.
+- **Names are identities and must be unique within the model.** An aggregate is
+  named after its root, and the two sharing a name is the idiom rather than a
+  collision — but two different things called \`Line\` in one bounded context is
+  the ubiquitous language failing.
+- **\`model\` is accepted as a synonym for \`context\`** at the top. Write
+  \`context\`: it is what the file is about.
+
+Checked after the whole model is read, and refused rather than warned about:
+every aggregate has exactly one \`root\`, and it is an entity; every name is
+unique within the model; \`contains\` points at an entity in the same aggregate;
+\`embeds\` points at a value or an enumeration, in the same aggregate or shared
+at model level; and \`references\` points at an aggregate rather than at
+something inside one.
+
+An aggregate with no \`invariant\`, and a shared \`value\` nothing embeds, are
+**warnings** rather than errors — the file still opens. They are the two things
+the doctrine tells you to look at first, so the tool says them out loud without
+refusing to show you the model.`;
+
+export const DDD_DOCTRINE = `## What a good context map does
 
 **The characteristic failure of a context map is aspiration.** Every arrow gets
 labelled \`customer-supplier\` because \`conformist\` feels like a defeat, and a
@@ -147,7 +318,7 @@ map of what everyone wishes were true tells you nothing. So:
 - A context whose \`language\` is empty has no edge. The terms that mean
   something here and not next door are what make it a boundary.`;
 
-const DDM_DOCTRINE = `## What a good domain model does
+export const DDM_DOCTRINE = `## What a good domain model does
 
 **An aggregate exists to keep something true across a transaction.** One with
 nothing to protect is a table with extra ceremony, and its parts probably belong
@@ -163,6 +334,34 @@ to their own boundaries. So:
 - A large aggregate is a contention problem before it is a design problem:
   everything inside it is loaded and saved together.
 - Eventual consistency between aggregates is the normal case, not a compromise.`;
+
+/**
+ * The rules for changing somebody else's document.
+ *
+ * Facts about the two formats and about whose file it is, not about this panel.
+ * A model editing a `.ddd` in a terminal has to honour every one of them, which
+ * is why they are their own constant and why they are exported: the contract
+ * below quotes them, and so does the notation document the export dialog
+ * writes. Two copies worded differently would be one copy that keeps the
+ * `because` lines and one that quietly tidies them away.
+ */
+export const EDITING = `- **The whole document**, not a fragment, not a diff, not the changed
+  aggregate. It replaces the file.
+- **Change only what was asked for.** Everything else comes back byte-identical
+  — comments, blank lines, wrapping, the order of declarations. The result is
+  read as a diff, and a diff full of reformatting is a diff nobody reads.
+- **Keep the comments.** They are the author's reasoning and are not yours to
+  tidy.
+- **Never soften a \`because\`.** It is where the politics are written down —
+  *"the vendor will not change for us"* — and it is the most valuable line in a
+  context map precisely because it is the one nobody enjoys writing. Rephrasing
+  it into something diplomatic destroys the record.
+- **Never move a node's coordinates.** They are not in these files at all: an
+  arrangement lives in the \`.dddview\` or \`.ddmview\` sidecar beside the
+  document, and it is regenerated from a computed layout when it is missing.
+  Nothing you write in a \`.ddd\` should be about where anything sits.
+- **It must parse.** A document that does not is not a smaller version of one
+  that does; it is a file nobody can open.`;
 
 /**
  * What an answer has to look like to be usable.
@@ -194,18 +393,10 @@ why — and then exactly one fenced block:
 
 Rules for that block, all of them load-bearing:
 
-- **The whole document**, not a fragment, not a diff, not the changed aggregate.
-  It replaces the file.
-- **Change only what the demand asked for.** Everything else comes back
-  byte-identical — comments, blank lines, wrapping, the order of declarations.
-  It is shown to the visitor as a diff, and a diff full of reformatting is a
-  diff nobody reads.
-- **Keep the comments.** They are the author's reasoning and are not yours to
-  tidy.
-- It must parse. A block that does not is shown with its errors and cannot be
-  applied.
-- One block. If you want to illustrate something in passing, describe it in
-  prose instead.`;
+${EDITING}
+- **One block.** If you want to illustrate something in passing, describe it in
+  prose instead. A block that does not parse is shown to the visitor with its
+  errors and cannot be applied.`;
 
 /**
  * The system prompt for one document, plus whatever standing instructions the

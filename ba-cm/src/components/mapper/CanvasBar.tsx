@@ -51,7 +51,9 @@ export interface AddChoice {
  * goes back to what was computed. That button is why moving things is safe:
  * there is always a way back to the arrangement everybody else sees.
  *
- * **Export** writes the map as a standalone `.svg`: the whole map at its own
+ * **Export** is on this bar only for the editor that has nowhere else to put it
+ * — see `onExportSvg`. Where it appears it writes the map as a standalone
+ * `.svg`: the whole map at its own
  * size rather than the current viewport, with the colours of the theme the
  * panel is showing baked in. It sits with the layout buttons because it is the
  * same kind of thing — an artefact of how the map looks, next to the file that
@@ -80,7 +82,20 @@ interface Props {
 	onConnecting?: (on: boolean) => void;
 	onFit: () => void;
 	onReset: () => void;
-	onExportSvg: () => void;
+	/**
+	 * Write the picture, or absent when this canvas's editor offers it elsewhere.
+	 *
+	 * Optional because the bar is shared and the two editors differ. The model
+	 * page has no export dialog, so its picture button is here and is the only
+	 * way to get one. The mapper does, and the picture is one row in it beside
+	 * every other file the tool writes — so the mapper omits this, and having
+	 * the same artefact on two controls in one screen is the duplication that
+	 * avoids.
+	 *
+	 * The canvas produces the file either way; see `serialize` on the controls
+	 * handle.
+	 */
+	onExportSvg?: () => void;
 	/** How many nodes and edges have been moved. Zero disables Reset. */
 	moved: number;
 }
@@ -137,7 +152,9 @@ export default function CanvasBar({
 				<Icon name="reset" className="h-4 w-4" />
 			</Button>
 
-			<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			{onExportSvg && (
+				<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+			)}
 
 			{/*
 			 * The one export at this level, and it is the picture — the artefact
@@ -146,9 +163,11 @@ export default function CanvasBar({
 			 * `.dddview` by itself; the board's export carries that file now, and
 			 * two buttons for one artefact is a choice nobody should have to make.
 			 */}
-			<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
-				<Icon name="picture" className="h-4 w-4" />
-			</Button>
+			{onExportSvg && (
+				<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
+					<Icon name="picture" className="h-4 w-4" />
+				</Button>
+			)}
 		</div>
 	);
 }

@@ -49,11 +49,9 @@ import * as edits from '../../lib/graph/edit';
 import type { EdgeField, ListField, ScalarField } from '../../lib/graph/edit';
 import {
 	clearFileInput,
-	DDD_ACCEPT,
+	IMPORT_ACCEPT,
 	downloadBlob,
-	downloadText,
 	readTextFile,
-	svgFilenameFor,
 } from '../../lib/files';
 import { freshMap } from '../../lib/ddd/seed';
 import { seedModel } from '../../lib/ddm/seed';
@@ -103,11 +101,14 @@ import {
 } from '../../lib/storage';
 import EmptyState from '../ui/EmptyState';
 import StoreState from '../ui/StoreState';
+import ExportDialog from '../ui/ExportDialog';
+import { produce, type DestinationId } from '../../lib/mapper/export';
 import Editor from './Editor';
 import Graph from './Graph';
 import ImportBundle from '../ui/ImportBundle';
 import { incoming, mapIn, outgoing, receive, type Incoming } from '../../lib/bundle';
-import { unzip, zip, ZipError } from '../../lib/zip';
+import { parseView } from '../../lib/view-file';
+import { unzip, ZipError } from '../../lib/zip';
 import AgentPanel from '../agent/AgentPanel';
 import type { AddChoice } from './CanvasBar';
 import Inspector from './Inspector';
@@ -301,8 +302,7 @@ export default function DddMapper({ promptsUrl }: Props) {
 	const [scale, setScale] = useState(1);
 	const [textSize, setTextSize] = useState(DEFAULT_TEXT_SIZE);
 	const [saveFailed, setSaveFailed] = useState(false);
-	const fileInput = useRef<HTMLInputElement>(null);
-	const bundleInput = useRef<HTMLInputElement>(null);
+	const importInput = useRef<HTMLInputElement>(null);
 	/** An archive read but not yet written. See `ImportBundle`. */
 	const [arriving, setArriving] = useState<{ name: string; incoming: Incoming } | null>(null);
 	/*
@@ -349,6 +349,8 @@ export default function DddMapper({ promptsUrl }: Props) {
 	const renamed = useRef(false);
 	/** The store panel. Read-only, and read fresh each time it opens. */
 	const [showStore, setShowStore] = useState(false);
+	/** Whether the export dialog is up. Its selection lives in the dialog. */
+	const [exporting, setExporting] = useState(false);
 
 	// Restore before first paint of anything the visitor could act on.
 	useEffect(() => {
@@ -902,24 +904,9 @@ export default function DddMapper({ promptsUrl }: Props) {
 	}, [document_]);
 
 	/**
-	 * Write the picture the graph just drew.
+	 * The exports, run in the order the dialog lists them.
 	 *
-	 * The graph hands over a finished string rather than being asked for its
-	 * element: the serialising is the canvas's business — it owns the DOM and
-	 * knows which frame is the exportable one — and the filename and the
-	 * download are this component's, which is where every other file the mapper
-	 * writes comes from.
-	 */
-	const exportSvg = useCallback(
-		(svg: string) => {
-			downloadText(svgFilenameFor(document_.title), svg, 'image/svg+xml;charset=utf-8');
-		},
-		[document_.title],
-	);
-
-	/**
-	 * Export: this map, its arrangement, and the inside of every context it
-	 * names — one archive, one gesture.
+	 * ## The archive is the whole of the work
 	 *
 	 *     insurance/
 	 *       insurance.ddd
@@ -928,44 +915,74 @@ export default function DddMapper({ promptsUrl }: Props) {
 	 *         risk-appetite.ddm
 	 *         risk-appetite.ddmview
 	 *
-	 * **The only export at this level, and deliberately.** There used to be one
-	 * that wrote the `.ddd` and its sidecar alone and another that wrote the
-	 * arrangement by itself, and both are contained in this. A toolbar with
-	 * three exports makes somebody choose between them every time, having first
-	 * worked out what the difference is — and the difference was scope, which is
-	 * the one thing a person exporting their work does not want to think about.
+	 * The map on its own is the row under it, and the two are one question asked
+	 * at two scopes. They were one row until the dialog existed — a *toolbar*
+	 * with three exports makes somebody choose between them every time, having
+	 * first worked out that the difference is scope, and a 28px square has
+	 * nowhere to explain that. A row does; see the catalogue.
 	 *
-	 * The sidecar goes out even when nothing has been dragged: an empty one
-	 * costs nothing and means an export is always the same shape rather than one
-	 * that varies with history.
+	 * The sidecar goes out with the archive even when nothing has been dragged:
+	 * an empty one costs nothing and means an export is always the same shape
+	 * rather than one that varies with history. Contexts the map names that have no model in
+	 * this browser are counted rather than written — an empty folder is a claim
+	 * that something is there — and the count is on the row *before* the press
+	 * rather than in a note after it, because "three of these are still
+	 * unmodelled" is something to know while deciding, not while filing.
 	 *
-	 * Contexts the map names that have no model in this browser are counted
-	 * rather than written — an empty folder is a claim that something is there —
-	 * and the note says how many, because "three of these are still unmodelled"
-	 * is exactly what somebody wants to hear while packing up.
+	 * ## The picture is asked for once, and awaited before the loop
 	 *
-	 * The picture is not here. It belongs to the canvas — it is a copy of the
-	 * live tree rather than a second renderer — and it stays where the thing it
-	 * copies is, on the canvas's own toolbar.
+	 * Serialising the canvas costs a suppressed render and a clone of the whole
+	 * tree — see `serialize` on the handle — and the SVG and the PNG are the
+	 * same picture twice. Asking once and passing the string to both is one
+	 * clone rather than two, and it guarantees the pair cannot disagree about
+	 * which frame they came from.
+	 *
+	 * ## One file at a time
+	 *
+	 * Nested `for … of` with an `await` in it, rather than `Promise.all`. A browser
+	 * asked to start several downloads at once shows a permission prompt, and
+	 * several *simultaneous* anchor clicks are what makes it think the page is
+	 * doing something it should be asked about; spaced by the time it takes to
+	 * zip an archive, they arrive as a sequence.
+	 *
+	 * The first failure stops the run and is reported by the dialog. Continuing
+	 * would produce a downloads folder holding some of what was asked for, with
+	 * no indication of which part is missing.
 	 */
-	const exportBundle = useCallback(async () => {
+	const runExport = useCallback(
+		async (picks: readonly DestinationId[]) => {
+			const svg = picks.some((pick) => pick === 'svg' || pick === 'png')
+				? ((await canvas.current?.serialize()) ?? null)
+				: null;
+
+			for (const pick of picks) {
+				// A destination may be more than one file — the map on its own is
+				// the `.ddd` and its sidecar — so this is a loop inside a loop
+				// rather than one download per tick.
+				for (const file of await produce(pick, { document: document_, source, svg })) {
+					downloadBlob(file.filename, file.blob);
+				}
+			}
+		},
+		[document_, source],
+	);
+
+	/**
+	 * What the archive row warns about, computed only while the dialog is up.
+	 *
+	 * `outgoing` reads the store for every context the map names, and `source`
+	 * changes on every keystroke — so a memo keyed on both would re-read
+	 * localStorage as fast as somebody can type. Gating it on `exporting` costs
+	 * nothing the rest of the time, and the dialog is modal, so the source is
+	 * not being edited while it is open.
+	 */
+	const unmodelled = useMemo(() => {
+		if (!exporting) return 0;
 		const contexts = document_.nodes
 			.filter((node) => node.kind === 'context')
 			.map((node) => node.name);
-		const bundle = outgoing(document_.title, source, contexts);
-
-		downloadBlob(`${bundle.root}.zip`, await zip(bundle.entries));
-
-		const models = bundle.entries.filter((entry) => entry.path.endsWith('.ddm')).length;
-		setNote({
-			kind: 'warn',
-			text:
-				`Exported ${bundle.root}.zip — the map and ${models === 1 ? 'one model' : `${models} models`}.` +
-				(bundle.missing.length > 0
-					? ` ${bundle.missing.length === 1 ? 'One context has' : `${bundle.missing.length} contexts have`} no model in this browser yet, so nothing was written for ${bundle.missing.length === 1 ? 'it' : 'them'}.`
-					: ''),
-		});
-	}, [document_, source]);
+		return outgoing(document_.title, source, contexts).missing.length;
+	}, [exporting, document_, source]);
 
 	/**
 	 * Everything that has to be true before the model page opens.
@@ -1098,18 +1115,103 @@ export default function DddMapper({ promptsUrl }: Props) {
 	 * replace, and the writing waits for somebody to say yes: an import can
 	 * overwrite the only copy of a map, and ⌘Z does not reach the store.
 	 */
-	const openBundle = async (file: File | undefined) => {
-		clearFileInput(bundleInput.current);
+	/**
+	 * Import: one control, and the file says what it is.
+	 *
+	 * There were two — a `.ddd` picker labelled Open and a `.zip` picker
+	 * labelled Import — and the split asked the visitor a question they should
+	 * never have been asked: *which kind of file is this?* They are holding the
+	 * file. They know what it is called. The extension is the answer and this
+	 * reads it, which is the whole of the change.
+	 *
+	 * Four outcomes, and they are genuinely different things rather than four
+	 * spellings of one:
+	 *
+	 *   `.ddd`      becomes the map on screen. This is Open, and it replaces
+	 *               what you are looking at.
+	 *   `.dddview`  is an arrangement for the map already on screen. It moves
+	 *               the boxes and touches no text.
+	 *   `.ddm`      and `.ddmview` belong to the model page. They go to the
+	 *               store, which is where that page reads from, through the same
+	 *               confirm panel an archive uses — they replace documents whose
+	 *               only copy may be in this browser.
+	 *   `.zip`      is any number of the above, and always was.
+	 *
+	 * Longest suffix first. `"a.dddview".endsWith(".ddd")` is false so the order
+	 * does not currently matter, and writing it in the order that survives
+	 * somebody adding `.dddviewer` costs nothing.
+	 *
+	 * Anything else is named back rather than ignored. A picker that accepts a
+	 * file and does nothing visible is indistinguishable from one that is
+	 * broken.
+	 */
+	const onImport = async (file: File | undefined) => {
+		clearFileInput(importInput.current);
 		if (!file) return;
+		const name = file.name.toLowerCase();
 
-		try {
-			setArriving({ name: file.name, incoming: incoming(await unzip(await file.arrayBuffer())) });
-		} catch (error) {
-			setNote({
-				kind: 'error',
-				text: error instanceof ZipError ? error.message : 'That file could not be read as an archive.',
-			});
+		if (name.endsWith('.zip')) {
+			try {
+				setArriving({ name: file.name, incoming: incoming(await unzip(await file.arrayBuffer())) });
+			} catch (error) {
+				setNote({
+					kind: 'error',
+					text: error instanceof ZipError ? error.message : 'That file could not be read as an archive.',
+				});
+			}
+			return;
 		}
+
+		if (name.endsWith('.dddview')) {
+			const parsed = parseView(await readTextFile(file), document_.title);
+			if (!parsed.ok) {
+				setNote({ kind: 'error', text: parsed.error });
+				return;
+			}
+			// Nothing is written here: the debounced effect that persists every
+			// drag persists these too, four hundred milliseconds from now, under
+			// the key this map already owns. Saving explicitly would be a second
+			// writer for one file.
+			setPositions(parsed.view.positions);
+			setCurves(parsed.view.curves);
+			setNote({
+				kind: 'warn',
+				// The mismatch warning outranks the confirmation: it is the one of
+				// the two that means somebody may want to undo this.
+				text: parsed.warning ?? `Applied the arrangement from ${file.name}.`,
+			});
+			return;
+		}
+
+		if (name.endsWith('.ddmview') || name.endsWith('.ddm')) {
+			// Through the archive's own panel, with one entry in it. A loose model
+			// replaces a stored one exactly as an archive's would, and the rule
+			// that the destructive gesture names what it takes first does not care
+			// how the file arrived.
+			setArriving({
+				name: file.name,
+				incoming: incoming([{ path: file.name, text: await readTextFile(file) }]),
+			});
+			return;
+		}
+
+		if (name.endsWith('.ddd')) {
+			renamed.current = false;
+			applyEdit(await readTextFile(file));
+			setSelected(null);
+			// A different map's boxes are not this map's boxes. Keeping the
+			// overrides would scatter the new one across positions computed for
+			// the old — which is also why a `.dddview` is a separate gesture
+			// rather than something this could guess at.
+			setPositions({});
+			setCurves({});
+			return;
+		}
+
+		setNote({
+			kind: 'error',
+			text: `Import takes a .ddd, a .dddview, a .ddm, a .ddmview or a .zip. “${file.name}” is none of those.`,
+		});
 	};
 
 	/** Yes, having read the list. */
@@ -1144,18 +1246,6 @@ export default function DddMapper({ promptsUrl }: Props) {
 			kind: 'warn',
 			text: `Imported ${result.written} ${result.written === 1 ? 'document' : 'documents'}.`,
 		});
-	};
-
-	const onOpen = async (file: File | undefined) => {
-		if (!file) return;
-		renamed.current = false;
-		applyEdit(await readTextFile(file));
-		setSelected(null);
-		// A different map's boxes are not this map's boxes. Keeping the overrides
-		// would scatter the new one across positions computed for the old.
-		setPositions({});
-		setCurves({});
-		clearFileInput(fileInput.current);
 	};
 
 	return (
@@ -1262,20 +1352,26 @@ export default function DddMapper({ promptsUrl }: Props) {
 					>
 						<Icon name="new" />
 					</IconButton>
-					<IconButton label="Open a .ddd map" onClick={() => fileInput.current?.click()}>
+					{/* One control for every way in. What happens is decided by the
+					    file's extension — see `onImport` — which is a question the
+					    visitor should never have had to answer with a button. */}
+					<IconButton
+						label="Import a map, an arrangement, a model or an archive"
+						onClick={() => importInput.current?.click()}
+					>
 						<Icon name="open" />
 					</IconButton>
-					<IconButton
-						label="Export this map and the models of the contexts it names, as a .zip"
-						onClick={() => void exportBundle()}
-					>
-						<Icon name="folder-export" />
-					</IconButton>
-					<IconButton
-						label="Import a .zip: a map and its models"
-						onClick={() => bundleInput.current?.click()}
-					>
-						<Icon name="folder-import" />
+					{/*
+					 * It opens a dialog rather than writing a file, which is why the
+					 * label ends in an ellipsis — the usual signal that a control asks
+					 * before it acts. What the dialog offers is in
+					 * src/lib/mapper/export.ts, and the argument for cumulating the
+					 * destinations under one button rather than growing this row — and
+					 * for taking the picture off the canvas bar — is at the top of
+					 * ExportDialog.
+					 */}
+					<IconButton label="Export this map…" onClick={() => setExporting(true)}>
+						<Icon name="export" />
 					</IconButton>
 					<IconButton
 						label="What this browser is holding"
@@ -1317,17 +1413,10 @@ export default function DddMapper({ promptsUrl }: Props) {
 				</span>
 
 				<input
-					ref={fileInput}
+					ref={importInput}
 					type="file"
-					accept={DDD_ACCEPT}
-					onChange={(event) => void onOpen(event.target.files?.[0])}
-					className="hidden"
-				/>
-				<input
-					ref={bundleInput}
-					type="file"
-					accept=".zip,application/zip"
-					onChange={(event) => void openBundle(event.target.files?.[0])}
+					accept={IMPORT_ACCEPT}
+					onChange={(event) => void onImport(event.target.files?.[0])}
 					className="hidden"
 				/>
 			</div>
@@ -1341,6 +1430,28 @@ export default function DddMapper({ promptsUrl }: Props) {
 					incoming={arriving.incoming}
 					onImport={takeBundle}
 					onClose={() => setArriving(null)}
+				/>
+			)}
+
+			{exporting && (
+				<ExportDialog
+					caveats={
+						unmodelled === 0
+							? {}
+							: {
+									bundle: `${unmodelled === 1 ? 'One context has' : `${unmodelled} contexts have`} no model in this browser yet, so nothing is written for ${unmodelled === 1 ? 'it' : 'them'}.`,
+								}
+					}
+					unavailable={
+						panes === 'source'
+							? {
+									svg: 'The map pane is not showing, so there is no canvas to copy.',
+									png: 'The map pane is not showing, so there is no canvas to copy.',
+								}
+							: {}
+					}
+					onExport={runExport}
+					onClose={() => setExporting(false)}
 				/>
 			)}
 
@@ -1446,7 +1557,6 @@ export default function DddMapper({ promptsUrl }: Props) {
 							onAdd={addNode}
 							adds={adds}
 							onConnect={connect}
-							onExportSvg={exportSvg}
 							onOpenNode={openModel}
 						/>
 						{document_.nodes.length === 0 && (

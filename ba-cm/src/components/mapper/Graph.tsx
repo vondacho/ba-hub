@@ -72,7 +72,6 @@ interface Props {
 	adds: readonly AddChoice[];
 	/** Draw an edge between two nodes. The parent decides what that means. */
 	onConnect: (fromId: string, toId: string) => void;
-	onExportSvg: (svg: string) => void;
 	/**
 	 * Open a node's own document — a double click on a context.
 	 *
@@ -127,7 +126,6 @@ export default function Graph({
 	onAdd,
 	adds,
 	onConnect,
-	onExportSvg,
 	onOpenNode,
 }: Props) {
 	const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
@@ -312,12 +310,70 @@ export default function Graph({
 		setTip(null);
 	}, [connecting, origin, placed]);
 
+	/*
+	 * The canvas as a file, asked for from outside.
+	 *
+	 * `exporting` is not a mode, it is one frame: while it is true every piece
+	 * of interaction chrome below renders as absent — the selection ring, the
+	 * hover state, the half-drawn connector, the moved-node marker. A picture
+	 * with somebody's cursor state baked into it is a picture they have to take
+	 * again.
+	 *
+	 * That suppression is a React render, so the clone has to wait for the paint
+	 * after it. Hence the two halves: `serialize` raises the flag and hands back
+	 * a promise; the layout effect below runs once the frame without the chrome
+	 * is on screen, clones it, and settles the promise.
+	 *
+	 * The resolver is a ref rather than state because settling it must not
+	 * itself cause a render — and because a second request arriving while one is
+	 * in flight should join it rather than start a second clone of the same
+	 * frame.
+	 */
+	const pending = useRef<{ resolve: (svg: string | null) => void } | null>(null);
+
+	const serialize = useCallback((): Promise<string | null> => {
+		if (pending.current !== null) {
+			// Already waiting for the clean frame. Chain rather than race: two
+			// clones of one picture is work nobody asked for.
+			const waiting = pending.current;
+			return new Promise((resolve) => {
+				const previous = waiting.resolve;
+				waiting.resolve = (svg) => {
+					previous(svg);
+					resolve(svg);
+				};
+			});
+		}
+		return new Promise((resolve) => {
+			pending.current = { resolve };
+			setExporting(true);
+		});
+	}, []);
+
 	useLayoutEffect(() => {
 		if (!exporting) return;
-		const svg = surface.current;
-		if (svg) onExportSvg(toSvgFile(svg, extent, backgroundOf(svg), document.title));
+		const waiting = pending.current;
+		pending.current = null;
 		setExporting(false);
-	}, [exporting, extent, document.title, onExportSvg]);
+		if (waiting === null) return;
+		const svg = surface.current;
+		waiting.resolve(svg === null ? null : toSvgFile(svg, extent, backgroundOf(svg), document.title));
+	}, [exporting, extent, document.title]);
+
+	/*
+	 * A canvas that goes away with a request outstanding answers it.
+	 *
+	 * Otherwise the export dialog waits for a promise nothing will ever settle,
+	 * and the Export button says "Exporting…" until the page is reloaded. Null
+	 * is the honest answer: there is no surface any more.
+	 */
+	useEffect(
+		() => () => {
+			pending.current?.resolve(null);
+			pending.current = null;
+		},
+		[],
+	);
 
 	const refitOnResize = useRef(false);
 	useEffect(() => {
@@ -386,7 +442,7 @@ export default function Graph({
 		});
 	};
 
-	useImperativeHandle(controls, () => ({ zoomBy }), [size.width, size.height]);
+	useImperativeHandle(controls, () => ({ zoomBy, serialize }), [size.width, size.height, serialize]);
 
 	// Whatever moved it — a button, the wheel, a fit — the readout is the same
 	// number, so it is reported from the value rather than from each gesture.
@@ -466,7 +522,6 @@ export default function Graph({
 					onPositions({});
 					onCurves({});
 				}}
-				onExportSvg={() => setExporting(true)}
 				moved={Object.keys(positions).length + Object.keys(curves).length}
 			/>
 

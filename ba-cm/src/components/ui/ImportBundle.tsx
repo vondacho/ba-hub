@@ -1,10 +1,16 @@
 /**
- * What an archive is about to write, said before it writes any of it.
+ * What an import is about to write, said before it writes any of it.
  *
  * `StoreState`'s manners, and its reason: the destructive gesture names what it
  * is about to take *first*. An import replaces documents whose only copy may be
  * in this browser, and a list somebody can read beats a confirmation dialog
  * they will learn to dismiss without reading.
+ *
+ * It was the archive's panel and is now every store-writing import's — a loose
+ * `.ddm` replaces a stored one exactly as an archive's entry would, and the
+ * rule does not care how the file arrived. Which is why the copy below says
+ * "this import" rather than "this archive": with one file in the list, an
+ * archive is what it is not.
  *
  * Replacements are marked rather than filtered, and counted in the button, so
  * "this will overwrite the map I have open" is answerable before pressing it
@@ -19,7 +25,7 @@ export default function ImportBundle({
 	onImport,
 	onClose,
 }: {
-	/** The archive's filename, so the panel says which one this is. */
+	/** The file's name, so the panel says which one this is. */
 	name: string;
 	incoming: Incoming;
 	onImport: () => void;
@@ -52,7 +58,7 @@ export default function ImportBundle({
 				<div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm">
 					{incoming.files.length === 0 ? (
 						<p className="text-ink-muted dark:text-slate-400">
-							Nothing in this archive is a <code>.ddd</code>, <code>.dddview</code>,{' '}
+							Nothing here is a <code>.ddd</code>, <code>.dddview</code>,{' '}
 							<code>.ddm</code> or <code>.ddmview</code>.
 						</p>
 					) : (
@@ -71,7 +77,7 @@ export default function ImportBundle({
 							{incoming.ignored.length > 0 && (
 								<p className="mt-3 text-xs text-ink-muted dark:text-slate-500">
 									{incoming.ignored.length} other{' '}
-									{incoming.ignored.length === 1 ? 'file' : 'files'} in the archive
+									{incoming.ignored.length === 1 ? 'file' : 'files'} alongside
 									{incoming.ignored.length === 1 ? ' is' : ' are'} not this tool's and will be
 									left alone.
 								</p>

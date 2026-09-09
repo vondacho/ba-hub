@@ -63,13 +63,7 @@ export interface Outgoing {
  * bug: invisible until it matters.
  */
 export function outgoing(title: string, source: string, contexts: readonly string[]): Outgoing {
-	const root = slug(title, 'map');
-	const keys = mapKeys(title);
-	const entries: ZipEntry[] = [{ path: `${root}/${keys.doc}`, text: source }];
-
-	const view = loadText(keys.view);
-	if (view !== null) entries.push({ path: `${root}/${keys.view}`, text: view });
-
+	const { root, entries } = mapEntries(title, source);
 	const missing: string[] = [];
 	// Deduplicated by stem: two contexts whose names slug to one filename are
 	// already one document in this store, and writing it twice would put two
@@ -94,6 +88,66 @@ export function outgoing(title: string, source: string, contexts: readonly strin
 	}
 
 	return { root, entries, missing };
+}
+
+/**
+ * The map's own two files, in the map's folder.
+ *
+ * Shared by the two outgoing shapes so that the *document* half of an archive
+ * is assembled once. The names come from `mapKeys`, which is also what the
+ * store keys off — that is the invariant an import depends on, and it is worth
+ * exactly one function.
+ */
+function mapEntries(title: string, source: string): { root: string; keys: DocumentKeys; entries: ZipEntry[] } {
+	const root = slug(title, 'map');
+	const keys = mapKeys(title);
+	const entries: ZipEntry[] = [{ path: `${root}/${keys.doc}`, text: source }];
+
+	const view = loadText(keys.view);
+	if (view !== null) entries.push({ path: `${root}/${keys.view}`, text: view });
+
+	return { root, keys, entries };
+}
+
+/**
+ * The map and its arrangement, as two loose files.
+ *
+ * The narrower of the two scopes: what you hand somebody who is reviewing the
+ * *map* rather than adopting the work. The models are what make an archive
+ * large and what make it somebody else's business.
+ *
+ * ## Loose, not an archive
+ *
+ * The `.ddd` is the file that goes in a pull request, and a `.ddd` inside a zip
+ * is a file somebody has to unpack before they can review it — which is the
+ * whole of what this scope is for. So both come out plain, under the names the
+ * store keeps them under.
+ *
+ * **The sidecar has no way back in.** Opening a `.ddd` deliberately clears the
+ * positions — a different map's boxes are not this map's boxes — and there is
+ * no input that takes a `.dddview` on its own; the full archive is the only
+ * road home for an arrangement. That is a real limit and the export dialog's
+ * row says it out loud rather than letting somebody find out by trying. It is
+ * also cheap to lift later: `incoming` already keys everything off the
+ * basename, so a file input that accepted the sidecar would need no new rules.
+ *
+ * Until then the loose `.dddview` is for reading, for version control, and for
+ * being carried back inside an archive somebody else builds — none of which
+ * are nothing, and all of which are worse served by a zip.
+ */
+export function mapAlone(title: string, source: string): readonly { name: string; text: string }[] {
+	const keys = mapKeys(title);
+	const files = [{ name: keys.doc, text: source }];
+
+	// Absent only if the store has never held one for this title, which the
+	// mapper's own autosave makes unlikely — `saveMapView` writes the pair
+	// whether or not anything has been dragged. Guarded anyway: a map opened
+	// from a file and exported before the first autosave is exactly the case
+	// that would otherwise write the string "null" into somebody's repository.
+	const view = loadText(keys.view);
+	if (view !== null) files.push({ name: keys.view, text: view });
+
+	return files;
 }
 
 // ---------------------------------------------------------------------------

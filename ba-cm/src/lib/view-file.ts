@@ -58,7 +58,7 @@ export function parseView(text: string, currentMap: string): ViewParse {
 	try {
 		raw = JSON.parse(text);
 	} catch {
-		return { ok: false, error: 'Not valid JSON — a .dddview file is JSON, not a .ddd map.' };
+		return { ok: false, error: 'Not valid JSON. A .dddview is JSON; this file is named like one and is not.' };
 	}
 
 	if (!raw || typeof raw !== 'object') {
@@ -69,7 +69,7 @@ export function parseView(text: string, currentMap: string): ViewParse {
 	if (record.format !== FORMAT) {
 		return {
 			ok: false,
-			error: 'Not a view file — it has no `"format": "ba-cm-view"`. A .ddd map goes in Open, not here.',
+			error: 'Not a view file — it has no `"format": "ba-cm-view"`. Something has renamed a different file to .dddview.',
 		};
 	}
 	if (typeof record.version !== 'number' || record.version > VERSION) {

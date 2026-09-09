@@ -48,12 +48,14 @@ export type IconName =
 	| 'inspector'
 	| 'agent'
 	| 'new'
-	| 'folder-export'
-	| 'folder-import'
 	| 'add-aggregate'
 	| 'add-entity'
 	| 'add-value'
-	| 'add-enum';
+	| 'add-enum'
+	| 'vector'
+	| 'notes'
+	| 'notation'
+	| 'doctrine';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A blank sheet with a plus: a document that does not exist yet.
@@ -68,18 +70,19 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	 * instead of a tray. A map and its models go out and come back together, and
 	 * the icon should say "more than one file" before the tooltip does.
 	 */
-	'folder-export': (
-		<>
-			<path d="M2 12.5v-9h4l1.5 2h6.5v7H2Z" />
-			<path d="M8 11V6.5m0 0L6.4 8.1M8 6.5l1.6 1.6" />
-		</>
-	),
-	'folder-import': (
-		<>
-			<path d="M2 12.5v-9h4l1.5 2h6.5v7H2Z" />
-			<path d="M8 6.5V11m0 0 1.6-1.6M8 11 6.4 9.4" />
-		</>
-	),
+	/*
+	 * The import/export pair, and they are drawn as a pair on purpose.
+	 *
+	 * One tray, one arrow, reversed. They are the two ends of one idea and they
+	 * sit next to each other on the toolbar, so the only thing a reader has to
+	 * tell apart is which way the arrow points.
+	 *
+	 * There were folder-shaped variants of both, from when each button meant one
+	 * archive specifically. Neither button means that any more — Import takes
+	 * whichever of this tool's files you hand it, and Export opens a dialog of
+	 * six destinations, only one of which is an archive — so a folder glyph
+	 * over-claimed on both, and both are gone.
+	 */
 	// A tray with an arrow coming *in* — the file comes to you.
 	open: <path d="M2.5 10.5v2A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5v-2M8 2v7m0 0 2.5-2.5M8 9 5.5 6.5" />,
 	// The same tray, arrow going *out*.
@@ -239,6 +242,38 @@ const PATHS: Record<IconName, React.ReactNode> = {
 		</>
 	),
 	remove: <path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.2a1 1 0 0 0 1 .8h2.8a1 1 0 0 0 1-.8l.6-8.2" />,
+	/*
+	 * The four the export dialog adds, drawn as what the file *is* rather than
+	 * as what the format is called — "SVG" and "PNG" are the two strings a glyph
+	 * conveys worst.
+	 *
+	 * A curve between two anchor handles for the vector, beside `picture`'s
+	 * framed photograph for the raster: the pair has to be told apart at
+	 * fourteen pixels, and a second framed rectangle would not be.
+	 *
+	 * A pair of braces for the notation — the one shape that says "this is a
+	 * syntax" without a word of English in it — and an open book for the
+	 * doctrine. Those two sit apart from the rest because what they carry is not
+	 * this map; the dialog groups them under their own heading for the same
+	 * reason.
+	 */
+	vector: (
+		<>
+			<path d="M3 13c0-5.5 3.5-9 9-9" />
+			<rect x="1.5" y="12" width="3" height="3" rx="0.5" />
+			<rect x="11.5" y="2.5" width="3" height="3" rx="0.5" />
+		</>
+	),
+	notes: <path d="M2.5 4h1.5M2.5 8h1.5M2.5 12h1.5M6.5 4h7M6.5 8h7M6.5 12h4.5" />,
+	notation: (
+		<path d="M6 2.5H5a1.5 1.5 0 0 0-1.5 1.5v2A1.5 1.5 0 0 1 2 7.5a1.5 1.5 0 0 1 1.5 1.5v2A1.5 1.5 0 0 0 5 12.5h1M10 2.5h1A1.5 1.5 0 0 1 12.5 4v2A1.5 1.5 0 0 0 14 7.5 1.5 1.5 0 0 0 12.5 9v2a1.5 1.5 0 0 1-1.5 1.5h-1" />
+	),
+	doctrine: (
+		<>
+			<path d="M8 4.5C7 3.5 5.3 3.2 2.5 3.2v9c2.8 0 4.5.3 5.5 1.3 1-1 2.7-1.3 5.5-1.3v-9c-2.8 0-4.5.3-5.5 1.3Z" />
+			<path d="M8 4.5v9.5" />
+		</>
+	),
 	// Half-filled: following whatever the page is doing.
 	'theme-auto': (
 		<>

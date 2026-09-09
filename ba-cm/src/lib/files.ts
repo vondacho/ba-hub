@@ -5,6 +5,27 @@
 export const DDD_EXTENSION = '.ddd';
 export const DDD_ACCEPT = '.ddd,text/plain';
 
+/**
+ * What the mapper's Import takes: every file this tool writes, and the archive
+ * that holds several of them.
+ *
+ * One list because there is one input. There used to be two — a `.ddd` picker
+ * and a `.zip` picker — and the split asked the visitor a question they should
+ * never have been asked: *which kind of file is this?* They are holding the
+ * file. They know what it is called. The extension is the answer, and the code
+ * can read it as easily as they can.
+ *
+ * `text/plain` and `application/zip` ride along because some platforms filter
+ * by MIME type rather than by suffix, and a picker that greys out the file
+ * somebody is looking at is worse than one that offers too much.
+ *
+ * The list is deliberately not `*`: it is the set this tool can do something
+ * with, and offering more would be inviting the "that is none of those" note
+ * rather than preventing it.
+ */
+export const IMPORT_ACCEPT =
+	'.ddd,.dddview,.ddm,.ddmview,.zip,text/plain,application/json,application/zip';
+
 
 export async function readTextFile(file: File): Promise<string> {
 	return file.text();

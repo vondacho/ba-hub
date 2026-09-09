@@ -241,7 +241,22 @@ export default function Diagram({
 		});
 	};
 
-	useImperativeHandle(controls, () => ({ zoomBy }), [size.width, size.height]);
+	/*
+	 * `serialize` answers "no picture" rather than being left off the handle.
+	 *
+	 * The model page has no export that wants one yet — the mapper's dialog is
+	 * the only caller, and it is on the other page. Making the method optional
+	 * on `CanvasControls` would be the other way to satisfy the type, and it is
+	 * worse: it would let a canvas that *should* produce a picture silently omit
+	 * it, and the caller would read the absence as "not showing" rather than as
+	 * "nobody implemented this". A required method with an explicit null is a
+	 * canvas saying so out loud.
+	 */
+	useImperativeHandle(
+		controls,
+		() => ({ zoomBy, serialize: async () => null }),
+		[size.width, size.height],
+	);
 
 	// In the same display units the readout shows — the diagram's own natural
 	// size is ZOOM_UNIT, and nobody outside this file should have to know that.
