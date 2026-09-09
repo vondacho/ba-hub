@@ -5,12 +5,13 @@
  * in README.md: React Flow and its neighbours own node positions as their own
  * state, which is exactly the second source of truth this component refuses.
  *
- * Nodes can be moved, and a move is a **view** operation. It changes
- * `positions`, which the parent keeps in `localStorage` next to the theme and
- * the split; it never touches the `.ddd` source. Nudging a box for readability
- * and changing what the map says are different acts, and only one of them
- * belongs in a pull request — which is also why the widget bar has a Reset that
- * puts everything back where ELK had it.
+ * Nodes can be moved — one at a time, or several at once by shift-clicking
+ * them first and then dragging any one of them — and a move is a **view**
+ * operation. It changes `positions`, which the parent keeps in `localStorage`
+ * next to the theme and the split; it never touches the `.ddd` source. Nudging
+ * a box for readability and changing what the map says are different acts, and
+ * only one of them belongs in a pull request — which is also why the widget
+ * bar has a Reset that puts everything back where ELK had it.
  *
  * Edges are re-routed from current positions on every frame of a drag, which is
  * why `routeEdges` is a pure function of geometry rather than something ELK
@@ -37,6 +38,7 @@ import {
 	type PlacedNode,
 	type Positions,
 } from '../../lib/graph/layout';
+import { alignBoxes, spreadBoxes, type AlignTo, type SpreadAxis } from '../../lib/graph/align';
 import { classificationLabel, statusNote, styleFor } from '../../lib/graph/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
 import CanvasBar, { type AddChoice } from './CanvasBar';
@@ -50,7 +52,23 @@ interface Props {
 	/** True while the text does not parse, so the render is of an older document. */
 	stale: boolean;
 	selected: string | null;
-	onSelect: (id: string | null) => void;
+	/**
+	 * The rest of the selection: the boxes picked with shift held, most recently
+	 * picked first, and never the one in `selected`.
+	 *
+	 * Two fields rather than one list, because the two are asked different
+	 * questions. `selected` is the *subject* — what the inspector describes and
+	 * what an Add button adds into — and there can only be one of those. The
+	 * selection is what a gesture on the canvas acts on, and a drag on one box of
+	 * six has to move six. Collapsing them would either hand the inspector a list
+	 * it has nothing to say about, or leave the drag without the group it needs.
+	 */
+	also: readonly string[];
+	/**
+	 * `extend` is shift held: the box joins the selection instead of replacing
+	 * it, and joining is a toggle — the same click takes it back out again.
+	 */
+	onSelect: (id: string | null, extend?: boolean) => void;
 	positions: Positions;
 	onPositions: (next: Positions) => void;
 	curves: Curves;
@@ -115,6 +133,7 @@ export default function Graph({
 	layout,
 	stale,
 	selected,
+	also,
 	onSelect,
 	positions,
 	onPositions,
@@ -165,10 +184,24 @@ export default function Graph({
 		pointerId: number;
 		live: boolean;
 	} | null>(null);
+	/*
+	 * A move in progress — and it is a move of *the selection*, not of the box
+	 * under the pointer: grab any member of a group and the whole group travels.
+	 *
+	 * `from` freezes where every moving box sat when the press landed, and each
+	 * frame writes `from + the total delta` rather than adding a per-frame step.
+	 * Adding steps is the version that drifts: `positions` is rewritten on every
+	 * frame, so a step measured against the previous frame compounds every
+	 * rounding error over the length of the drag, and six boxes moved that way do
+	 * not stay in formation. It also survives the pointer leaving and re-entering
+	 * the surface, which a running total does not.
+	 */
 	const dragging = useRef<{
 		id: string;
-		offsetX: number;
-		offsetY: number;
+		from: ReadonlyMap<string, { x: number; y: number }>;
+		/** Where the pointer was, in graph coordinates, when the press landed. */
+		graphX: number;
+		graphY: number;
 		startX: number;
 		startY: number;
 		pointerId: number;
@@ -202,24 +235,51 @@ export default function Graph({
 		live: boolean;
 	} | null>(null);
 
-	/*
-	 * Nudging reads `layout.nodes` rather than `placed`, which is the same
-	 * distinction `useNudge` documents: an override is written in the layout's
-	 * coordinates, and `placed` is what those coordinates come out as.
-	 */
-	useNudge({
-		selected,
-		positions,
-		onPositions,
-		originOf: (id) => layout?.nodes.find((node) => node.id === id) ?? null,
-	});
-
 	const placed = useMemo(
 		() => (layout ? applyPositions(layout.nodes, positions) : []),
 		[layout, positions],
 	);
 	const edges = useMemo(() => routeEdges(document, placed, curves), [document, placed, curves]);
 	const extent = useMemo(() => extentOf(placed), [placed]);
+
+	/**
+	 * Everything picked right now, subject included, for the only two questions
+	 * the canvas asks of it: does this box wear a ring, and does this box come
+	 * along when one of its neighbours is dragged.
+	 */
+	const picked = useMemo(
+		() => new Set(selected === null ? also : [selected, ...also]),
+		[selected, also],
+	);
+
+	/**
+	 * The picked boxes, in the order they are drawn.
+	 *
+	 * Not the same list as `picked`, which can hold the id of a selected *edge*
+	 * — an edge is a fine thing to have selected and not a thing a group gesture
+	 * can move or line up. Going through `placed` drops it without anyone
+	 * needing to ask what kind of id they are holding.
+	 */
+	const group = useMemo(() => placed.filter((node) => picked.has(node.id)), [placed, picked]);
+
+	/*
+	 * The arrow keys move the same set the drag does — see `useNudge`, which
+	 * carries why they must not disagree. It is called from down here, below
+	 * `group`, rather than up with the other state: the list it needs is the one
+	 * the pointer gestures use, and computing a second one from `selected` and
+	 * `also` would be two answers to the same question.
+	 *
+	 * Nudging reads `layout.nodes` rather than `placed`, which is the same
+	 * distinction `useNudge` documents: an override is written in the layout's
+	 * coordinates, and `placed` is what those coordinates come out as.
+	 */
+	const nudged = useMemo(() => group.map((node) => node.id), [group]);
+	useNudge({
+		ids: nudged,
+		positions,
+		onPositions,
+		originOf: (id) => layout?.nodes.find((node) => node.id === id) ?? null,
+	});
 
 	/*
 	 * The containment edges written as a `serves` line, as opposed to the ones
@@ -495,6 +555,20 @@ export default function Graph({
 		if (from !== id) onConnect(from, id);
 	};
 
+	/**
+	 * A click on a box, with `extend` set when shift was held.
+	 *
+	 * Shift extends. A plain click on the only picked box lets go of it — around
+	 * here clicking a thing twice has always meant that — but a plain click on
+	 * one of several narrows to that one instead: clearing the lot is what the
+	 * background is for, and losing five picks to a slightly misplaced click is
+	 * not a gesture anybody asked for.
+	 */
+	const selectNode = (id: string, extend: boolean) => {
+		if (extend) onSelect(id, true);
+		else onSelect(selected === id && also.length === 0 ? null : id);
+	};
+
 	const originNode = origin === null ? null : placed.find((node) => node.id === origin) ?? null;
 
 	return (
@@ -518,6 +592,9 @@ export default function Graph({
 				connecting={connecting}
 				onConnecting={setConnecting}
 				onFit={fit}
+				onAlign={(to: AlignTo) => onPositions(alignBoxes(placed, picked, to, positions))}
+				onSpread={(axis: SpreadAxis) => onPositions(spreadBoxes(placed, picked, axis, positions))}
+				picked={group.length}
 				onReset={() => {
 					onPositions({});
 					onCurves({});
@@ -594,10 +671,13 @@ export default function Graph({
 							surface.current?.setPointerCapture(drag.pointerId);
 						}
 						const point = toGraph(event.clientX, event.clientY);
-						onPositions({
-							...positions,
-							[drag.id]: { x: point.x - drag.offsetX, y: point.y - drag.offsetY },
-						});
+						const dx = point.x - drag.graphX;
+						const dy = point.y - drag.graphY;
+						const next: Record<string, { x: number; y: number }> = { ...positions };
+						for (const [id, start] of drag.from) {
+							next[id] = { x: start.x + dx, y: start.y + dy };
+						}
+						onPositions(next);
 						return;
 					}
 					const start = pan.current;
@@ -856,21 +936,32 @@ export default function Graph({
 						<NodeBox
 							key={node.id}
 							placed={node}
-							selected={!exporting && selected === node.id}
+							selected={!exporting && picked.has(node.id)}
 							pending={!exporting && origin === node.id}
 							connecting={connecting}
 							moved={!exporting && positions[node.id] !== undefined}
 							classificationOf={classificationOf}
-							onSelect={onSelect}
+							onSelect={selectNode}
 							onConnect={connectTo}
 							onOpen={onOpenNode}
 							didDrag={() => draggedLast.current}
 							onGrab={(event) => {
 								const point = toGraph(event.clientX, event.clientY);
+								/*
+								 * A box outside the selection travels alone, and the
+								 * selection is left exactly where it was. The alternative
+								 * — a press that quietly re-selects — would move a group
+								 * somebody had just spent six clicks assembling, on the
+								 * one gesture that gives no chance to say otherwise.
+								 */
+								const movers = picked.has(node.id) ? group : [node];
 								dragging.current = {
 									id: node.id,
-									offsetX: point.x - node.x,
-									offsetY: point.y - node.y,
+									from: new Map(
+										movers.map((other) => [other.id, { x: other.x, y: other.y }]),
+									),
+									graphX: point.x,
+									graphY: point.y,
 									startX: event.clientX,
 									startY: event.clientY,
 									pointerId: event.pointerId,
@@ -925,7 +1016,7 @@ export default function Graph({
 					? origin === null
 						? 'click the box the edge starts from · esc to put the tool down'
 						: 'click the box it ends at · click anywhere else to lose it · esc to cancel'
-					: 'drag a box to move it, or nudge it with the arrow keys · click an edge then drag its handle to bend it · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
+					: 'drag a box to move it, or nudge it with the arrow keys · shift-click to pick several, then drag them as one or line them up from the bar · click an edge then drag its handle to bend it · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
 			</p>
 		</div>
 	);
@@ -951,7 +1042,7 @@ function NodeBox({
 	connecting: boolean;
 	moved: boolean;
 	classificationOf: (id: string) => Classification | null;
-	onSelect: (id: string | null) => void;
+	onSelect: (id: string, extend: boolean) => void;
 	onConnect: (id: string) => void;
 	onOpen: (id: string) => void;
 	onGrab: (event: React.PointerEvent) => void;
@@ -984,7 +1075,7 @@ function NodeBox({
 				// A drag that ends over the box must not also select it — otherwise
 				// every move opens the inspector.
 				if (didDrag()) return;
-				onSelect(selected ? null : node.id);
+				onSelect(node.id, event.shiftKey);
 			}}
 			onDoubleClick={(event) => {
 				event.stopPropagation();

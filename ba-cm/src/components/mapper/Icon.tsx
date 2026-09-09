@@ -40,6 +40,14 @@ export type IconName =
 	| 'add-subdomain'
 	| 'add-context'
 	| 'connect'
+	| 'align-left'
+	| 'align-centre'
+	| 'align-right'
+	| 'align-top'
+	| 'align-middle'
+	| 'align-bottom'
+	| 'spread-across'
+	| 'spread-down'
 	| 'remove'
 	| 'picture'
 	| 'store'
@@ -265,6 +273,79 @@ const PATHS: Record<IconName, React.ReactNode> = {
 		</>
 	),
 	notes: <path d="M2.5 4h1.5M2.5 8h1.5M2.5 12h1.5M6.5 4h7M6.5 8h7M6.5 12h4.5" />,
+	/*
+	 * The six aligns, and they are one drawing with two variables: where the
+	 * line is, and which part of the boxes touches it. Two boxes of *different*
+	 * sizes hang off it in every one of them, because "these end up on one line"
+	 * is the whole instruction and equal boxes would read as "these end up the
+	 * same size" — which is the neighbouring idea nobody wants by accident.
+	 *
+	 * The line runs the full 16 in each, past the boxes at both ends, so the
+	 * glyph says "line" rather than "edge of a shape" at the size it is used.
+	 */
+	'align-left': (
+		<>
+			<path d="M2.5 1.5v13" />
+			<rect x="2.5" y="3" width="9" height="4" rx="1" />
+			<rect x="2.5" y="9.5" width="6" height="4" rx="1" />
+		</>
+	),
+	'align-centre': (
+		<>
+			<path d="M8 1.5v13" />
+			<rect x="3.5" y="3" width="9" height="4" rx="1" />
+			<rect x="5" y="9.5" width="6" height="4" rx="1" />
+		</>
+	),
+	'align-right': (
+		<>
+			<path d="M13.5 1.5v13" />
+			<rect x="4.5" y="3" width="9" height="4" rx="1" />
+			<rect x="7.5" y="9.5" width="6" height="4" rx="1" />
+		</>
+	),
+	'align-top': (
+		<>
+			<path d="M1.5 2.5h13" />
+			<rect x="3" y="2.5" width="4" height="9" rx="1" />
+			<rect x="9.5" y="2.5" width="4" height="6" rx="1" />
+		</>
+	),
+	'align-middle': (
+		<>
+			<path d="M1.5 8h13" />
+			<rect x="3" y="3.5" width="4" height="9" rx="1" />
+			<rect x="9.5" y="5" width="4" height="6" rx="1" />
+		</>
+	),
+	'align-bottom': (
+		<>
+			<path d="M1.5 13.5h13" />
+			<rect x="3" y="4.5" width="4" height="9" rx="1" />
+			<rect x="9.5" y="7.5" width="4" height="6" rx="1" />
+		</>
+	),
+	/*
+	 * The two spreads. Three bars rather than two, because two of anything are
+	 * always evenly spaced and the glyph has to show the gap being *repeated*.
+	 * Equal bars here on purpose, the opposite of the aligns above: what is
+	 * equal in the result is the space, and drawing three different sizes would
+	 * put the eye on the boxes instead of on the gaps between them.
+	 */
+	'spread-across': (
+		<>
+			<rect x="1.5" y="3" width="3" height="10" rx="1" />
+			<rect x="6.5" y="3" width="3" height="10" rx="1" />
+			<rect x="11.5" y="3" width="3" height="10" rx="1" />
+		</>
+	),
+	'spread-down': (
+		<>
+			<rect x="3" y="1.5" width="10" height="3" rx="1" />
+			<rect x="3" y="6.5" width="10" height="3" rx="1" />
+			<rect x="3" y="11.5" width="10" height="3" rx="1" />
+		</>
+	),
 	notation: (
 		<path d="M6 2.5H5a1.5 1.5 0 0 0-1.5 1.5v2A1.5 1.5 0 0 1 2 7.5a1.5 1.5 0 0 1 1.5 1.5v2A1.5 1.5 0 0 0 5 12.5h1M10 2.5h1A1.5 1.5 0 0 1 12.5 4v2A1.5 1.5 0 0 0 14 7.5 1.5 1.5 0 0 0 12.5 9v2a1.5 1.5 0 0 1-1.5 1.5h-1" />
 	),

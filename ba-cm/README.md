@@ -257,6 +257,74 @@ Both the boxes and the edges can be moved, and both moves are
 routing is a pure function of box geometry rather than something ELK produces —
 ELK runs once per document and a drag never goes near it.
 
+**Several nodes** move together. Shift-click picks boxes into a group — the
+same click takes one back out — and dragging any member moves all of them by
+the same offset. So do the arrow keys, which move whatever is picked and are
+the only way to move anything at all without a mouse; each press adds the same
+step to each box, so a group keeps its formation exactly. That is the gesture the arrangement actually needs: a
+subdomain and the four contexts under it are read as one thing and belong
+somewhere as one thing, and moving them one at a time means re-establishing
+their spacing by eye four times.
+
+Every frame writes each box's *starting* position plus the total delta, rather
+than adding a step to where it was last frame. Accumulating steps is how a
+group loses formation: overrides are rewritten on every frame, so each step
+measured against the previous one compounds its rounding for the length of the
+drag.
+
+The subject and the group are two different things, and the code keeps them
+apart. The subject is what the inspector describes and what an Add button adds
+into, so there is exactly one of it — the box picked most recently. The group is
+what a drag moves. A plain click on the only picked box lets go of it, as it
+always has; a plain click on one of several narrows to that one, because
+clearing the lot is what the background is for and five picks should not be lost
+to a click that landed slightly off.
+
+**Aligning and spreading** are the two arrangements the hand is bad at, so
+they are buttons rather than gestures. Pick two or more boxes and a cluster
+appears at the end of the canvas bar: six aligns — left, centre, right, top,
+middle, bottom — and two spreads, across and down.
+
+Three contexts that are *nearly* on a line read as a mistake rather than as a
+group, and getting them onto one by eye means making the same four-pixel
+correction three times, at every zoom level: at 60% the error is invisible and
+at 140% it is all you can see. Even spacing is worse, because it is arithmetic
+over the whole row at once and moving any one box invalidates the answer.
+
+**Where an align puts the line** depends on which kind it is. An edge align
+borrows an edge that already exists — the leftmost left edge, the lowest bottom
+— so at least one box does not move and you can see the line the others came
+to. That is what edge aligns are *for*: `left` is a promise about a line you can
+already point at.
+
+A centre align has no such edge to borrow, so its line goes halfway between the
+two outermost centres. The group stays where it was and the two boxes defining
+the spread travel equally. Aligning to a chosen box would be the other rule, and
+it needs you to be able to *see* which box that is — every picked box wears the
+same ring, and a rule that depends on a distinction the picture does not draw is
+one people learn by being surprised. The mean of all the centres is the same
+thing for two boxes and worse for six: a cluster of five drags the line towards
+itself, so the outlier moves furthest.
+
+**A spread evens out the gaps, not the centres.** For boxes of one size those
+are the same arrangement; here they are not, and equal centre spacing between a
+wide domain and a narrow context leaves gaps of visibly different sizes — which
+is what the eye actually reads. The two outermost boxes stay put, so the gesture
+is "tidy up what is between these" and you can ask for it without first working
+out where the group will end up. Order comes from where the boxes are now rather
+than from the text: it tidies the arrangement in front of you.
+
+Both leave the other axis alone, and they are two buttons rather than a single
+"tidy this up" because they are two decisions — the row of contexts that wants
+even gaps usually does not want its `y` touched at all.
+
+The cluster is the one group on that bar that comes and goes, which breaks the
+bar's own rule that a control stays put and greys out with its reason on the
+tooltip. Eight dead buttons sitting permanently on top of the picture, for a
+gesture that cannot mean anything until a group exists, is the worse of the two
+answers; the Add buttons keep the old treatment because they are the only way to
+make a node and have to be visible before anything is selected.
+
 **An edge** is bent by selecting it and dragging the handle at its midpoint.
 The handle appears on the selected edge only, not on hover: a handle that
 materialises under the pointer on a canvas with eleven overlapping arcs is a

@@ -1,3 +1,4 @@
+import type { AlignTo, SpreadAxis } from '../../lib/graph/align';
 import Icon, { type IconName } from './Icon';
 
 /**
@@ -39,13 +40,37 @@ export interface AddChoice {
  * `ViewControls`, which carries the argument. What is left is what genuinely
  * belongs to the picture: what you draw on it, and how it is arranged.
  *
- * Three controls are worth explaining.
+ * The controls that are not self-evident:
  *
  * **Connect** is a mode rather than a drag, and that is deliberate. A drag
  * from a box already means "move the box", and overloading it would make every
  * nudge a possible accidental relationship. In connect mode you click the
  * origin, the candidate follows the pointer, and you click the target — or
  * click nothing, and lose it.
+ *
+ * **Align and spread** are the arrangement cluster, and they are the one group
+ * here that comes and goes. Eight controls appear when two or more boxes are
+ * picked and are gone the rest of the time.
+ *
+ * That breaks this bar's own rule — everything else stays put and greys out,
+ * with the reason on the tooltip, because a button you cannot see is a feature
+ * you do not know exists. The Add buttons have to keep that treatment: they are
+ * the only way to make a node, so they have to be visible before anything is
+ * selected. The arrangement cluster is the opposite case. It is *eight* dead
+ * controls sitting on top of the picture, permanently, for a gesture that
+ * cannot mean anything until a group exists — and this bar takes space away
+ * from the map it sits on. So it arrives with the thing it acts on, and the
+ * canvas hint line carries the shift-click that summons it.
+ *
+ * It goes at the end, after everything else, so that appearing never moves a
+ * button somebody was reaching for.
+ *
+ * Within the cluster: six aligns, then the two spreads. The aligns are ordered
+ * left-centre-right, top-middle-bottom, which is the order they are drawn in
+ * and the order every other tool lists them in. Spread is last because it is
+ * the one that is not an align — it moves what is *between* the extremes rather
+ * than putting anything on a line — and it needs three boxes rather than two,
+ * so it is also the pair most often greyed out.
  *
  * **Reset layout** drops every position and curve the visitor has nudged and
  * goes back to what was computed. That button is why moving things is safe:
@@ -81,6 +106,21 @@ interface Props {
 	connecting?: boolean;
 	onConnecting?: (on: boolean) => void;
 	onFit: () => void;
+	/**
+	 * Line the picked boxes up on one line. Optional, like the drawing tools:
+	 * the model editor has no group selection to arrange yet.
+	 */
+	onAlign?: (to: AlignTo) => void;
+	/** Even out the gaps between them. Present whenever `onAlign` is. */
+	onSpread?: (axis: SpreadAxis) => void;
+	/**
+	 * How many boxes are picked.
+	 *
+	 * Fewer than two and there is nothing to line up, so the cluster is not
+	 * there at all; fewer than three and there is nothing between anything, so
+	 * the spreads are greyed.
+	 */
+	picked?: number;
 	onReset: () => void;
 	/**
 	 * Write the picture, or absent when this canvas's editor offers it elsewhere.
@@ -100,18 +140,48 @@ interface Props {
 	moved: number;
 }
 
+/**
+ * The six aligns, in the order they are drawn: the three that make a column,
+ * then the three that make a row.
+ *
+ * A table rather than twelve lines of JSX, so that the only difference between
+ * two of these buttons is the two words that differ.
+ */
+const ALIGNS: readonly { to: AlignTo; icon: IconName; label: string }[] = [
+	{ to: 'left', icon: 'align-left', label: 'left edges' },
+	{ to: 'centre', icon: 'align-centre', label: 'centres, on one vertical line' },
+	{ to: 'right', icon: 'align-right', label: 'right edges' },
+	{ to: 'top', icon: 'align-top', label: 'top edges' },
+	{ to: 'middle', icon: 'align-middle', label: 'middles, on one horizontal line' },
+	{ to: 'bottom', icon: 'align-bottom', label: 'bottom edges' },
+];
+
+const SPREADS: readonly { axis: SpreadAxis; icon: IconName; label: string }[] = [
+	{ axis: 'across', icon: 'spread-across', label: 'across' },
+	{ axis: 'down', icon: 'spread-down', label: 'down' },
+];
+
 export default function CanvasBar({
 	onAdd,
 	adds,
 	connecting,
 	onConnecting,
 	onFit,
+	onAlign,
+	onSpread,
+	picked = 0,
 	onReset,
 	onExportSvg,
 	moved,
 }: Props) {
 	return (
-		<div className="absolute top-3 left-3 z-10 flex items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900/95">
+		/*
+		 * Wraps rather than overflowing. The cluster above can take this bar past
+		 * the width of a narrow graph pane — a 42% split, or a window somebody has
+		 * dragged in — and a toolbar that runs off the edge of the panel takes its
+		 * last buttons with it.
+		 */
+		<div className="absolute top-3 left-3 z-10 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-1 rounded-lg border border-slate-300 bg-white/95 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900/95">
 			{onAdd &&
 				adds?.map((add) => (
 					<Button
@@ -167,6 +237,35 @@ export default function CanvasBar({
 				<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
 					<Icon name="picture" className="h-4 w-4" />
 				</Button>
+			)}
+
+			{onAlign && onSpread && picked >= 2 && (
+				<>
+					<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+					{ALIGNS.map((align) => (
+						<Button
+							key={align.to}
+							label={`Line the ${picked} picked boxes up by their ${align.label}`}
+							onClick={() => onAlign(align.to)}
+						>
+							<Icon name={align.icon} className="h-4 w-4" />
+						</Button>
+					))}
+					{SPREADS.map((spread) => (
+						<Button
+							key={spread.axis}
+							label={
+								picked < 3
+									? `Space boxes evenly ${spread.label} (pick three or more)`
+									: `Space the ${picked} picked boxes evenly ${spread.label}`
+							}
+							onClick={() => onSpread(spread.axis)}
+							disabled={picked < 3}
+						>
+							<Icon name={spread.icon} className="h-4 w-4" />
+						</Button>
+					))}
+				</>
 			)}
 		</div>
 	);

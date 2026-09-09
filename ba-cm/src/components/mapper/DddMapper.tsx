@@ -172,6 +172,15 @@ const EMPTY: DddDocument = {
 	source: '',
 };
 
+/**
+ * Nobody else picked.
+ *
+ * One shared array rather than a fresh `[]`, so clearing a selection that is
+ * already clear is the same value and React declines to render — which matters
+ * because every path that selects something clears this on the way past.
+ */
+const NOBODY: readonly string[] = [];
+
 interface Arrival {
 	readonly name: string;
 	readonly source: string;
@@ -250,7 +259,61 @@ export default function DddMapper({ promptsUrl }: Props) {
 	const [problems, setProblems] = useState<readonly Problem[]>([]);
 	const [stale, setStale] = useState(false);
 	const [layout, setLayout] = useState<Layout | null>(null);
-	const [selected, setSelected] = useState<string | null>(null);
+	const [selected, setLead] = useState<string | null>(null);
+	/**
+	 * The rest of the selection — `Graph`'s prop of the same name says why the
+	 * subject is held apart from it.
+	 *
+	 * Node ids only. Shift-clicking is a canvas gesture on boxes, and everything
+	 * that reads an edge selection reads exactly one edge.
+	 */
+	const [also, setAlso] = useState<readonly string[]>(NOBODY);
+	/**
+	 * Select one thing and nothing else.
+	 *
+	 * Every path but a shift-click on the canvas means this — adding a node,
+	 * revealing one from the text, opening another map — so dropping the rest of
+	 * the group lives here rather than at each of the dozen call sites, where the
+	 * one that got forgotten would leave a stale group for the next drag to move.
+	 */
+	const setSelected = useCallback((id: string | null) => {
+		setLead(id);
+		setAlso(NOBODY);
+	}, []);
+	/**
+	 * A click on the canvas, with `extend` set when shift was held.
+	 *
+	 * The subject is always the box picked most recently, so the inspector
+	 * follows the hand: shift-click a sixth context and it describes the sixth.
+	 * Take the subject back out and the one picked before it takes over, which is
+	 * the whole reason `also` is kept most-recent-first.
+	 */
+	const pick = useCallback(
+		(id: string | null, extend = false) => {
+			if (id === null || !extend) {
+				setSelected(id);
+				return;
+			}
+			if (id === selected) {
+				const [next, ...rest] = also;
+				setLead(next ?? null);
+				setAlso(rest);
+				return;
+			}
+			if (also.includes(id)) {
+				setAlso(also.filter((other) => other !== id));
+				return;
+			}
+			// An edge cannot join the group — a group is a thing a drag moves, and
+			// an edge moves by having its own handle pulled. So a selected edge is
+			// dropped by the shift-click rather than demoted into `also`, which is
+			// what keeps that list node ids all the way down.
+			const box = selected !== null && document_.nodes.some((node) => node.id === selected);
+			setAlso(box ? [selected, ...also] : also);
+			setLead(id);
+		},
+		[selected, also, setSelected, document_],
+	);
 	const [revealLine, setRevealLine] = useState<number | null>(null);
 	const [collapsed, setCollapsed] = useState(false);
 	const [split, setSplit] = useState(42);
@@ -486,11 +549,17 @@ export default function DddMapper({ promptsUrl }: Props) {
 	// A selection that no longer exists — the node was renamed or deleted in the
 	// text — must not leave the inspector describing something that is gone.
 	useEffect(() => {
-		if (!selected) return;
-		const exists =
-			document_.nodes.some((node) => node.id === selected) ||
-			document_.edges.some((edge) => edge.id === selected);
-		if (!exists) setSelected(null);
+		const ids = new Set<string>();
+		for (const node of document_.nodes) ids.add(node.id);
+		for (const edge of document_.edges) ids.add(edge.id);
+		if (selected !== null && !ids.has(selected)) setLead(null);
+		// The group is pruned rather than dropped. One context renamed out from
+		// under a selection of six is not a reason to make somebody pick the other
+		// five again — and returning the same array when nothing went missing is
+		// what keeps this off the render path of every keystroke.
+		setAlso((current) =>
+			current.every((id) => ids.has(id)) ? current : current.filter((id) => ids.has(id)),
+		);
 	}, [document_, selected]);
 
 	/**
@@ -1546,7 +1615,8 @@ export default function DddMapper({ promptsUrl }: Props) {
 							layout={layout}
 							stale={stale}
 							selected={selected}
-							onSelect={setSelected}
+							also={also}
+							onSelect={pick}
 							positions={positions}
 							onPositions={setPositions}
 							curves={curves}

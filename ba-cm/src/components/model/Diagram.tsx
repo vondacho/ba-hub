@@ -137,7 +137,8 @@ export default function Diagram({
 	 * where its override says it is. See `useNudge`.
 	 */
 	useNudge({
-		selected,
+		// One at a time here: this canvas has no group selection to move.
+		ids: selected === null ? [] : [selected],
 		positions,
 		onPositions,
 		originOf: (id) => placement?.boxes.find((box) => box.id === id) ?? null,

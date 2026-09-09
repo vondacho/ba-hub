@@ -1,6 +1,18 @@
 /**
  * Moving the selection with the arrow keys.
  *
+ * Whatever is picked moves, and moves *together* — one box on the model canvas,
+ * a group of six on a context map. That is not a separate feature from the
+ * bulk drag, it is the same rule stated with a keyboard: what a gesture acts on
+ * is the selection, and a selection of six that came apart under the arrow keys
+ * would mean the arrangement somebody assembled depended on which hand they
+ * used.
+ *
+ * The group survives the keys exactly, without any of the care the drag needs.
+ * Each press adds the same step to each box's own current position, so the
+ * offsets between them are preserved by construction; there is no pointer to
+ * measure against and so nothing to accumulate error from.
+ *
  * Shared by both canvases, for `IconButton`'s reason: a gesture that means the
  * same thing in two places should be the same code in two places, or it stops
  * meaning the same thing on the first change to either.
@@ -46,13 +58,21 @@ const DELTAS: Readonly<Record<string, Point>> = {
 };
 
 export function useNudge({
-	selected,
+	ids,
 	positions,
 	onPositions,
 	/** Where an override for `id` starts from: its place in the raw layout. */
 	originOf,
 }: {
-	selected: string | null;
+	/**
+	 * Everything picked. A canvas with no group selection passes one id, or none.
+	 *
+	 * Ids rather than boxes, because this hook has never needed to know what a
+	 * box is: `originOf` answers the only question it has. Anything in here that
+	 * is not a box — the id of a selected edge — has no origin, is skipped, and
+	 * leaves the key to whatever else wants it.
+	 */
+	ids: readonly string[];
 	positions: Positions;
 	onPositions: (next: Positions) => void;
 	originOf: (id: string) => Point | null;
@@ -64,11 +84,18 @@ export function useNudge({
 	 * and build it again, and a caller passing an inline `originOf` would do the
 	 * same on every unrelated render.
 	 */
-	const latest = useRef({ positions, onPositions, originOf });
-	latest.current = { positions, onPositions, originOf };
+	const latest = useRef({ ids, positions, onPositions, originOf });
+	latest.current = { ids, positions, onPositions, originOf };
 
+	/*
+	 * The listener is bound while *anything* is picked, rather than re-bound
+	 * whenever the picks change. `ids` is a fresh array on most renders, so
+	 * depending on it directly would tear the listener down and build it again
+	 * on every keystroke — the very thing the ref above exists to prevent.
+	 */
+	const picked = ids.length > 0;
 	useEffect(() => {
-		if (selected === null) return;
+		if (!picked) return;
 
 		const onKey = (event: KeyboardEvent) => {
 			const delta = DELTAS[event.key];
@@ -79,23 +106,35 @@ export function useNudge({
 			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			if (isTyping(event.target)) return;
 
-			const { positions: current, onPositions: write, originOf: origin } = latest.current;
-			// An id that is not a box — a relationship, a link — has no position to
-			// write and is left to whatever else wants the key.
-			const from = current[selected] ?? origin(selected);
-			if (!from) return;
+			const {
+				ids: picks,
+				positions: current,
+				onPositions: write,
+				originOf: origin,
+			} = latest.current;
+			const step = event.shiftKey ? COARSE : STEP;
+
+			const next: Record<string, Point> = { ...current };
+			let moved = false;
+			for (const id of picks) {
+				// An id that is not a box — a relationship, a link — has no position
+				// to write and is left to whatever else wants the key.
+				const from = current[id] ?? origin(id);
+				if (!from) continue;
+				next[id] = { x: from.x + delta.x * step, y: from.y + delta.y * step };
+				moved = true;
+			}
+			// Nothing to move means the key was never ours: taking it here would
+			// swallow a scroll on a canvas where only an edge is selected.
+			if (!moved) return;
 
 			event.preventDefault();
-			const step = event.shiftKey ? COARSE : STEP;
-			write({
-				...current,
-				[selected]: { x: from.x + delta.x * step, y: from.y + delta.y * step },
-			});
+			write(next);
 		};
 
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [selected]);
+	}, [picked]);
 }
 
 /**
