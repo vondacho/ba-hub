@@ -274,12 +274,11 @@ export default function Graph({
 	 * coordinates, and `placed` is what those coordinates come out as.
 	 */
 	const nudged = useMemo(() => group.map((node) => node.id), [group]);
-	useNudge({
-		ids: nudged,
-		positions,
-		onPositions,
-		originOf: (id) => layout?.nodes.find((node) => node.id === id) ?? null,
-	});
+	const originOf = useCallback(
+		(id: string) => layout?.nodes.find((node) => node.id === id) ?? null,
+		[layout],
+	);
+	useNudge({ ids: nudged, positions, onPositions, originOf });
 
 	/*
 	 * The containment edges written as a `serves` line, as opposed to the ones
@@ -592,8 +591,12 @@ export default function Graph({
 				connecting={connecting}
 				onConnecting={setConnecting}
 				onFit={fit}
-				onAlign={(to: AlignTo) => onPositions(alignBoxes(placed, picked, to, positions))}
-				onSpread={(axis: SpreadAxis) => onPositions(spreadBoxes(placed, picked, axis, positions))}
+				onAlign={(to: AlignTo) =>
+					onPositions(alignBoxes({ placed, ids: picked, to, positions, originOf }))
+				}
+				onSpread={(axis: SpreadAxis) =>
+					onPositions(spreadBoxes({ placed, ids: picked, axis, positions, originOf }))
+				}
 				picked={group.length}
 				onReset={() => {
 					onPositions({});

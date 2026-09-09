@@ -25,9 +25,44 @@
  * usually does not want its `y` touched at all.
  *
  * Both leave the other axis exactly as it was, for the same reason.
+ *
+ * ## Shared by both canvases, and typed for neither
+ *
+ * The context map and the domain model both arrange boxes, so this arranges
+ * boxes: the structural minimum a box has to have, and nothing about what it
+ * *means*. `useNudge` is written the same way and for the same reason — see
+ * `CanvasBar`, which the two canvases also share.
+ *
+ * ## Where an override starts from
+ *
+ * Never from where the box is drawn. On the domain model canvas
+ * `applyPositions` adds a member's own shift to its aggregate's, so a member
+ * inside a boundary that has moved is drawn somewhere its override never said;
+ * writing that drawn position back would fold the parent's shift into the child
+ * and the box would jump by the width of the parent's last move. So a new
+ * override is the box's *own* current value — the override it already has, or
+ * its place in the raw layout — plus however far this gesture is moving it.
+ *
+ * That is the same rule `useNudge` states, and the two must not drift. It reads
+ * as an identity on the map, where a node's override simply replaces its
+ * layout position, and it is the whole ball game on the model.
  */
 
-import type { PlacedNode, Positions } from './layout';
+/** The minimum this module needs to know about a box. */
+export interface Boxed {
+	readonly id: string;
+	readonly x: number;
+	readonly y: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+interface Point {
+	readonly x: number;
+	readonly y: number;
+}
+
+type Positions = Readonly<Record<string, Point>>;
 
 /**
  * Which line the boxes go onto, named for the part of the box that lands on it.
@@ -75,12 +110,7 @@ export type SpreadAxis = 'across' | 'down';
  * re-render on the same value, and a press that changes nothing does not stamp
  * a "moved here in your browser" dot on six boxes.
  */
-export function alignBoxes(
-	placed: readonly PlacedNode[],
-	ids: ReadonlySet<string>,
-	to: AlignTo,
-	positions: Positions,
-): Positions {
+export function alignBoxes({ placed, ids, to, positions, originOf }: Arrangement & { to: AlignTo }): Positions {
 	const boxes = placed.filter((box) => ids.has(box.id));
 	if (boxes.length < 2) return positions;
 
@@ -105,6 +135,7 @@ export function alignBoxes(
 					: line - span.size / 2,
 		),
 		positions,
+		originOf,
 	);
 }
 
@@ -134,12 +165,13 @@ export function alignBoxes(
  * refusing it because the result is ugly would leave the visitor guessing which
  * rule they broke.
  */
-export function spreadBoxes(
-	placed: readonly PlacedNode[],
-	ids: ReadonlySet<string>,
-	axis: SpreadAxis,
-	positions: Positions,
-): Positions {
+export function spreadBoxes({
+	placed,
+	ids,
+	axis,
+	positions,
+	originOf,
+}: Arrangement & { axis: SpreadAxis }): Positions {
 	const down = axis === 'down';
 	const boxes = placed
 		.filter((box) => ids.has(box.id))
@@ -164,11 +196,27 @@ export function spreadBoxes(
 		down,
 		starts,
 		positions,
+		originOf,
 	);
 }
 
+/** What both of these need to be told, beyond which arrangement is wanted. */
+interface Arrangement {
+	/** Every box on the canvas, where it is currently drawn. */
+	readonly placed: readonly Boxed[];
+	/** The picked ones. Anything in here that is not on the canvas is ignored. */
+	readonly ids: ReadonlySet<string>;
+	readonly positions: Positions;
+	/**
+	 * Where an override for `id` starts from when it has none yet: the box's
+	 * place in the raw layout, before any of this. Same parameter, same meaning,
+	 * as `useNudge`'s.
+	 */
+	readonly originOf: (id: string) => Point | null;
+}
+
 /** One box's extent along the axis being worked on. */
-function spanOf(box: PlacedNode, down: boolean): { readonly start: number; readonly size: number } {
+function spanOf(box: Boxed, down: boolean): { readonly start: number; readonly size: number } {
 	return down ? { start: box.y, size: box.height } : { start: box.x, size: box.width };
 }
 
@@ -182,19 +230,26 @@ function middleOf(spans: readonly { start: number; size: number }[]): number {
  * Move each box to its new start along one axis, and hand back the same
  * `positions` if none of them actually moved — see `alignBoxes` for why that
  * identity matters.
+ *
+ * The new *drawn* start becomes a distance, and the distance is added to the
+ * box's own base — see the note at the top of this file. A box with no base at
+ * all is not on the canvas any more and is skipped.
  */
 function write(
-	boxes: readonly PlacedNode[],
+	boxes: readonly Boxed[],
 	down: boolean,
 	starts: readonly number[],
 	positions: Positions,
+	originOf: (id: string) => Point | null,
 ): Positions {
-	const next: Record<string, { x: number; y: number }> = { ...positions };
+	const next: Record<string, Point> = { ...positions };
 	let moved = false;
 	boxes.forEach((box, index) => {
-		const start = starts[index]!;
-		if (start === (down ? box.y : box.x)) return;
-		next[box.id] = down ? { x: box.x, y: start } : { x: start, y: box.y };
+		const by = starts[index]! - (down ? box.y : box.x);
+		if (by === 0) return;
+		const from = positions[box.id] ?? originOf(box.id);
+		if (!from) return;
+		next[box.id] = down ? { x: from.x, y: from.y + by } : { x: from.x + by, y: from.y };
 		moved = true;
 	});
 	return moved ? next : positions;

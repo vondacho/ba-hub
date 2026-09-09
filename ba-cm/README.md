@@ -280,6 +280,12 @@ always has; a plain click on one of several narrows to that one, because
 clearing the lot is what the background is for and five picks should not be lost
 to a click that landed slightly off.
 
+All four of these — the group, the drag, the arrow keys and the cluster below
+— work the same way on the domain model canvas, which shares the bar and the
+arithmetic. The one difference is its own: a member picked together with its
+aggregate is left out of the group, because it already travels with its
+boundary and moving it twice would take it out through the wall.
+
 **Aligning and spreading** are the two arrangements the hand is bad at, so
 they are buttons rather than gestures. Pick two or more boxes and a cluster
 appears at the end of the canvas bar: six aligns — left, centre, right, top,

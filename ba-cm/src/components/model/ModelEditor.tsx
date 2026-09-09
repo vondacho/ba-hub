@@ -151,6 +151,15 @@ const EMPTY: DomainModel = {
 	source: '',
 };
 
+/**
+ * Nobody else picked.
+ *
+ * One shared array rather than a fresh `[]`, so clearing a selection that is
+ * already clear is the same value and React declines to render — which matters
+ * because every path that selects something clears this on the way past.
+ */
+const NOBODY: readonly string[] = [];
+
 interface Arrival {
 	readonly name: string;
 	readonly source: string;
@@ -297,7 +306,63 @@ export default function ModelEditor({ promptsUrl }: Props) {
 	const [problems, setProblems] = useState<readonly Problem[]>([]);
 	const [stale, setStale] = useState(false);
 	const [placement, setPlacement] = useState<Placement | null>(null);
-	const [selected, setSelected] = useState<string | null>(null);
+	const [selected, setLead] = useState<string | null>(null);
+	/**
+	 * The rest of the selection — `Diagram`'s prop of the same name says why the
+	 * subject is held apart from it.
+	 *
+	 * Box ids only. Shift-clicking is a canvas gesture on boxes, and everything
+	 * that reads a link selection reads exactly one link.
+	 */
+	const [also, setAlso] = useState<readonly string[]>(NOBODY);
+	/**
+	 * Select one thing and nothing else.
+	 *
+	 * Every path but a shift-click on the canvas means this — adding a class,
+	 * revealing one from the text, opening another model — so dropping the rest
+	 * of the group lives here rather than at each of the dozen call sites, where
+	 * the one that got forgotten would leave a stale group for the next drag.
+	 */
+	const setSelected = useCallback((id: string | null) => {
+		setLead(id);
+		setAlso(NOBODY);
+	}, []);
+	/**
+	 * A click on the canvas, with `extend` set when shift was held.
+	 *
+	 * The subject is always the box picked most recently, so the inspector
+	 * follows the hand. Take the subject back out and the one picked before it
+	 * takes over, which is why `also` is kept most-recent-first.
+	 */
+	const pick = useCallback(
+		(id: string | null, extend = false) => {
+			if (id === null || !extend) {
+				setSelected(id);
+				return;
+			}
+			if (id === selected) {
+				const [next, ...rest] = also;
+				setLead(next ?? null);
+				setAlso(rest);
+				return;
+			}
+			if (also.includes(id)) {
+				setAlso(also.filter((other) => other !== id));
+				return;
+			}
+			// A link cannot join the group — a group is a thing a drag moves, and a
+			// link is drawn from the boxes at its ends. So a selected link is
+			// dropped by the shift-click rather than demoted into `also`, which is
+			// what keeps that list box ids all the way down.
+			const box =
+				selected !== null &&
+				(document_.aggregates.some((a) => a.id === selected) ||
+					document_.members.some((m) => m.id === selected));
+			setAlso(box ? [selected, ...also] : also);
+			setLead(id);
+		},
+		[selected, also, setSelected, document_],
+	);
 	const [revealLine, setRevealLine] = useState<number | null>(null);
 	const [collapsed, setCollapsed] = useState(false);
 	const [split, setSplit] = useState(42);
@@ -614,12 +679,18 @@ export default function ModelEditor({ promptsUrl }: Props) {
 	// A selection that no longer exists — renamed or deleted in the text — must
 	// not leave the inspector describing something that is gone.
 	useEffect(() => {
-		if (!selected) return;
-		const exists =
-			document_.aggregates.some((a) => a.id === selected) ||
-			document_.members.some((m) => m.id === selected) ||
-			document_.links.some((l) => l.id === selected);
-		if (!exists) setSelected(null);
+		const ids = new Set<string>();
+		for (const aggregate of document_.aggregates) ids.add(aggregate.id);
+		for (const member of document_.members) ids.add(member.id);
+		for (const link of document_.links) ids.add(link.id);
+		if (selected !== null && !ids.has(selected)) setLead(null);
+		// The group is pruned rather than dropped. One entity renamed out from
+		// under a selection of six is not a reason to make somebody pick the other
+		// five again — and returning the same array when nothing went missing is
+		// what keeps this off the render path of every keystroke.
+		setAlso((current) =>
+			current.every((id) => ids.has(id)) ? current : current.filter((id) => ids.has(id)),
+		);
 	}, [document_, selected]);
 
 	/**
@@ -1324,7 +1395,8 @@ export default function ModelEditor({ promptsUrl }: Props) {
 							placement={placement}
 							stale={stale}
 							selected={selected}
-							onSelect={setSelected}
+							also={also}
+							onSelect={pick}
 							positions={positions}
 							onPositions={setPositions}
 							controls={canvas}

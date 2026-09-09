@@ -107,8 +107,11 @@ interface Props {
 	onConnecting?: (on: boolean) => void;
 	onFit: () => void;
 	/**
-	 * Line the picked boxes up on one line. Optional, like the drawing tools:
-	 * the model editor has no group selection to arrange yet.
+	 * Line the picked boxes up on one line.
+	 *
+	 * Optional, like the drawing tools, because this bar is shared and a canvas
+	 * without a group selection would have nothing to hand it. Both canvases do
+	 * have one now; the option stays because the next one might not.
 	 */
 	onAlign?: (to: AlignTo) => void;
 	/** Even out the gaps between them. Present whenever `onAlign` is. */

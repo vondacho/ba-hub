@@ -40,6 +40,7 @@ import { multiplicityMark, type AggregateNode, type DomainModel, type Member } f
 import { routeLinks, type RoutedLink } from '../../lib/ddm/route';
 import { paint } from '../../lib/ddm/style';
 import { backgroundOf, toSvgFile, VIEWPORT_MARK } from '../../lib/graph/svg-file';
+import { alignBoxes, spreadBoxes, type AlignTo, type SpreadAxis } from '../../lib/graph/align';
 import CanvasBar, { type AddChoice } from '../mapper/CanvasBar';
 import type { CanvasControls } from '../ui/ViewControls';
 import { useNudge } from '../../lib/nudge';
@@ -49,7 +50,21 @@ interface Props {
 	placement: Placement | null;
 	stale: boolean;
 	selected: string | null;
-	onSelect: (id: string | null) => void;
+	/**
+	 * The rest of the selection: the boxes picked with shift held, most recently
+	 * picked first, and never the one in `selected`.
+	 *
+	 * Two fields rather than one list, for the map canvas's reason: `selected` is
+	 * the *subject*, which the inspector describes and an Add button adds into,
+	 * and there can only be one of those. The selection is what a gesture acts
+	 * on, and a drag on one box of six has to move six.
+	 */
+	also: readonly string[];
+	/**
+	 * `extend` is shift held: the box joins the selection instead of replacing
+	 * it, and joining is a toggle — the same click takes it back out again.
+	 */
+	onSelect: (id: string | null, extend?: boolean) => void;
 	positions: Positions;
 	onPositions: (next: Positions) => void;
 	/** The top bar's handle on this canvas. See `Graph`, which carries the note. */
@@ -95,6 +110,7 @@ export default function Diagram({
 	placement,
 	stale,
 	selected,
+	also,
 	onSelect,
 	positions,
 	onPositions,
@@ -127,27 +143,93 @@ export default function Diagram({
 	const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
 	const surface = useRef<SVGSVGElement>(null);
 	const pan = useRef<{ x: number; y: number; originX: number; originY: number; pointerId: number; live: boolean } | null>(null);
-	const dragging = useRef<{ id: string; offsetX: number; offsetY: number; startX: number; startY: number; pointerId: number; moved: boolean } | null>(null);
+	/*
+	 * A move in progress — and it is a move of *the selection*, not of the box
+	 * under the pointer: grab any member of a group and the whole group travels.
+	 *
+	 * `from` freezes each moving box's **own** coordinates when the press landed
+	 * — its override, or its place in the raw layout — and every frame writes
+	 * that plus the total distance travelled. Two bugs die there. The first is
+	 * drift: `positions` is rewritten on every frame, so a step measured against
+	 * the previous frame compounds its rounding for the length of the drag and a
+	 * group does not stay in formation. The second is this canvas's own, and it
+	 * was here before groups were: `applyPositions` adds a member's shift to its
+	 * aggregate's, so a member inside a boundary that had been moved was drawn
+	 * somewhere its override did not say — and the old drag wrote that *drawn*
+	 * position straight back, folding the parent's shift in a second time. The
+	 * box jumped by the width of the aggregate's last move on the first pixel of
+	 * every drag. Starting from the box's own value is the fix, and it is the
+	 * same rule `useNudge` has always used.
+	 */
+	const dragging = useRef<{
+		id: string;
+		from: ReadonlyMap<string, { x: number; y: number }>;
+		/** Where the pointer was, in graph coordinates, when the press landed. */
+		graphX: number;
+		graphY: number;
+		startX: number;
+		startY: number;
+		pointerId: number;
+		moved: boolean;
+	} | null>(null);
 	const draggedLast = useRef(false);
 
-	/*
-	 * Nudging reads `placement.boxes` rather than `boxes`, and that is load
-	 * bearing here: `applyPositions` adds a member's own shift to its
-	 * aggregate's, so a member drawn inside a boundary that has moved is not
-	 * where its override says it is. See `useNudge`.
+	/**
+	 * Where a box's override starts from, and the reason every gesture on this
+	 * canvas goes through it.
+	 *
+	 * `placement.boxes` rather than `boxes`, and that distinction is load
+	 * bearing: `applyPositions` adds a member's own shift to its aggregate's, so
+	 * a member drawn inside a boundary that has moved is not where its override
+	 * says it is. Writing a drawn position back as an override would fold the
+	 * parent's shift in twice. The drag, the arrow keys and the two arrangement
+	 * gestures are all handed this same function — see `useNudge` and
+	 * `alignBoxes`, which both state the rule.
 	 */
-	useNudge({
-		// One at a time here: this canvas has no group selection to move.
-		ids: selected === null ? [] : [selected],
-		positions,
-		onPositions,
-		originOf: (id) => placement?.boxes.find((box) => box.id === id) ?? null,
-	});
+	const originOf = useCallback(
+		(id: string) => placement?.boxes.find((box) => box.id === id) ?? null,
+		[placement],
+	);
 
 	const boxes = useMemo(
 		() => (placement ? applyPositions(placement.boxes, positions) : []),
 		[placement, positions],
 	);
+
+	/**
+	 * Everything picked right now, subject included, for the two questions the
+	 * canvas asks of it: does this box wear a ring, and does this box come along
+	 * when one of its neighbours is dragged.
+	 */
+	const picked = useMemo(
+		() => new Set(selected === null ? also : [selected, ...also]),
+		[selected, also],
+	);
+
+	/**
+	 * The picked boxes — and only the ones a gesture should actually move.
+	 *
+	 * Two things are dropped here rather than at each of the four gestures. A
+	 * selected *link* is not a box and has nothing to move. And a member whose
+	 * own aggregate is picked is dropped as well: it already travels with its
+	 * boundary, because `applyPositions` adds the parent's shift to its
+	 * children's, so moving it too would move it twice. Aligning it would be the
+	 * same argument with the same answer — a box that follows its parent cannot
+	 * also be put somewhere else, and the boundary is the thing that was picked.
+	 */
+	const group = useMemo(
+		() => boxes.filter((box) => picked.has(box.id) && !(box.parent && picked.has(box.parent))),
+		[boxes, picked],
+	);
+
+	/*
+	 * The arrow keys move the same set the drag does — see `useNudge`, which
+	 * carries why they must not disagree, and why the override is written
+	 * against the box's own coordinates rather than where it is drawn.
+	 */
+	const nudged = useMemo(() => group.map((box) => box.id), [group]);
+	useNudge({ ids: nudged, positions, onPositions, originOf });
+
 	const links = useMemo(
 		() => routeLinks(document.links, boxes, multiplicityMark),
 		[document.links, boxes],
@@ -302,6 +384,20 @@ export default function Diagram({
 		if (from !== id) onConnect(from, id);
 	};
 
+	/**
+	 * A click on a box, with `extend` set when shift was held.
+	 *
+	 * Shift extends. A plain click on the only picked box lets go of it — around
+	 * here clicking a thing twice has always meant that — but a plain click on
+	 * one of several narrows to that one instead: clearing the lot is what the
+	 * background is for, and losing five picks to a slightly misplaced click is
+	 * not a gesture anybody asked for.
+	 */
+	const selectBox = (id: string, extend: boolean) => {
+		if (extend) onSelect(id, true);
+		else onSelect(selected === id && also.length === 0 ? null : id);
+	};
+
 	const originBox = origin === null ? null : (boxes.find((box) => box.id === origin) ?? null);
 
 	// Aggregates first so their members draw on top of them.
@@ -322,6 +418,13 @@ export default function Diagram({
 				connecting={connecting}
 				onConnecting={setConnecting}
 				onFit={fit}
+				onAlign={(to: AlignTo) =>
+					onPositions(alignBoxes({ placed: group, ids: picked, to, positions, originOf }))
+				}
+				onSpread={(axis: SpreadAxis) =>
+					onPositions(spreadBoxes({ placed: group, ids: picked, axis, positions, originOf }))
+				}
+				picked={group.length}
 				onReset={() => onPositions({})}
 				onExportSvg={() => setExporting(true)}
 				moved={Object.keys(positions).length}
@@ -366,10 +469,13 @@ export default function Diagram({
 							surface.current?.setPointerCapture(drag.pointerId);
 						}
 						const point = toGraph(event.clientX, event.clientY);
-						onPositions({
-							...positions,
-							[drag.id]: { x: point.x - drag.offsetX, y: point.y - drag.offsetY },
-						});
+						const dx = point.x - drag.graphX;
+						const dy = point.y - drag.graphY;
+						const next: Record<string, { x: number; y: number }> = { ...positions };
+						for (const [id, start] of drag.from) {
+							next[id] = { x: start.x + dx, y: start.y + dy };
+						}
+						onPositions(next);
 						return;
 					}
 
@@ -448,10 +554,10 @@ export default function Diagram({
 							key={box.id}
 							box={box}
 							aggregate={box.node as AggregateNode}
-							selected={!exporting && selected === box.id}
+							selected={!exporting && picked.has(box.id)}
 							pending={!exporting && origin === box.id}
 							connecting={connecting}
-							onSelect={onSelect}
+							onSelect={selectBox}
 							onConnect={connectTo}
 							didDrag={() => draggedLast.current}
 							onGrab={(event) => grab(event, box)}
@@ -472,10 +578,10 @@ export default function Diagram({
 							key={box.id}
 							box={box}
 							member={box.node as Member}
-							selected={!exporting && selected === box.id}
+							selected={!exporting && picked.has(box.id)}
 							pending={!exporting && origin === box.id}
 							connecting={connecting}
-							onSelect={onSelect}
+							onSelect={selectBox}
 							onConnect={connectTo}
 							didDrag={() => draggedLast.current}
 							onGrab={(event) => grab(event, box)}
@@ -507,17 +613,31 @@ export default function Diagram({
 					? origin === null
 						? 'click the class the link starts from · esc to put the tool down'
 						: 'click what it points at · click anywhere else to lose it · esc to cancel'
-					: 'drag a class to move it, or nudge it with the arrow keys · drag an aggregate to move it with its members · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
+					: 'drag a class to move it, or nudge it with the arrow keys · shift-click to pick several, then drag them as one or line them up from the bar · drag an aggregate to move it with its members · drag the canvas to pan · ⌘/ctrl + scroll to zoom'}
 			</p>
 		</div>
 	);
 
 	function grab(event: React.PointerEvent, box: PlacedBox) {
 		const point = toGraph(event.clientX, event.clientY);
+		/*
+		 * A box outside the selection travels alone, and the selection is left
+		 * exactly where it was. The alternative — a press that quietly re-selects
+		 * — would move a group somebody had just spent six clicks assembling, on
+		 * the one gesture that gives no chance to say otherwise.
+		 */
+		const movers = picked.has(box.id) ? group : [box];
+		const from = new Map<string, { x: number; y: number }>();
+		for (const mover of movers) {
+			// Its own coordinates, never where it is drawn. See the ref's note.
+			const own = positions[mover.id] ?? originOf(mover.id);
+			if (own) from.set(mover.id, { x: own.x, y: own.y });
+		}
 		dragging.current = {
 			id: box.id,
-			offsetX: point.x - box.x,
-			offsetY: point.y - box.y,
+			from,
+			graphX: point.x,
+			graphY: point.y,
 			startX: event.clientX,
 			startY: event.clientY,
 			pointerId: event.pointerId,
@@ -557,7 +677,7 @@ function AggregateBox({
 	/** The origin of a half-drawn link. */
 	pending: boolean;
 	connecting: boolean;
-	onSelect: (id: string | null) => void;
+	onSelect: (id: string, extend: boolean) => void;
 	onConnect: (id: string) => void;
 	didDrag: () => boolean;
 	onGrab: (event: React.PointerEvent) => void;
@@ -579,7 +699,7 @@ function AggregateBox({
 					return;
 				}
 				if (didDrag()) return;
-				onSelect(selected ? null : box.id);
+				onSelect(box.id, event.shiftKey);
 			}}
 		>
 			<rect
@@ -637,7 +757,7 @@ function MemberBox({
 	/** The origin of a half-drawn link. */
 	pending: boolean;
 	connecting: boolean;
-	onSelect: (id: string | null) => void;
+	onSelect: (id: string, extend: boolean) => void;
 	onConnect: (id: string) => void;
 	didDrag: () => boolean;
 	onGrab: (event: React.PointerEvent) => void;
@@ -662,7 +782,7 @@ function MemberBox({
 					return;
 				}
 				if (didDrag()) return;
-				onSelect(selected ? null : box.id);
+				onSelect(box.id, event.shiftKey);
 			}}
 		>
 			<rect
