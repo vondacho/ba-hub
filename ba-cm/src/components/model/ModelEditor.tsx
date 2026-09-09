@@ -35,13 +35,15 @@ import type {
 	MemberKind,
 } from '../../lib/ddm/model';
 import type { Problem } from '../../lib/ddd/problems';
+import { clearFileInput, downloadBlob, readTextFile } from '../../lib/files';
+import ExportDialog from '../ui/ExportDialog';
 import {
-	clearFileInput,
-	downloadText,
-	readTextFile,
-	slug,
-	SVG_EXTENSION,
-} from '../../lib/files';
+	DESTINATIONS,
+	INITIAL,
+	produce,
+	SECTIONS,
+	type DestinationId,
+} from '../../lib/model/export';
 import {
 	forget,
 	lastModel,
@@ -115,20 +117,27 @@ const NEW_MEMBER: Record<MemberKind, string> = {
 	enum: 'New enumeration',
 };
 
-const MODEL_EXTENSION = '.ddm';
 const MODEL_ACCEPT = '.ddm,text/plain';
-/** The layout sidecar. See src/lib/view-file.ts for why it is a separate file. */
-const MODEL_VIEW_EXTENSION = '.ddmview';
 
 /**
  * How far apart the exported files are handed to the browser.
  *
- * Two downloads from one click, and browsers that treat two anchor clicks in
- * the same task as one gesture drop the second. Spacing them is the only
- * reliable answer; a quarter of a second is under notice and well clear of the
- * coalescing window.
+ * Browsers that treat two anchor clicks in the same task as one gesture drop
+ * the second. Spacing them is the only reliable answer; a quarter of a second
+ * is under notice and well clear of the coalescing window.
+ *
+ * It used to sit between the two halves of the old two-file export, and it is
+ * kept now that the panel can send six: the default selection here is still the
+ * `.ddm` and its sidecar, which is exactly the case — two files, no work in
+ * between — where a run would otherwise hand a browser two clicks in one task
+ * and quietly lose the arrangement.
  */
 const DOWNLOAD_GAP_MS = 250;
+
+/** A gap between two downloads. See `DOWNLOAD_GAP_MS`. */
+function pause(ms: number): Promise<void> {
+	return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 /** Parsed once, so the initial model and the initial key agree. */
 const SEED = parse(SAMPLE).document;
@@ -438,6 +447,8 @@ export default function ModelEditor({ promptsUrl }: Props) {
 	const loading = useRef<string | null>(null);
 	/** The store panel. Read-only, and read fresh each time it opens. */
 	const [showStore, setShowStore] = useState(false);
+	/** The export panel. The map's, one zoom level down — see `model/export.ts`. */
+	const [exporting, setExporting] = useState(false);
 
 	useEffect(() => {
 		migrate();
@@ -1022,25 +1033,42 @@ export default function ModelEditor({ promptsUrl }: Props) {
 	);
 
 	/**
-	 * Export: the model and its sidecar, in one gesture.
+	 * Run the export panel's selection.
 	 *
-	 * The map's pair exactly, one zoom level down — `risk-appetite.ddm` and
-	 * `risk-appetite.ddmview`, the same two keys the store holds and the same
-	 * stem. Writing only the first would hand somebody a model that redraws to
-	 * the computed layout, silently dropping an arrangement they had worked out,
-	 * so the sidecar goes out even when nothing has been dragged.
+	 * `DddMapper`'s twin, and its three notes hold here word for word: the
+	 * picture is asked for **once** and awaited before the loop, because the
+	 * `.svg` and the `.png` are the same picture and serialising costs a
+	 * suppressed render and a clone of the whole tree; the files go out **one at
+	 * a time**, because several simultaneous anchor clicks are what makes a
+	 * browser ask whether the page should be allowed to download things; and the
+	 * first failure stops the run and is reported by the panel, because a
+	 * downloads folder holding some of what was asked for, with no indication of
+	 * which part is missing, is worse than an error.
 	 *
-	 * The picture is not here. It belongs to the canvas — it is a copy of the
-	 * live tree rather than a second renderer — and it stays where the thing it
-	 * copies is, on the canvas's own toolbar.
+	 * The sidecar is serialised here from the live positions rather than read
+	 * back from the store — `modelAlone` carries why.
 	 */
-	const exportModel = useCallback(() => {
-		const stem = slug(document_.context, 'model');
-		downloadText(`${stem}${MODEL_EXTENSION}`, source);
+	const runExport = useCallback(
+		async (picks: readonly DestinationId[]) => {
+			const svg = picks.some((pick) => pick === 'svg' || pick === 'png')
+				? ((await canvas.current?.serialize()) ?? null)
+				: null;
+			const view = serializeModelView({ positions: { ...positions }, model: document_.context });
 
-		const sidecar = serializeModelView({ positions: { ...positions }, model: document_.context });
-		window.setTimeout(() => downloadText(`${stem}${MODEL_VIEW_EXTENSION}`, sidecar), DOWNLOAD_GAP_MS);
-	}, [document_.context, source, positions]);
+			let first = true;
+			for (const pick of picks) {
+				// A destination may be more than one file — the model row is the
+				// `.ddm` and its sidecar — so this is a loop inside a loop rather
+				// than one download per tick.
+				for (const file of await produce(pick, { document: document_, source, view, svg })) {
+					if (!first) await pause(DOWNLOAD_GAP_MS);
+					first = false;
+					downloadBlob(file.filename, file.blob);
+				}
+			}
+		},
+		[document_, source, positions],
+	);
 
 	/**
 	 * Write this model out now, rather than at the end of the debounce.
@@ -1254,8 +1282,8 @@ export default function ModelEditor({ promptsUrl }: Props) {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export this model: a .ddm file and its .ddmview sidecar"
-						onClick={exportModel}
+						label="Export: the model, its arrangement, a picture, an outline"
+						onClick={() => setExporting(true)}
 					>
 						<Icon name="export" />
 					</IconButton>
@@ -1310,6 +1338,25 @@ export default function ModelEditor({ promptsUrl }: Props) {
 			    off, which is a different question with the same answer on screen. */}
 			{showStore && (
 				<StoreState current={keys.doc} onLeaving={flush} onClose={() => setShowStore(false)} />
+			)}
+
+			{exporting && (
+				<ExportDialog
+					subject="model"
+					destinations={DESTINATIONS}
+					sections={SECTIONS}
+					initial={INITIAL}
+					unavailable={
+						panes === 'source'
+							? {
+									svg: 'The model pane is not showing, so there is no canvas to copy.',
+									png: 'The model pane is not showing, so there is no canvas to copy.',
+								}
+							: {}
+					}
+					onExport={runExport}
+					onClose={() => setExporting(false)}
+				/>
 			)}
 
 			{panes !== 'source' && legend && <Legend theme={theme} />}
@@ -1401,13 +1448,6 @@ export default function ModelEditor({ promptsUrl }: Props) {
 							onPositions={setPositions}
 							controls={canvas}
 							onScale={setScale}
-							onExportSvg={(svg) =>
-								downloadText(
-									`${slug(document_.context, 'model')}${SVG_EXTENSION}`,
-									svg,
-									'image/svg+xml;charset=utf-8',
-								)
-							}
 							adds={adds}
 							onAdd={add}
 							onConnect={connect}

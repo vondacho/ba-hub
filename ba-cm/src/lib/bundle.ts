@@ -150,6 +150,34 @@ export function mapAlone(title: string, source: string): readonly { name: string
 	return files;
 }
 
+/**
+ * The model and its sidecar, under the names the store keeps them under.
+ *
+ * `mapAlone` one zoom level down, and the naming matters for the same reason:
+ * filenames *are* the storage keys here, and these two have to be spelled the
+ * same as the copies the full archive writes inside a context's folder. Two
+ * ways to spell them would fail quietly, as a re-import landing beside the
+ * document it came from rather than on it.
+ *
+ * The sidecar is handed in rather than read from the store, which is where this
+ * one differs from the map's. The model page has the live positions and the
+ * store is a debounce behind them, so reading the key here would export the
+ * arrangement as it was four hundred milliseconds ago — invisible in every case
+ * except the one where somebody drags a box and exports immediately, which is
+ * a completely ordinary thing to do.
+ */
+export function modelAlone(
+	context: string,
+	source: string,
+	view: string,
+): readonly { name: string; text: string }[] {
+	const keys = modelKeys(context);
+	return [
+		{ name: keys.doc, text: source },
+		{ name: keys.view, text: view },
+	];
+}
+
 // ---------------------------------------------------------------------------
 // In
 // ---------------------------------------------------------------------------

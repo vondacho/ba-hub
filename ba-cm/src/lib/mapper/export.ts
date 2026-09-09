@@ -53,7 +53,7 @@
  * return type that is sometimes an array.
  */
 
-import type { IconName } from '../../components/mapper/Icon';
+import type { Destination, ExportFile, Section } from '../destinations';
 import type { DddDocument } from '../ddd/model';
 import { outline } from '../ddd/outline';
 import { svgToPng, sizeOf } from '../graph/raster';
@@ -72,60 +72,8 @@ export type DestinationId = 'bundle' | 'map' | 'svg' | 'png' | 'outline' | 'nota
  */
 export type Group = 'map' | 'reference';
 
-/** One file, named. A destination produces at least one. */
-export interface ExportFile {
-	readonly filename: string;
-	readonly blob: Blob;
-}
-
-export interface Destination {
-	readonly id: DestinationId;
-	/** The row's heading. What the file is, not what the format is called. */
-	readonly label: string;
-	/**
-	 * What lands, as the chip on the row spells it.
-	 *
-	 * Usually one extension and occasionally two, because a destination is
-	 * allowed to be more than one file — see `produce`. It is display text
-	 * rather than a format identifier, and nothing matches on it.
-	 */
-	readonly extension: string;
-	/**
-	 * How many files this writes, in the ordinary case.
-	 *
-	 * Here so the dialog's footer can count *files* rather than ticked rows, and
-	 * so the line about the browser asking before it saves several appears when
-	 * several is true. Two ticks that write three files is exactly the case a
-	 * count of rows gets wrong.
-	 *
-	 * "Ordinary" is doing one small job: the map on its own says 2, and writes 1
-	 * in the single case where this browser has never stored an arrangement for
-	 * the title — a board exported inside the first autosave of a document it
-	 * did not already hold. The count is then one high, which shows the caution
-	 * about several downloads slightly early and misstates nothing anybody acts
-	 * on. Deriving it truthfully would mean asking the store what it holds every
-	 * time the dialog renders, to correct a number by one, in a case that lasts
-	 * four hundred milliseconds.
-	 */
-	readonly writes: number;
-	readonly icon: IconName;
-	/** One sentence: what this is for, and when to reach for it. */
-	readonly what: string;
-	/**
-	 * Whether this destination is a copy of the canvas rather than of the model.
-	 *
-	 * True for the two pictures, and it is the only reason a row can be
-	 * unavailable: no canvas, nothing to copy. The dialog does not read this —
-	 * the mapper passes it a reason instead — but the catalogue says it out loud
-	 * so that a destination added later has somewhere to declare the dependency
-	 * rather than discovering it as a null.
-	 */
-	readonly needsCanvas: boolean;
-	readonly group: Group;
-}
-
 /**
- * The six, in the order the dialog offers them.
+ * The seven, in the order the dialog offers them.
  *
  * The archive first, because it is the one that cannot lose anything, and the
  * map on its own second — the two of them are one question asked at two scopes,
@@ -133,8 +81,17 @@ export interface Destination {
  * Then the two pictures, vector before raster since the raster is a photograph
  * of it, then the outline because it is read rather than looked at, and the two
  * reference documents last.
+ *
+ * One note on `writes` that the shared definition has no room for: the map on
+ * its own says 2 and writes 1 in the single case where this browser has never
+ * stored an arrangement for the title — a board exported inside the first
+ * autosave of a document it did not already hold. The count is then one high,
+ * which shows the caution about several downloads slightly early and misstates
+ * nothing anybody acts on. Deriving it truthfully would mean asking the store
+ * what it holds every time the dialog renders, to correct a number by one, in a
+ * case that lasts four hundred milliseconds.
  */
-export const DESTINATIONS: readonly Destination[] = [
+export const DESTINATIONS: readonly Destination<DestinationId, Group>[] = [
 	{
 		id: 'bundle',
 		label: 'The map and its models',
@@ -207,7 +164,30 @@ export const DESTINATIONS: readonly Destination[] = [
 	},
 ];
 
-export function destination(id: DestinationId): Destination {
+/**
+ * The dialog's two headings, and the sentence under each.
+ *
+ * Beside the catalogue rather than in the panel, because the panel now serves
+ * two documents — see `ExportDialog`. The second heading has a sentence and the
+ * first does not, on purpose: "This map" needs no explanation in a panel opened
+ * from a map, while "The practice" is a genuinely surprising thing to find
+ * under an Export button, and somebody who does not read the line will tick it
+ * expecting a document about the map they are looking at.
+ */
+export const SECTIONS: readonly Section<Group>[] = [
+	{ group: 'map', title: 'This map', blurb: null },
+	{
+		group: 'reference',
+		title: 'The practice',
+		blurb:
+			'Not about this map. Instructions to hand a coding agent working on a .ddd or .ddm file somewhere else — the same text this tool’s own assistant is given.',
+	},
+];
+
+/** Ticked when nothing else has been said. The one that cannot lose anything. */
+export const INITIAL: readonly DestinationId[] = ['bundle'];
+
+export function destination(id: DestinationId): Destination<DestinationId, Group> {
 	const found = DESTINATIONS.find((entry) => entry.id === id);
 	if (found === undefined) throw new Error(`No export destination called ${id}.`);
 	return found;

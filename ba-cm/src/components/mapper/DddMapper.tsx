@@ -102,7 +102,13 @@ import {
 import EmptyState from '../ui/EmptyState';
 import StoreState from '../ui/StoreState';
 import ExportDialog from '../ui/ExportDialog';
-import { produce, type DestinationId } from '../../lib/mapper/export';
+import {
+	DESTINATIONS,
+	INITIAL,
+	produce,
+	SECTIONS,
+	type DestinationId,
+} from '../../lib/mapper/export';
 import Editor from './Editor';
 import Graph from './Graph';
 import ImportBundle from '../ui/ImportBundle';
@@ -1504,6 +1510,10 @@ export default function DddMapper({ promptsUrl }: Props) {
 
 			{exporting && (
 				<ExportDialog
+					subject="map"
+					destinations={DESTINATIONS}
+					sections={SECTIONS}
+					initial={INITIAL}
 					caveats={
 						unmodelled === 0
 							? {}

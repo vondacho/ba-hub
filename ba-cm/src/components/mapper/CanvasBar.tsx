@@ -76,19 +76,13 @@ export interface AddChoice {
  * goes back to what was computed. That button is why moving things is safe:
  * there is always a way back to the arrangement everybody else sees.
  *
- * **Export** is on this bar only for the editor that has nowhere else to put it
- * — see `onExportSvg`. Where it appears it writes the map as a standalone
- * `.svg`: the whole map at its own
- * size rather than the current viewport, with the colours of the theme the
- * panel is showing baked in. It sits with the layout buttons because it is the
- * same kind of thing — an artefact of how the map looks, next to the file that
- * says what it means.
- *
- * **Save and load layout** write and read a `.dddview` sidecar. Positions stay
- * out of the `.ddd` file — otherwise every diff fills with coordinate churn —
- * but an arrangement in which the relationships finally read clearly is worth
- * keeping and worth handing to a colleague. Two files, two lifetimes; losing
- * the sidecar costs nothing.
+ * **Export is not here any more, on either canvas.** It was on this bar for the
+ * editor that had nowhere else to put it, because the picture is a copy of the
+ * live tree rather than a second renderer — which is a true fact about where
+ * the code lives and a useless one to somebody looking for a file. Both pages
+ * now have an export panel where a row can carry a sentence saying what a file
+ * is for, and both canvases hand the picture over through `serialize` on their
+ * controls handle instead. See `ExportDialog`.
  */
 
 interface Props {
@@ -125,20 +119,6 @@ interface Props {
 	 */
 	picked?: number;
 	onReset: () => void;
-	/**
-	 * Write the picture, or absent when this canvas's editor offers it elsewhere.
-	 *
-	 * Optional because the bar is shared and the two editors differ. The model
-	 * page has no export dialog, so its picture button is here and is the only
-	 * way to get one. The mapper does, and the picture is one row in it beside
-	 * every other file the tool writes — so the mapper omits this, and having
-	 * the same artefact on two controls in one screen is the duplication that
-	 * avoids.
-	 *
-	 * The canvas produces the file either way; see `serialize` on the controls
-	 * handle.
-	 */
-	onExportSvg?: () => void;
 	/** How many nodes and edges have been moved. Zero disables Reset. */
 	moved: number;
 }
@@ -174,7 +154,6 @@ export default function CanvasBar({
 	onSpread,
 	picked = 0,
 	onReset,
-	onExportSvg,
 	moved,
 }: Props) {
 	return (
@@ -224,23 +203,6 @@ export default function CanvasBar({
 			>
 				<Icon name="reset" className="h-4 w-4" />
 			</Button>
-
-			{onExportSvg && (
-				<span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-			)}
-
-			{/*
-			 * The one export at this level, and it is the picture — the artefact
-			 * that belongs to the canvas rather than to the document. The
-			 * arrangement used to have its own save and load here, writing the
-			 * `.dddview` by itself; the board's export carries that file now, and
-			 * two buttons for one artefact is a choice nobody should have to make.
-			 */}
-			{onExportSvg && (
-				<Button label="Export the map as an .svg picture" onClick={onExportSvg}>
-					<Icon name="picture" className="h-4 w-4" />
-				</Button>
-			)}
 
 			{onAlign && onSpread && picked >= 2 && (
 				<>

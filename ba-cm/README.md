@@ -348,10 +348,42 @@ contexts, or an arc passing behind a box, are fixed by pulling the curve aside.
 An edge's shape says nothing that its pattern and direction do not already say,
 which is exactly why it belongs to the person looking rather than to the file.
 
-### Exporting a picture
+### Exporting: one panel per page
 
-The map can be written out as a standalone `.svg` from the widget bar. It is a
-**copy of the live graph**, not a second renderer, and that is the whole design:
+Every file either page can write is behind one Export button, as a list of rows
+with a sentence each — the archive, the document and its sidecar, the picture as
+vector and as image, the outline, and the two reference documents about the
+practice. Tick what you want and press once. A row in a list can say what a file
+is for and when to reach for it; a 28px square on a canvas bar cannot, and "SVG"
+is not the question anybody has. The question is which of these goes in the pull
+request.
+
+The **domain model page has the same panel**, with its own rows: the `.ddm` and
+its `.ddmview`, the two pictures, an outline of every aggregate and what it
+protects, and the same two reference documents. One component, two catalogues —
+`mapper/export.ts` and `model/export.ts` — because the two pages ask the same
+question about two different documents.
+
+There is no archive row on the model page, and that is not an omission. The
+archive's shape *is* the relationship — a folder per context inside the map's
+folder — and a model does not know which map names it. The two documents are
+matched by name, deliberately, so that neither holds a pointer into the other;
+an archive built from the model page would be one document in a folder guessing
+at its parent. The row that carries a model is on the map page, and the model's
+own row says so.
+
+Both pictures are asked of the canvas **once** per run and awaited before
+anything is written, because the `.svg` and the `.png` are the same picture and
+serialising costs a suppressed render and a clone of the whole tree. Files go
+out one at a time, spaced: several simultaneous anchor clicks are what makes a
+browser ask whether the page should be allowed to download things, and a second
+click in the same task is one some browsers simply drop. The first failure stops
+the run and is named on the panel — a downloads folder holding some of what was
+asked for, with no sign of which part is missing, is worse than an error.
+
+#### The picture is a copy of the canvas
+
+It is a **copy of the live graph**, not a second renderer, and that is the whole design:
 a function that walked the document and drew boxes would be a second
 implementation of `Graph.tsx`, and the two would drift — the day the contexts
 became ellipses, the export would have gone on drawing rectangles until a
@@ -376,8 +408,8 @@ inside the exporter would be a second thing to keep in step.
 
 ### Keeping an arrangement: the `.dddview` sidecar
 
-Positions and curvature can be written to a file and read back, from the widget
-bar. It is a **sidecar**, not part of the map:
+Positions and curvature are written to a file beside the map, and read back from
+an archive. It is a **sidecar**, not part of the map:
 
 ```
 insurance.ddd       the model. Reviewed, diffed, argued about.
@@ -404,11 +436,11 @@ SVG transform blanks the whole graph with no error anywhere.
 - **A dot grid**, in graph coordinates rather than screen ones, so it pans and
   zooms with the content. That is what makes the canvas read as a surface things
   sit on rather than as a texture painted on the window.
-- **A widget bar**: zoom out, zoom in, fit, reset layout, save layout, load
-  layout, and full screen. Everything on it is about the view rather than the
-  document, which is why saving an arrangement lives here and not on the bar
-  above it — that one handles the map, this one handles how you are looking at
-  it.
+- **A widget bar**: what you draw on the picture, and how it is arranged — the
+  Add buttons, the connect tool, fit, reset layout, and the eight-button
+  arrangement cluster that appears when two or more boxes are picked. Zoom and
+  full screen moved to the top bar; export moved into the panel above, since
+  a file is a file wherever the code that makes it lives.
   Reset is disabled until something has actually been moved, and says how many.
 - **Full screen** takes the whole mapper — editor, problems panel and graph —
   not the graph alone. Both panels are the tool, and a graph filling a large

@@ -1,5 +1,14 @@
 /**
- * Where this map goes — one panel, several destinations, one press.
+ * Where this document goes — one panel, several destinations, one press.
+ *
+ * ## One panel, two catalogues
+ *
+ * The map page and the model page ask the same question about two different
+ * documents, so the rows are a prop. What a `.ddd` can become and what a `.ddm`
+ * can become are two lists — `mapper/export.ts` and `model/export.ts` — and
+ * this draws whichever it is handed; `destinations.ts` holds the vocabulary
+ * they share. The alternative was a second dialog, which would have been the
+ * same panel with different strings until the day one of them grew a feature.
  *
  * ## Why the destinations moved behind one control
  *
@@ -49,47 +58,42 @@
 
 import { useEffect, useState } from 'react';
 import Icon from '../mapper/Icon';
-import { DESTINATIONS, type DestinationId, type Group } from '../../lib/mapper/export';
+import type { Destination, Section } from '../../lib/destinations';
 
-/** Ticked when nothing else has been said. The one file that is not a rendering. */
-const INITIAL: readonly DestinationId[] = ['bundle'];
-
-/**
- * The two halves of the list, and what to call them.
- *
- * The copy is here rather than beside the destinations because it is a caption
- * on a panel: the catalogue's job is to know that a destination is reference
- * material, and this file's job is to explain that to somebody reading it for
- * the first time.
- *
- * The second heading has a sentence under it and the first does not, on
- * purpose. "This map" needs no explanation in a panel opened from a map. "The
- * practice" is a genuinely surprising thing to find under an Export button, and
- * somebody who does not read the line will tick it expecting a document about
- * the map they are looking at.
- */
-const GROUPS: readonly { group: Group; title: string; blurb: string | null }[] = [
-	{ group: 'map', title: 'This map', blurb: null },
-	{
-		group: 'reference',
-		title: 'The practice',
-		blurb:
-			'Not about this map. Instructions to hand a coding agent working on a .ddd or .ddm file somewhere else — the same text this tool’s own assistant is given.',
-	},
-];
-
-interface Props {
+interface Props<Id extends string> {
+	/** What is being exported, for the panel's accessible name: "map", "model". */
+	subject: string;
+	/** The rows, in the order they are offered. */
+	destinations: readonly Destination<Id>[];
+	/**
+	 * The headings, and the sentence under each.
+	 *
+	 * A destination whose group is not named here is not drawn at all, which
+	 * makes the sections the running order rather than a decoration on one.
+	 */
+	sections: readonly Section[];
+	/** Ticked when nothing else has been said. */
+	initial: readonly Id[];
 	/** A warning to print under one row: the file will be written, and will lack something. */
-	caveats?: Partial<Record<DestinationId, string>>;
+	caveats?: Partial<Record<Id, string>>;
 	/** Destinations that cannot run right now, with the reason. The row goes quiet. */
-	unavailable?: Partial<Record<DestinationId, string>>;
+	unavailable?: Partial<Record<Id, string>>;
 	/** Runs the selection. Resolves when every file has been handed over. */
-	onExport: (picks: readonly DestinationId[]) => Promise<void>;
+	onExport: (picks: readonly Id[]) => Promise<void>;
 	onClose: () => void;
 }
 
-export default function ExportDialog({ caveats = {}, unavailable = {}, onExport, onClose }: Props) {
-	const [picked, setPicked] = useState<ReadonlySet<DestinationId>>(new Set(INITIAL));
+export default function ExportDialog<Id extends string>({
+	subject,
+	destinations,
+	sections,
+	initial,
+	caveats = {},
+	unavailable = {},
+	onExport,
+	onClose,
+}: Props<Id>) {
+	const [picked, setPicked] = useState<ReadonlySet<Id>>(new Set(initial));
 	const [running, setRunning] = useState(false);
 	const [failed, setFailed] = useState<string | null>(null);
 
@@ -104,7 +108,7 @@ export default function ExportDialog({ caveats = {}, unavailable = {}, onExport,
 		return () => window.removeEventListener('keydown', onKey);
 	}, [onClose]);
 
-	const toggle = (id: DestinationId) =>
+	const toggle = (id: Id) =>
 		setPicked((was) => {
 			const next = new Set(was);
 			if (!next.delete(id)) next.add(id);
@@ -120,15 +124,15 @@ export default function ExportDialog({ caveats = {}, unavailable = {}, onExport,
 	 * means the choice comes back when the canvas does, which is what the person
 	 * meant.
 	 */
-	const chosen = DESTINATIONS.filter(
+	const chosen = destinations.filter(
 		(entry) => picked.has(entry.id) && unavailable[entry.id] === undefined,
 	);
 
 	/*
 	 * Files, not ticked rows.
 	 *
-	 * One row is two files — the map on its own writes the `.ddd` and its
-	 * sidecar — so counting rows would under-report, and it would put the line
+	 * One row is two files — a document and the sidecar beside it — so
+	 * counting rows would under-report, and it would put the line
 	 * about the browser asking before it saves several under a selection that
 	 * triggers exactly that prompt.
 	 */
@@ -153,7 +157,7 @@ export default function ExportDialog({ caveats = {}, unavailable = {}, onExport,
 		<div
 			role="dialog"
 			aria-modal="true"
-			aria-label="Export this map"
+			aria-label={`Export this ${subject}`}
 			className="absolute inset-0 z-30 flex items-start justify-center bg-slate-900/30 p-6 backdrop-blur-[1px]"
 			onClick={(event) => {
 				if (event.target === event.currentTarget) onClose();
@@ -178,7 +182,7 @@ export default function ExportDialog({ caveats = {}, unavailable = {}, onExport,
 				</div>
 
 				<div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-					{GROUPS.map(({ group, title, blurb }) => (
+					{sections.map(({ group, title, blurb }) => (
 						<section key={group} className="mb-1 last:mb-0">
 							<h3 className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase dark:text-slate-400">
 								{title}
@@ -187,7 +191,7 @@ export default function ExportDialog({ caveats = {}, unavailable = {}, onExport,
 								<p className="px-3 pb-2 text-sm text-ink-muted dark:text-slate-400">{blurb}</p>
 							)}
 							<ul className="flex flex-col gap-1">
-								{DESTINATIONS.filter((entry) => entry.group === group).map((entry) => {
+								{destinations.filter((entry) => entry.group === group).map((entry) => {
 									const blocked = unavailable[entry.id];
 									return (
 										<li key={entry.id}>

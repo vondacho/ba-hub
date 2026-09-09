@@ -81,9 +81,14 @@ export function downloadBlob(filename: string, blob: Blob): void {
  * `bundle.ts` builds those names from the storage keys, which are the same
  * slug, so having a second way to spell them was a second thing to keep in
  * step.
+ *
+ * `fallback` is what an untitled document is called. It defaults to the map's
+ * because the map is the page that had a picture first, and the model page
+ * passes its own: a `.svg` of an unnamed domain model landing as `map.svg`
+ * would be filed, and later found, as the wrong document entirely.
  */
-export function svgFilenameFor(title: string): string {
-	return `${slug(title, 'map')}${SVG_EXTENSION}`;
+export function svgFilenameFor(title: string, fallback = 'map'): string {
+	return `${slug(title, fallback)}${SVG_EXTENSION}`;
 }
 
 export function slug(text: string, fallback: string): string {

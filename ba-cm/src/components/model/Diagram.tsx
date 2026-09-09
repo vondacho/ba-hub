@@ -70,7 +70,6 @@ interface Props {
 	/** The top bar's handle on this canvas. See `Graph`, which carries the note. */
 	controls: React.RefObject<CanvasControls | null>;
 	onScale: (scale: number) => void;
-	onExportSvg: (svg: string) => void;
 	/** What this canvas can make, and why each button is off. */
 	adds: readonly AddChoice[];
 	onAdd: (kind: string) => void;
@@ -116,7 +115,6 @@ export default function Diagram({
 	onPositions,
 	controls,
 	onScale,
-	onExportSvg,
 	adds,
 	onAdd,
 	onConnect,
@@ -292,12 +290,70 @@ export default function Diagram({
 		setTip(null);
 	}, [connecting, origin, boxes]);
 
+	/*
+	 * The canvas as a file, asked for from outside.
+	 *
+	 * `Graph`'s mechanism, moved here when the model page grew an export dialog
+	 * of its own, and its note carries the argument in full. In short:
+	 * `exporting` is one frame rather than a mode, every piece of interaction
+	 * chrome renders as absent in it, and the clone has to wait for the paint
+	 * after that render — so `serialize` raises the flag and hands back a
+	 * promise, and the layout effect below settles it once the clean frame is on
+	 * screen.
+	 *
+	 * This used to push instead: the canvas bar had its own picture button, the
+	 * canvas rendered a clean frame and handed the string up. That worked for
+	 * exactly one caller. A dialog that offers a `.svg` and a `.png` has to be
+	 * able to *ask* — and to ask once for both, or the same picture is cloned
+	 * twice and the two copies can disagree about which frame they came from.
+	 */
+	const pending = useRef<{ resolve: (svg: string | null) => void } | null>(null);
+
+	const serialize = useCallback((): Promise<string | null> => {
+		if (pending.current !== null) {
+			// Already waiting for the clean frame. Chain rather than race: two
+			// clones of one picture is work nobody asked for.
+			const waiting = pending.current;
+			return new Promise((resolve) => {
+				const previous = waiting.resolve;
+				waiting.resolve = (svg) => {
+					previous(svg);
+					resolve(svg);
+				};
+			});
+		}
+		return new Promise((resolve) => {
+			pending.current = { resolve };
+			setExporting(true);
+		});
+	}, []);
+
 	useLayoutEffect(() => {
 		if (!exporting) return;
-		const svg = surface.current;
-		if (svg) onExportSvg(toSvgFile(svg, extent, backgroundOf(svg), document.context));
+		const waiting = pending.current;
+		pending.current = null;
 		setExporting(false);
-	}, [exporting, extent, document.context, onExportSvg]);
+		if (waiting === null) return;
+		const svg = surface.current;
+		waiting.resolve(
+			svg === null ? null : toSvgFile(svg, extent, backgroundOf(svg), document.context),
+		);
+	}, [exporting, extent, document.context]);
+
+	/*
+	 * A canvas that goes away with a request outstanding answers it.
+	 *
+	 * Otherwise the dialog waits for a promise nothing will ever settle and the
+	 * button says "Exporting…" until the page is reloaded. Null is the honest
+	 * answer: there is no surface any more.
+	 */
+	useEffect(
+		() => () => {
+			pending.current?.resolve(null);
+			pending.current = null;
+		},
+		[],
+	);
 
 	// Fit when the shape of the model changes materially, not on every render —
 	// refitting while somebody is reading, because they typed an attribute, is
@@ -324,22 +380,7 @@ export default function Diagram({
 		});
 	};
 
-	/*
-	 * `serialize` answers "no picture" rather than being left off the handle.
-	 *
-	 * The model page has no export that wants one yet — the mapper's dialog is
-	 * the only caller, and it is on the other page. Making the method optional
-	 * on `CanvasControls` would be the other way to satisfy the type, and it is
-	 * worse: it would let a canvas that *should* produce a picture silently omit
-	 * it, and the caller would read the absence as "not showing" rather than as
-	 * "nobody implemented this". A required method with an explicit null is a
-	 * canvas saying so out loud.
-	 */
-	useImperativeHandle(
-		controls,
-		() => ({ zoomBy, serialize: async () => null }),
-		[size.width, size.height],
-	);
+	useImperativeHandle(controls, () => ({ zoomBy, serialize }), [size.width, size.height, serialize]);
 
 	// In the same display units the readout shows — the diagram's own natural
 	// size is ZOOM_UNIT, and nobody outside this file should have to know that.
@@ -426,7 +467,6 @@ export default function Diagram({
 				}
 				picked={group.length}
 				onReset={() => onPositions({})}
-				onExportSvg={() => setExporting(true)}
 				moved={Object.keys(positions).length}
 			/>
 
