@@ -1282,7 +1282,7 @@ export default function ModelEditor({ promptsUrl }: Props) {
 						<Icon name="open" />
 					</IconButton>
 					<IconButton
-						label="Export: the model, its arrangement, a picture, an outline"
+						label="Export: the model, its arrangement, a picture, a diagram, an outline"
 						onClick={() => setExporting(true)}
 					>
 						<Icon name="export" />

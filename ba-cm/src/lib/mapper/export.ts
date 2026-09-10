@@ -1,7 +1,7 @@
 /**
  * Where a map can go, and what it becomes on the way.
  *
- * One place that knows the five destinations, so nothing else has to. The
+ * One place that knows the destinations, so nothing else has to. The
  * dialog reads this list to draw its rows; the mapper hands it a request and
  * gets files back. Neither of them knows what a zip is, and neither of them
  * composes a filename.
@@ -57,12 +57,23 @@ import type { Destination, ExportFile, Section } from '../destinations';
 import type { DddDocument } from '../ddd/model';
 import { outline } from '../ddd/outline';
 import { svgToPng, sizeOf } from '../graph/raster';
+import { plantuml } from '../ddd/puml';
+import { mermaid } from '../ddd/mermaid';
 import { DOCTRINE_STEM, doctrineDocument, NOTATION_STEM, notationDocument } from './instructions';
 import { mapAlone, outgoing } from '../bundle';
 import { zip } from '../zip';
 import { slug, svgFilenameFor } from '../files';
 
-export type DestinationId = 'bundle' | 'map' | 'svg' | 'png' | 'outline' | 'notation' | 'doctrine';
+export type DestinationId =
+	| 'bundle'
+	| 'map'
+	| 'svg'
+	| 'png'
+	| 'puml'
+	| 'mermaid'
+	| 'outline'
+	| 'notation'
+	| 'doctrine';
 
 /**
  * Which half of the dialog a destination belongs in.
@@ -73,14 +84,21 @@ export type DestinationId = 'bundle' | 'map' | 'svg' | 'png' | 'outline' | 'nota
 export type Group = 'map' | 'reference';
 
 /**
- * The seven, in the order the dialog offers them.
+ * The nine, in the order the dialog offers them.
  *
  * The archive first, because it is the one that cannot lose anything, and the
  * map on its own second — the two of them are one question asked at two scopes,
  * so they sit together and the narrower one's sentence says what it leaves out.
  * Then the two pictures, vector before raster since the raster is a photograph
- * of it, then the outline because it is read rather than looked at, and the two
- * reference documents last.
+ * of it, then the two diagram sources, then the outline because it is read
+ * rather than looked at, and the two reference documents last.
+ *
+ * The diagram sources sit under the pictures rather than beside the outline,
+ * because the question they answer is the pictures' question — *how does this
+ * map get into that document?* — and the answer that separates them is whether
+ * the file arrives drawn or arrives as instructions for drawing it. They are
+ * the two rows on this list that do not need the canvas and are still a
+ * picture, which is the whole reason somebody reaches for one.
  *
  * One note on `writes` that the shared definition has no room for: the map on
  * its own says 2 and writes 1 in the single case where this browser has never
@@ -130,6 +148,26 @@ export const DESTINATIONS: readonly Destination<DestinationId, Group>[] = [
 		what: 'The same drawing, rastered at 2×. What you paste into a slide, a ticket or a chat.',
 		writes: 1,
 		needsCanvas: true,
+		group: 'map',
+	},
+	{
+		id: 'puml',
+		label: 'Diagram, as PlantUML',
+		extension: '.puml',
+		icon: 'diagram',
+		what: 'The map as a diagram a renderer somewhere else draws — a CI job, a wiki, an IDE. Text, so it diffs like the `.ddd` does; the layout is the renderer’s rather than the one you arranged.',
+		writes: 1,
+		needsCanvas: false,
+		group: 'map',
+	},
+	{
+		id: 'mermaid',
+		label: 'Diagram, as Mermaid',
+		extension: '.mmd',
+		icon: 'diagram',
+		what: 'The same diagram in the language GitHub, GitLab and most wikis already render on the page. Paste it into a pull request and the map appears in the review.',
+		writes: 1,
+		needsCanvas: false,
 		group: 'map',
 	},
 	{
@@ -193,7 +231,7 @@ export function destination(id: DestinationId): Destination<DestinationId, Group
 	return found;
 }
 
-/** Everything the five of them draw on. Assembled once, by the mapper. */
+/** Everything the nine of them draw on. Assembled once, by the mapper. */
 export interface ExportRequest {
 	readonly document: DddDocument;
 	/**
@@ -263,6 +301,28 @@ export async function produce(id: DestinationId, request: ExportRequest): Promis
 				{ filename: `${slug(map.title, 'map')}.png`, blob: await svgToPng({ svg: request.svg, ...size }) },
 			];
 		}
+
+		/*
+		 * Neither reads the canvas, which is the point of them: with the panes
+		 * set to source only both picture rows go quiet, and these two still
+		 * write a picture. They are rendered from the document, so what lands is
+		 * the map rather than a copy of the frame it was last drawn in.
+		 */
+		case 'puml':
+			return [
+				{
+					filename: `${slug(map.title, 'map')}.puml`,
+					blob: new Blob([plantuml(map)], { type: 'text/plain;charset=utf-8' }),
+				},
+			];
+
+		case 'mermaid':
+			return [
+				{
+					filename: `${slug(map.title, 'map')}.mmd`,
+					blob: new Blob([mermaid(map)], { type: 'text/plain;charset=utf-8' }),
+				},
+			];
 
 		case 'outline':
 			return [

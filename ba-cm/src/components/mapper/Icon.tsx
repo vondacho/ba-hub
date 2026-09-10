@@ -61,6 +61,7 @@ export type IconName =
 	| 'add-value'
 	| 'add-enum'
 	| 'vector'
+	| 'diagram'
 	| 'notes'
 	| 'notation'
 	| 'doctrine';
@@ -251,7 +252,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
 	),
 	remove: <path d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.6 8.2a1 1 0 0 0 1 .8h2.8a1 1 0 0 0 1-.8l.6-8.2" />,
 	/*
-	 * The four the export dialog adds, drawn as what the file *is* rather than
+	 * The five the export dialog adds, drawn as what the file *is* rather than
 	 * as what the format is called — "SVG" and "PNG" are the two strings a glyph
 	 * conveys worst.
 	 *
@@ -270,6 +271,22 @@ const PATHS: Record<IconName, React.ReactNode> = {
 			<path d="M3 13c0-5.5 3.5-9 9-9" />
 			<rect x="1.5" y="12" width="3" height="3" rx="0.5" />
 			<rect x="11.5" y="2.5" width="3" height="3" rx="0.5" />
+		</>
+	),
+	/*
+	 * Two boxes and the elbow between them: a diagram, as opposed to a picture
+	 * of one. It sits on both diagram-source rows, because a `.puml` and a
+	 * `.mmd` are the same drawing in two languages and the only glyph that
+	 * could tell them apart would be a wordmark.
+	 *
+	 * Rectangles and a right angle, where `connect` is two circles and a
+	 * diagonal. The pair has to be told apart at fourteen pixels.
+	 */
+	diagram: (
+		<>
+			<rect x="1.5" y="2.5" width="6" height="4" rx="1" />
+			<rect x="8.5" y="9.5" width="6" height="4" rx="1" />
+			<path d="M4.5 6.5v3a1 1 0 0 0 1 1h3" />
 		</>
 	),
 	notes: <path d="M2.5 4h1.5M2.5 8h1.5M2.5 12h1.5M6.5 4h7M6.5 8h7M6.5 12h4.5" />,

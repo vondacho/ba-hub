@@ -32,11 +32,21 @@ import type { Destination, ExportFile, Section } from '../destinations';
 import type { DomainModel } from '../ddm/model';
 import { outline } from '../ddm/outline';
 import { svgToPng, sizeOf } from '../graph/raster';
+import { plantuml } from '../ddm/puml';
+import { mermaid } from '../ddm/mermaid';
 import { DOCTRINE_STEM, doctrineDocument, NOTATION_STEM, notationDocument } from '../mapper/instructions';
 import { modelAlone } from '../bundle';
 import { slug, svgFilenameFor } from '../files';
 
-export type DestinationId = 'model' | 'svg' | 'png' | 'outline' | 'notation' | 'doctrine';
+export type DestinationId =
+	| 'model'
+	| 'svg'
+	| 'png'
+	| 'puml'
+	| 'mermaid'
+	| 'outline'
+	| 'notation'
+	| 'doctrine';
 
 /**
  * Which half of the dialog a destination belongs in.
@@ -48,12 +58,20 @@ export type DestinationId = 'model' | 'svg' | 'png' | 'outline' | 'notation' | '
 export type Group = 'model' | 'reference';
 
 /**
- * The six, in the order the dialog offers them.
+ * The eight, in the order the dialog offers them.
  *
  * The text pair first, because it is the only one that can be opened back into
  * a model. Then the two pictures, vector before raster since the raster is a
- * photograph of it; then the outline, which is read rather than looked at; then
- * the two reference documents.
+ * photograph of it; then the two diagram sources, which are a picture that
+ * arrives as instructions for drawing one; then the outline, which is read
+ * rather than looked at; then the two reference documents.
+ *
+ * The two diagram rows carry more here than they do on the map page, and it is
+ * worth saying why the model page wanted them first. A class diagram is where
+ * an invariant goes to be left out — `ddm/outline.ts` makes that argument — so
+ * both of these put what each aggregate protects on the picture, as a note. A
+ * `.ddm` rendered without them would be the drawing of the database this format
+ * exists to refuse.
  */
 export const DESTINATIONS: readonly Destination<DestinationId, Group>[] = [
 	{
@@ -84,6 +102,26 @@ export const DESTINATIONS: readonly Destination<DestinationId, Group>[] = [
 		what: 'The same drawing, rastered at 2×. What you paste into a slide, a ticket or a chat.',
 		writes: 1,
 		needsCanvas: true,
+		group: 'model',
+	},
+	{
+		id: 'puml',
+		label: 'Diagram, as PlantUML',
+		extension: '.puml',
+		icon: 'diagram',
+		what: 'Every aggregate as a class diagram a renderer somewhere else draws, with what each one protects as a note beside its root. Text, so it diffs like the `.ddm` does; the layout is the renderer’s.',
+		writes: 1,
+		needsCanvas: false,
+		group: 'model',
+	},
+	{
+		id: 'mermaid',
+		label: 'Diagram, as Mermaid',
+		extension: '.mmd',
+		icon: 'diagram',
+		what: 'The same class diagram in the language GitHub, GitLab and most wikis already render on the page. Paste it into a pull request and the model appears in the review.',
+		writes: 1,
+		needsCanvas: false,
 		group: 'model',
 	},
 	{
@@ -132,7 +170,7 @@ export const SECTIONS: readonly Section<Group>[] = [
 /** Ticked when nothing else has been said: the one that is not a rendering. */
 export const INITIAL: readonly DestinationId[] = ['model'];
 
-/** Everything the six of them draw on. Assembled once, by the model page. */
+/** Everything the eight of them draw on. Assembled once, by the model page. */
 export interface ExportRequest {
 	readonly document: DomainModel;
 	/**
@@ -199,6 +237,28 @@ export async function produce(
 				},
 			];
 		}
+
+		/*
+		 * Neither reads the canvas, which is the point of them: with the panes
+		 * set to source only both picture rows go quiet, and these two still
+		 * write a picture — rendered from the document rather than copied from
+		 * the frame it was last drawn in.
+		 */
+		case 'puml':
+			return [
+				{
+					filename: `${slug(model.context, 'model')}.puml`,
+					blob: new Blob([plantuml(model)], { type: 'text/plain;charset=utf-8' }),
+				},
+			];
+
+		case 'mermaid':
+			return [
+				{
+					filename: `${slug(model.context, 'model')}.mmd`,
+					blob: new Blob([mermaid(model)], { type: 'text/plain;charset=utf-8' }),
+				},
+			];
 
 		case 'outline':
 			return [

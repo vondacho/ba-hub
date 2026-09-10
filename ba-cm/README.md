@@ -352,15 +352,15 @@ which is exactly why it belongs to the person looking rather than to the file.
 
 Every file either page can write is behind one Export button, as a list of rows
 with a sentence each — the archive, the document and its sidecar, the picture as
-vector and as image, the outline, and the two reference documents about the
-practice. Tick what you want and press once. A row in a list can say what a file
+vector and as image, the diagram as PlantUML and as Mermaid, the outline, and the
+two reference documents about the practice. Tick what you want and press once. A row in a list can say what a file
 is for and when to reach for it; a 28px square on a canvas bar cannot, and "SVG"
 is not the question anybody has. The question is which of these goes in the pull
 request.
 
 The **domain model page has the same panel**, with its own rows: the `.ddm` and
-its `.ddmview`, the two pictures, an outline of every aggregate and what it
-protects, and the same two reference documents. One component, two catalogues —
+its `.ddmview`, the two pictures, the two diagram sources, an outline of every
+aggregate and what it protects, and the same two reference documents. One component, two catalogues —
 `mapper/export.ts` and `model/export.ts` — because the two pages ask the same
 question about two different documents.
 
@@ -380,6 +380,40 @@ browser ask whether the page should be allowed to download things, and a second
 click in the same task is one some browsers simply drop. The first failure stops
 the run and is named on the panel — a downloads folder holding some of what was
 asked for, with no sign of which part is missing, is worse than an error.
+
+#### A diagram somebody else draws
+
+Beside the two pictures are two rows that write a **diagram as text**: a `.puml`
+and a `.mmd`. The picture is a copy of the canvas and lands finished; these land
+as a description that a renderer somewhere else turns into a drawing. Which is
+what makes them worth having. A diagram source committed beside the code renders
+in a CI job, in a wiki and in an IDE, and when the map changes its diff is the
+three lines that changed rather than a new binary. Mermaid goes one further:
+GitHub, GitLab and most wikis render a fenced `mermaid` block on the page, so
+pasting one into a pull request puts the map inside the review.
+
+Two things follow from being a description rather than a copy. **The arrangement
+does not travel** — a `.ddd` holds no coordinates on purpose and the `.dddview`
+is this browser's, so the layout is the renderer's and will not match the canvas.
+Somebody who has spent an afternoon arranging a map wants the `.svg`. And
+**neither row needs the canvas**: with the panes set to source only, both picture
+rows go quiet and these two still write a picture, because they are rendered from
+the document.
+
+They are an **export and never an input**, which is the rule `ddm/model.ts` has
+stated since before there was one. A round trip through a rendering language
+would lose `intent`, `because`, `owner`, `language`, the invariants and the
+difference between a classification and a colour — everything the two formats
+exist to record. The arrows carry the pattern and nothing else: `exchange` and
+`because` are a sentence or two each, and an arrow label two sentences long is a
+paragraph with a line through it. The outline is where prose goes.
+
+The model page's pair carry one thing the map's do not. **The invariants are on
+the picture**, as a note beside each aggregate's root. A class diagram is exactly
+where the sentence saying why a boundary is where it is goes to be left out, so
+both renderings print it in full — and `contains`, `embeds` and `references` keep
+the canvas's three marks, which are UML's composition, aggregation and
+dependency.
 
 #### The picture is a copy of the canvas
 
