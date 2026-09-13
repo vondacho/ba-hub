@@ -22,8 +22,10 @@ spec:
     #   /dsl      the format reference, prerendered rather than server-rendered,
     #             which makes it the one URL here that proves the *build* output
     #             shipped and not just that the server is up
+    #   /notation the notation and doctrine Markdown an agent fetches, built from
+    #   /doctrine the assistant's own prompt — a broken import there breaks both
     #
-    # There is no fifth URL. /api/agent is a POST that needs the visitor's own
+    # There is no URL beyond these. /api/agent is a POST that needs the visitor's own
     # Anthropic key and would spend their money; a test that called it would be
     # testing Anthropic. That route's failure mode is visible in the panel, and
     # a 200 on / already proves the panel is served.
@@ -45,3 +47,5 @@ spec:
         - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/
         - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/model
         - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/dsl
+        - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/notation
+        - http://{{ include "ba-cm.fullname" . }}:{{ .Values.service.port }}/doctrine

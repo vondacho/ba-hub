@@ -27,6 +27,7 @@ spec:
           {{- range .paths }}
           # Routed at "/", not per-page: one Node server owns the context map,
           # the /model page behind each context, the /dsl format reference,
+          # the /notation and /doctrine Markdown,
           # /api/agent, /healthz and the hashed assets under /_astro/* —
           # including each island's own chunk, which its page loads after it
           # renders.

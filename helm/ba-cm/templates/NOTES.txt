@@ -21,6 +21,8 @@ Browse the mapper:
   {{ $scheme }}://{{ $host.host }}/                      the context map
   {{ $scheme }}://{{ $host.host }}/model                 the domain model behind one context
   {{ $scheme }}://{{ $host.host }}/dsl                   the .ddd and .ddm formats
+  {{ $scheme }}://{{ $host.host }}/notation              the notation, as Markdown for an agent
+  {{ $scheme }}://{{ $host.host }}/doctrine              the doctrine, as Markdown for an agent
 {{- end }}
 {{- else }}
   kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "ba-cm.fullname" . }} 4322:{{ .Values.service.port }}

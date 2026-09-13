@@ -826,6 +826,8 @@ doc-es has one — direct manipulation has no server round trip that expresses i
 |---|---|---|
 | `/` | server, island inside | the mapper |
 | `/dsl` | prerendered | the format, readable with no scripting |
+| `/notation` | server | `ba-cm-notation.md` as `text/markdown`, for an agent to fetch — the export dialog's document, from the same function |
+| `/doctrine` | server | `ba-cm-doctrine.md` as `text/markdown`, likewise; server-rendered so the content type is set rather than guessed |
 | `/healthz` | server | chart probes |
 | `/404` | prerendered | asks the server for nothing |
 

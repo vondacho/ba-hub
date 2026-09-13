@@ -138,9 +138,10 @@ every rendered page is broken, `/landscapes` is what proves `envFrom` is wired,
 `--fail` accepts the 302 without following it, so this asserts nothing about
 whether the mapper is installed.
 
-The mapper's four are `/healthz`, `/`, `/model` and `/dsl` — not a thinner test,
+The mapper's six are `/healthz`, `/`, `/model`, `/dsl`, `/notation` and
+`/doctrine` — not a thinner test,
 a component with less to check. It owns no database and makes no call, so `/`
-covers its whole configuration surface. `/dsl` is the one URL of the four that
+covers its whole configuration surface. `/dsl` is the one URL of the six that
 is prerendered rather than server-rendered, which makes it what proves the build
 output shipped and not just that the server is up.
 
