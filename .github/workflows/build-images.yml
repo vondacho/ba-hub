@@ -5,6 +5,13 @@
 # ba-portal (Astro/node)
 # ba-cm (Astro/node)
 #
+# plus one that is not a directory: ba-cm-render, the `render` target of
+# ba-cm's Dockerfile. It is the same app with headless Chromium added, for
+# rendering a .ddd or .ddm to SVG, PNG, PlantUML, Mermaid or Markdown from the
+# command line (ba-cm/src/cli/render.ts). It is its own image so that the server
+# that runs the site does not carry the browser, and it is smoke-tested here
+# before it is published.
+#
 # There is no separate "npm ci && npm run build" job on purpose. Each
 # Dockerfile is already multi-stage and runs the real build in its `build`
 # stage, so a compile error fails this workflow just the same — without a
@@ -13,6 +20,7 @@
 # Images land at:
 #   ghcr.io/vondacho/ba-hub/ba-portal
 #   ghcr.io/vondacho/ba-hub/ba-cm
+#   ghcr.io/vondacho/ba-hub/ba-cm-render
 #
 # They are nested under the repository path so GHCR links each package back to
 # this repo automatically (via the org.opencontainers.image.source label set
@@ -91,6 +99,9 @@ jobs:
             ba-cm:
               - *workflow
               - 'ba-cm/**'
+            ba-cm-render:
+              - *workflow
+              - 'ba-cm/**'
 
       - id: select
         env:
@@ -101,7 +112,7 @@ jobs:
           # that all three images carry it, whether or not each one changed.
           # Same for an explicit "build everything" dispatch.
           if [ "${{ github.ref_type }}" = 'tag' ] || [ "${{ inputs.all }}" = 'true' ]; then
-            components='["ba-portal","ba-cm"]'
+            components='["ba-portal","ba-cm","ba-cm-render"]'
           else
             # paths-filter emits every matched filter name, including the
             # "workflow" helper the anchors are attached to — drop it, it is
@@ -158,12 +169,21 @@ jobs:
           labels: |
             org.opencontainers.image.title=${{ matrix.component }}
 
+      # Every component is its own directory and the `runtime` stage of its
+      # Dockerfile, except ba-cm-render, which is ba-cm's `render` stage. Named
+      # explicitly rather than left to the Dockerfile's default, so a stage
+      # added or reordered there cannot change what gets published here.
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
-          context: ./${{ matrix.component }}
+          context: ./${{ matrix.component == 'ba-cm-render' && 'ba-cm' || matrix.component }}
+          target: ${{ matrix.component == 'ba-cm-render' && 'render' || 'runtime' }}
           platforms: ${{ env.PLATFORMS }}
           push: ${{ github.event_name != 'pull_request' }}
+          # Also into the runner's local docker, so the smoke test below runs
+          # the very image that was just published and not a rebuild of it.
+          load: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           # Per-component cache scopes. Sharing one scope would let the three
@@ -174,6 +194,39 @@ jobs:
           # story attached, and without one it shows up in the GHCR package list
           # as a phantom "unknown/unknown" platform next to every tag.
           provenance: false
+
+      # Every format, from both notations, through the image just built. It fails
+      # on a renderer that no longer starts, a Chromium that cannot launch as
+      # an unprivileged user, a lost font package, or a picture whose Tailwind
+      # classes were never computed. That last one is the `oklch(` check: an
+      # uncomputed fill comes out as the browser default, rgb(0, 0, 0).
+      - name: Smoke-test render
+        if: matrix.component == 'ba-cm-render'
+        env:
+          IMAGE: ${{ steps.build.outputs.imageid }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/render"
+          mkdir -p "$out"
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD/ba-cm/samples:/work:ro" -v "$out:/out" -w /work "$IMAGE" sh -euc '
+              for input in insurance.ddd risk-appetite.ddm; do
+                for format in svg png puml mmd md; do
+                  render "$input" -o "/out/${input%.*}.$format"
+                done
+              done'
+          for file in "$out"/*; do test -s "$file"; done
+          ls -l "$out"
+          for png in "$out"/*.png; do
+            head -c 8 "$png" | od -An -tx1 | tr -d ' \n' | grep -qx 89504e470d0a1a0a
+          done
+          grep -q 'fill="oklch(' "$out/insurance.svg"
+          grep -q 'fill="oklch(' "$out/risk-appetite.svg"
+          # A broken source has to fail, not render an empty picture.
+          if printf 'map "x" {\n  bogus\n' | docker run --rm -i "$IMAGE" render --kind ddd --format svg > /dev/null; then
+            echo 'render accepted a source that does not parse' >&2
+            exit 1
+          fi
 
       - name: Summarise
         if: github.event_name != 'pull_request'

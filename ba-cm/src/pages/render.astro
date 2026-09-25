@@ -1,0 +1,21 @@
+---
+import Layout from '../layouts/Layout.astro';
+import RenderSurface from '../components/render/RenderSurface.tsx';
+
+// The page `render` drives from a headless browser — see
+// src/components/render/RenderSurface.tsx and src/cli/render.ts.
+//
+// Only the render image serves it. It holds no data and does nothing without a
+// script calling into it, but a page the public site has no use for is still a
+// page the public site should not have, so everywhere else it is a 404.
+//
+// A bare one rather than `Astro.rewrite('/404')`: the 404 page is prerendered,
+// and a server route cannot rewrite into a page that only exists as a file.
+if (process.env.BA_CM_RENDER !== '1') {
+	return new Response('Not found', { status: 404 });
+}
+---
+
+<Layout title="Render — Context mapper" description="The canvases, for the command-line renderer.">
+	<RenderSurface client:only="react" />
+</Layout>

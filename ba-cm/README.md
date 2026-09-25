@@ -855,6 +855,57 @@ artefact, and **the file is the map**. The difference here is that the file is
 meant to end up in a repository rather than in a downloads folder, which is why
 the export filename is the slug and why the format is diff-shaped.
 
+## Rendering from the command line
+
+A `.ddd` map or a `.ddm` model can be rendered without opening the editor, into
+the same files the Export dialog writes: `.svg`, `.png`, `.puml`, `.mmd`
+(Mermaid) or `.md` (the outline).
+
+```
+docker run --rm -i ghcr.io/vondacho/ba-hub/ba-cm-render \
+  render --kind ddd --format png < insurance.ddd > insurance.png
+
+docker run --rm -v "$PWD:/work" -w /work --user "$(id -u):$(id -g)" \
+  ghcr.io/vondacho/ba-hub/ba-cm-render render risk-appetite.ddm -o risk-appetite.mmd
+```
+
+`render [<input.ddd|input.ddm>|-] [-o <output>|-] [--format svg|png|puml|mmd|md] [--kind ddd|ddm] [--view <file>|--no-view] [--scale N]`
+
+- **What to read and write.** The kind comes from the input's extension, and
+  `--kind` is only needed on stdin. The format comes from the output's
+  extension, and `--format` (`mermaid` works too) is only needed on stdout.
+- **The layout.** A `.dddview` / `.ddmview` next to the input with the same stem
+  is used for the layout, as if both had been imported together. `--view` names
+  another file, and `--no-view` uses ELK's layout.
+- **Theme.** Pictures are always in daylight, drawn with the panel pinned
+  light, exactly as the theme button pins it.
+- **Errors.** Parse problems, warnings included, go to stderr as
+  `line:column severity: message`. A source that does not parse, or a view file
+  that is not one, exits with 1. Bad usage exits with 2.
+
+**Why pictures need a browser.** The picture of a map is the canvas itself,
+cloned with the styles the browser computed for it (`src/lib/graph/svg-file.ts`).
+There is no second renderer to call instead, and there should not be one. So for
+`.svg` and `.png`, `src/cli/render.ts` starts this app's own server on loopback
+and opens `/render` in headless Chromium. That page
+(`src/components/render/RenderSurface.tsx`) mounts the real `Graph` or
+`Diagram`, fed by the same `layout`, and returns the picture through the same
+`serialize` and `svgToPng` the dialog uses. `/render` is a 404 unless
+`BA_CM_RENDER=1` is set, and only the render image sets it. The text formats
+are plain functions of the document and run in Node without a browser.
+
+**Why a separate image.** Chromium is a few hundred megabytes, and the server
+that runs the site has no use for it. So the browser lives in the `render`
+stage of the Dockerfile, published as `ba-cm-render`, while `ba-cm` stays as it
+was. CI renders both samples into every format through the image it has just
+built. It checks that each file is non-empty, that the PNGs are PNGs, and that
+the SVG fills are computed colours rather than the browser default.
+
+Locally, after `npm run build`, run
+`node dist/cli/render.mjs samples/insurance.ddd -o /tmp/map.png`. The pictures
+use Google Chrome through Playwright's `chrome` channel, or whatever
+`CHROMIUM_PATH` points at.
+
 ## Configuration
 
 | Variable | Default | Used by |
@@ -863,6 +914,8 @@ the export filename is the slug and why the format is diff-shaped.
 | `EVENT_STORMER_URL` | `http://doc-es.localhost` | the footer — where the contexts were found |
 | `ARCH_PORTAL_URL` | `http://arch-portal.localhost` | the footer — where they get realised |
 | `HOST` / `PORT` | `0.0.0.0` / `4321` | the standalone `@astrojs/node` server |
+| `BA_CM_RENDER` | unset | `/render`, which is a 404 unless this is `1`. Set by the render image only |
+| `CHROMIUM_PATH` | unset (Chrome channel) | the command-line renderer's browser. `/usr/bin/chromium` in the render image |
 
 Read at call time through `src/lib/links.ts`, matching every other component in
 the family. All three are browser-facing and resolved by the visitor.
@@ -875,6 +928,8 @@ the family. All three are browser-facing and resolved by the visitor.
 | `@astrojs/react`, `react` | one island | the mapper. The day a second island appears, ask whether this is still a documentation site |
 | `elkjs` | layout | layered algorithm; coordinates computed per render, never stored |
 | `tailwindcss` | styling | v4, as a Vite plugin |
+| `playwright-core` | the command-line renderer | drives the system Chromium and downloads no browser of its own. Loaded only when a picture is asked for |
+| `esbuild` (dev) | bundling the renderer | already under Vite; named because `build:cli` calls it directly |
 
 Deliberately **not** React Flow, dagre-d3 or cytoscape. Each owns node positions
 as its own state, which is the second source of truth this design refuses.
@@ -906,13 +961,12 @@ What has actually been checked, and how.
 | **Types and build** | `astro check` reports 0 errors across 24 files; `npm run build` prerenders `/404` and `/dsl` and emits the island. |
 | **Routes** | `/`, `/dsl`, `/healthz` all 200. The island is wired into the page as `client:only`. |
 
-**The SVG export is not checked at all.** It is the one piece of this component
-that cannot be exercised without a DOM — it clones a live element and reads
-`getComputedStyle` — and there is no DOM in the harnesses. Read the code, then
-open a file it wrote before trusting it. The known risk is the arrowhead
-markers: they live in `<defs>`, which is not rendered, and a browser that
-declines to resolve a custom property for a non-rendered element would give
-them a default fill.
+**The SVG export is checked through the command-line renderer.** That runs the
+same clone, in headless Chrome, on `samples/insurance.ddd` (with its
+`.dddview`) and `samples/risk-appetite.ddm`. The fills come out as computed
+`oklch(…)` colours, not the browser default. The arrowhead markers in `<defs>`,
+which were the known risk, are drawn filled in the resulting PNG. The export as
+the dialog triggers it, from a live editor, has still not been exercised.
 
 **Not checked: anything that needs a browser.** The Chrome extension was not
 connected, so no part of the interaction — typing, the debounce, the staleness

@@ -53,3 +53,34 @@ ENV HOST=0.0.0.0 PORT=4322
 EXPOSE 4322
 
 CMD ["node", "./dist/server/entry.mjs"]
+
+# ---------- render ----------
+# The same app plus a browser, for rendering a .ddd or .ddm from the command
+# line — see src/cli/render.ts. Published separately, as ba-cm-render, so the
+# server that runs the site does not carry a few hundred megabytes of Chromium it
+# never uses.
+#
+#   docker run --rm -i ghcr.io/vondacho/ba-hub/ba-cm-render \
+#     render --kind ddd --format png < insurance.ddd > insurance.png
+#
+# A browser, because the picture of a map is the canvas itself, copied with the
+# styles the browser computed for it (src/lib/graph/svg-file.ts). There is no
+# second renderer to call instead, on purpose. The text formats — PlantUML,
+# Mermaid, the outline — need none of this, but they come with the same command.
+#
+# `render` is on PATH, so the node image's entrypoint runs it in place of the
+# CMD. Chromium needs a font package or every label comes out empty, and a
+# writable HOME for its profile. The app user has no home directory at all.
+FROM runtime AS render
+USER root
+RUN apk add --no-cache chromium font-dejavu \
+ && printf '#!/bin/sh\nexec node /app/dist/cli/render.mjs "$@"\n' > /usr/local/bin/render \
+ && chmod 755 /usr/local/bin/render
+USER app
+ENV BA_CM_RENDER=1 CHROMIUM_PATH=/usr/bin/chromium HOME=/tmp
+
+# ---------- default ----------
+# The server, again, so that a plain `docker build` still produces it: the last
+# stage is the default target, and `render` has to come after the stage it
+# extends. CI names its target explicitly either way.
+FROM runtime
