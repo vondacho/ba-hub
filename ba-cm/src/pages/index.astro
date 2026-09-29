@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import DddMapper from '../components/mapper/DddMapper.tsx';
+import Icon from '../components/mapper/Icon.tsx';
 import { archPortalUrl, baPortalUrl, eventStormerUrl, promptsUrl } from '../lib/links';
 
 // Server-rendered: the footer resolves the neighbouring components' addresses
@@ -13,6 +14,11 @@ const portal = baPortalUrl();
 const prompts = promptsUrl();
 const stormer = eventStormerUrl();
 const arch = archPortalUrl();
+
+// The repository ba-cm is built from, linked from the header as doc-sm does.
+// A constant rather than an entry in `links.ts`: that module is for addresses
+// that differ per environment, and this one is the same from any cluster.
+const codebase = 'https://github.com/vondacho/ba-hub';
 ---
 
 <Layout
@@ -31,7 +37,27 @@ const arch = archPortalUrl();
 			<p class="text-xs font-semibold tracking-[0.16em] text-ink-muted uppercase dark:text-slate-400">
 				ba-hub · ddd mapper · context map
 			</p>
-			<h1 class="mt-2 text-3xl font-bold sm:text-4xl">Who depends on whom, and on whose terms</h1>
+			<div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+				<h1 class="mt-2 text-3xl font-bold sm:text-4xl">Who depends on whom, and on whose terms</h1>
+				{/*
+					One link on the title line, hard against the right margin: where this
+					tool was written. In the header rather than the toolbar because it is a
+					fact about the tool, not a control on the document, and a toolbar button
+					that navigated away would be the one press nobody expects. Words as well
+					as the mark, because the octocat alone does not say which repository.
+					`items-baseline` sits it on the title's baseline; `flex-wrap` drops it
+					under the title on a narrow window. doc-sm's header does the same.
+				*/}
+				<a
+					href={codebase}
+					target="_blank"
+					rel="noreferrer noopener"
+					class="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-brand hover:underline dark:text-purple-400"
+				>
+					View on GitHub
+					<Icon name="github" className="h-5 w-5" />
+				</a>
+			</div>
 			<p class="mt-3 text-ink-muted dark:text-slate-400">
 				The estate seen whole: the domains the business is in, the subdomains they divide into,
 				and the bounded contexts that serve them — with every relationship between contexts

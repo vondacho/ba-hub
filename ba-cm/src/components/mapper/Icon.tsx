@@ -64,7 +64,8 @@ export type IconName =
 	| 'diagram'
 	| 'notes'
 	| 'notation'
-	| 'doctrine';
+	| 'doctrine'
+	| 'github';
 
 const PATHS: Record<IconName, React.ReactNode> = {
 	// A blank sheet with a plus: a document that does not exist yet.
@@ -371,6 +372,24 @@ const PATHS: Record<IconName, React.ReactNode> = {
 			<path d="M8 4.5C7 3.5 5.3 3.2 2.5 3.2v9c2.8 0 4.5.3 5.5 1.3 1-1 2.7-1.3 5.5-1.3v-9c-2.8 0-4.5.3-5.5 1.3Z" />
 			<path d="M8 4.5v9.5" />
 		</>
+	),
+	/*
+	 * GitHub's mark, the one glyph here that is somebody else's, and so the one
+	 * not redrawn: it is doc-sm's path, on the 24 grid, left exactly as GitHub
+	 * draws it. Filled rather than stroked because a logo is a silhouette.
+	 *
+	 * The transform does two things at once: 16/24 brings it onto this grid, and
+	 * the extra inset puts it in the same field as the stroked glyphs, which stop
+	 * short of the edge, instead of letting it run edge to edge and look a size
+	 * larger than its neighbours. doc-sm's Icon.tsx insets it the same way.
+	 */
+	github: (
+		<path
+			transform="translate(1.3333 1.3333) scale(0.5556)"
+			fill="currentColor"
+			stroke="none"
+			d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2 0 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2 0-.3-.5-1.5.2-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 5 18.3 5.3 18.3 5.3c.7 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1.1.9 2.3v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"
+		/>
 	),
 	// Half-filled: following whatever the page is doing.
 	'theme-auto': (
